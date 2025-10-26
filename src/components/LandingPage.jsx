@@ -9,15 +9,15 @@ function LandingPage({ onStart }) {
             <div className="features">
                 <div className="feature">
                     <h3>📚 30 Essential Anchors</h3>
-                    <p>Carefully curated topics that build comprehensive historical understanding</p>
+                    <p>Curated topics that build comprehensive historical understanding</p>
                 </div>
                 <div className="feature">
                     <h3>🎯 Guided Learning Path</h3>
-                    <p>Follow a proven sequence designed for retention and coherence</p>
+                    <p>Follow a sequence designed for retention and coherence</p>
                 </div>
                 <div className="feature">
                     <h3>✨ Engaging Narratives</h3>
-                    <p>Dan Carlin-style storytelling that makes history memorable</p>
+                    <p>Engaging storytelling that makes history memorable</p>
                 </div>
             </div>
 

@@ -76,3 +76,137 @@
 .anchor-list h2 {
   font-size: 2.5rem;
   color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.anchor-list>p {
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.anchors {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.anchor-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.anchor-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.anchor-status {
+  font-size: 1.5rem;
+  color: #3498db;
+  min-width: 30px;
+}
+
+.anchor-card h3 {
+  flex: 1;
+  font-size: 1.1rem;
+  color: #2c3e50;
+  text-align: left;
+}
+
+.start-anchor-button {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 0.5rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.3s;
+}
+
+.start-anchor-button:hover {
+  background: #2980b9;
+}
+
+/* Narrative Reading Styles */
+.narrative-reading {
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+  padding: 3rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.narrative-header h1 {
+  font-size: 2rem;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.prerequisites {
+  color: #666;
+  font-style: italic;
+  margin-bottom: 2rem;
+}
+
+.narrative-text {
+  line-height: 1.8;
+  font-size: 1.1rem;
+  margin-bottom: 3rem;
+}
+
+.narrative-text p {
+  margin-bottom: 1.5rem;
+}
+
+.key-concepts {
+  background: #f8f9fa;
+  padding: 2rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.key-concepts h2 {
+  font-size: 1.5rem;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.concepts-note {
+  color: #666;
+  font-size: 0.9rem;
+  font-style: italic;
+  margin-bottom: 1rem;
+}
+
+.key-concepts ol {
+  padding-left: 1.5rem;
+}
+
+.key-concepts li {
+  margin-bottom: 0.75rem;
+  color: #555;
+}
+
+.quiz-button {
+  background: #27ae60;
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.3s;
+}
+
+.quiz-button:hover {
+  background: #229954;
+}
