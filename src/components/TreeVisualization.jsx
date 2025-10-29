@@ -2,146 +2,156 @@ import { useState, useEffect, useRef } from 'react';
 import { treeStructure, getChildren, getAnchorById } from '../data/treeStructure';
 
 function TreeVisualization() {
-    const [focusedAnchorId, setFocusedAnchorId] = useState(null);
-    const [isAnimating, setIsAnimating] = useState(false);
+    const [expandedNodeId, setExpandedNodeId] = useState(null); // Which node is currently expanded
+    const [animationPhase, setAnimationPhase] = useState('idle'); // Track animation state
+    const [fadingOutNodes, setFadingOutNodes] = useState([]); // Nodes currently fading out
     const containerRef = useRef(null);
-    const [focusedNodeY, setFocusedNodeY] = useState(null);
-
-    // Scroll to center focused node when it changes
-    useEffect(() => {
-        if (focusedNodeY !== null && containerRef.current) {
-            const container = containerRef.current;
-            const containerHeight = container.clientHeight;
-            const scrollTop = focusedNodeY - containerHeight / 2 + 40;
-
-            container.scrollTo({
-                top: scrollTop,
-                behavior: 'smooth'
-            });
-        }
-    }, [focusedNodeY]);
 
     const handleExplore = (anchorId) => {
-        if (isAnimating) return;
+        if (animationPhase !== 'idle') return;
 
-        setIsAnimating(true);
-        setFocusedAnchorId(anchorId);
+        // Determine which siblings need to fade out
+        if (anchorId !== '0-ROOT') {
+            const rootChildren = getChildren('0-ROOT');
+            const siblings = rootChildren.filter(child => child.id !== anchorId).map(child => child.id);
+            setFadingOutNodes(siblings);
+        }
 
-        // Wait for animation to complete before showing children
+        // Step 1: Fade out siblings (0-200ms)
+        setAnimationPhase('fadingOutSiblings');
+
         setTimeout(() => {
-            setIsAnimating(false);
-            // Calculate scroll position
-            setTimeout(() => {
-                const nodes = getDisplayNodes();
-                const focusedNode = nodes.find(n => n.isFocused);
-                if (focusedNode) {
-                    const pos = positionNode(focusedNode);
-                    setFocusedNodeY(pos.y);
-                }
-            }, 50);
-        }, 550); // Slightly longer than animation
+            // Step 2: Move selected to center + remove faded siblings (200-600ms)
+            setAnimationPhase('moving');
+            setExpandedNodeId(anchorId);
+            setFadingOutNodes([]); // Remove faded nodes from DOM
+        }, 200);
+
+        setTimeout(() => {
+            // Step 3: Change color (600-750ms)
+            setAnimationPhase('colorChange');
+        }, 600);
+
+        setTimeout(() => {
+            // Step 4: Fade in children (750-1000ms)
+            setAnimationPhase('fadingInChildren');
+        }, 750);
+
+        setTimeout(() => {
+            // Done
+            setAnimationPhase('idle');
+        }, 1000);
     };
 
     const handleCollapse = (anchorId) => {
-        if (isAnimating) return;
+        if (animationPhase !== 'idle') return;
 
-        setIsAnimating(true);
+        // Step 1: Fade out children (0-125ms) - reduced from 250ms
+        setAnimationPhase('fadingOutChildren');
 
-        if (anchorId === '0-ROOT') {
-            setFocusedAnchorId(null);
-            setFocusedNodeY(null);
-            setTimeout(() => setIsAnimating(false), 550);
-        } else {
-            const current = getAnchorById(anchorId);
-            if (current.parentId) {
-                setFocusedAnchorId(current.parentId);
-                setTimeout(() => {
-                    setIsAnimating(false);
-                    setTimeout(() => {
-                        const nodes = getDisplayNodes();
-                        const focusedNode = nodes.find(n => n.isFocused);
-                        if (focusedNode) {
-                            const pos = positionNode(focusedNode);
-                            setFocusedNodeY(pos.y);
-                        }
-                    }, 50);
-                }, 550);
+        setTimeout(() => {
+            // Step 2: Change color back (125-200ms) - reduced from 250-400ms
+            setAnimationPhase('colorChangeReverse');
+        }, 125);
+
+        setTimeout(() => {
+            // Step 3: Move back (200-600ms) - starts earlier, same duration
+            setAnimationPhase('movingReverse');
+        }, 200);
+
+        setTimeout(() => {
+            // Step 4: Show and fade in siblings (600-800ms)
+            setAnimationPhase('fadingInSiblings');
+            // Now update expandedNodeId to show siblings
+            if (anchorId === '0-ROOT') {
+                setExpandedNodeId(null);
+            } else {
+                setExpandedNodeId('0-ROOT');
             }
-        }
+        }, 600);
+
+        setTimeout(() => {
+            // Done - total 800ms now instead of 1000ms
+            setAnimationPhase('idle');
+        }, 800);
     };
 
-    const handleReadNarrative = (anchorId) => {
-        console.log('Reading narrative:', anchorId);
-        // Will implement navigation later
-    };
-
-    // Get nodes to display
-    const getDisplayNodes = () => {
+    // Determine which nodes should be rendered
+    const getVisibleNodes = () => {
         const nodes = [];
         const root = getAnchorById('0-ROOT');
 
-        // ROOT always visible in row 0
-        const isRootFocused = focusedAnchorId === '0-ROOT' || focusedAnchorId === null;
+        // ROOT always visible
         nodes.push({
             anchor: root,
-            row: 0,
-            col: 0,
-            totalInRow: 1,
-            isFocused: isRootFocused && focusedAnchorId !== null,
-            isRoot: true
+            id: root.id,
+            type: 'root'
         });
 
-        // If nothing expanded or still animating, stop here
-        if (focusedAnchorId === null || isAnimating) {
-            return nodes;
-        }
-
-        // If ROOT is focused, show its children
-        if (focusedAnchorId === '0-ROOT') {
+        // If ROOT is expanded or a child is expanded, show level 1 children
+        if (expandedNodeId !== null) {
             const rootChildren = getChildren('0-ROOT');
-            rootChildren.forEach((child, idx) => {
-                nodes.push({
-                    anchor: child,
-                    row: 1,
-                    col: idx,
-                    totalInRow: rootChildren.length,
-                    isFocused: false,
-                    isRoot: false
+
+            if (expandedNodeId === '0-ROOT') {
+                // All children visible
+                rootChildren.forEach(child => {
+                    nodes.push({
+                        anchor: child,
+                        id: child.id,
+                        type: 'level1',
+                        isExpanded: false
+                    });
                 });
-            });
-            return nodes;
+            } else {
+                // Only expanded child visible (plus fading siblings)
+                rootChildren.forEach(child => {
+                    if (child.id === expandedNodeId) {
+                        nodes.push({
+                            anchor: child,
+                            id: child.id,
+                            type: 'level1',
+                            isExpanded: true
+                        });
+                    } else if (fadingOutNodes.includes(child.id)) {
+                        // Sibling still in DOM while fading
+                        nodes.push({
+                            anchor: child,
+                            id: child.id,
+                            type: 'level1',
+                            isExpanded: false,
+                            isFading: true
+                        });
+                    } else if (animationPhase === 'fadingInSiblings') {
+                        // Siblings coming back during collapse - only during fadingInSiblings phase
+                        nodes.push({
+                            anchor: child,
+                            id: child.id,
+                            type: 'level1',
+                            isExpanded: false,
+                            isFadingIn: true
+                        });
+                    }
+                });
+
+                // Show children of expanded node
+                if (expandedNodeId) {
+                    const expandedChildren = getChildren(expandedNodeId);
+                    expandedChildren.forEach(child => {
+                        nodes.push({
+                            anchor: child,
+                            id: child.id,
+                            type: 'level2',
+                            isExpanded: false
+                        });
+                    });
+                }
+            }
         }
-
-        // Otherwise, focused node is not ROOT
-        const focused = getAnchorById(focusedAnchorId);
-        const focusedChildren = getChildren(focusedAnchorId);
-
-        // Focused node in row 1 (centered)
-        nodes.push({
-            anchor: focused,
-            row: 1,
-            col: 0,
-            totalInRow: 1,
-            isFocused: true,
-            isRoot: false
-        });
-
-        // Focused node's children in row 2
-        focusedChildren.forEach((child, idx) => {
-            nodes.push({
-                anchor: child,
-                row: 2,
-                col: idx,
-                totalInRow: focusedChildren.length,
-                isFocused: false,
-                isRoot: false
-            });
-        });
 
         return nodes;
     };
 
-    const displayNodes = getDisplayNodes();
+    const visibleNodes = getVisibleNodes();
 
     // Layout constants
     const nodeWidth = 200;
@@ -150,35 +160,123 @@ function TreeVisualization() {
     const horizontalSpacing = 40;
 
     // Calculate position for a node
-    const positionNode = (node) => {
+    const calculatePosition = (node) => {
         const containerWidth = 1200;
 
-        if (node.totalInRow === 1) {
+        if (node.type === 'root') {
             return {
                 x: (containerWidth - nodeWidth) / 2,
-                y: 60 + node.row * rowHeight
-            };
-        } else {
-            const rowWidth = node.totalInRow * nodeWidth + (node.totalInRow - 1) * horizontalSpacing;
-            const rowStartX = (containerWidth - rowWidth) / 2;
-            return {
-                x: rowStartX + node.col * (nodeWidth + horizontalSpacing),
-                y: 60 + node.row * rowHeight
+                y: 60
             };
         }
+
+        if (node.type === 'level1') {
+            const rootChildren = getChildren('0-ROOT');
+            const nodeIndex = rootChildren.findIndex(c => c.id === node.id);
+
+            // During movingReverse, previously expanded box should move to spread-out position
+            if (node.isExpanded && (animationPhase === 'movingReverse' || animationPhase === 'fadingInSiblings')) {
+                // Calculate spread-out position
+                const totalInRow = rootChildren.length;
+                const rowWidth = totalInRow * nodeWidth + (totalInRow - 1) * horizontalSpacing;
+                const rowStartX = (containerWidth - rowWidth) / 2;
+                return {
+                    x: rowStartX + nodeIndex * (nodeWidth + horizontalSpacing),
+                    y: 60 + rowHeight
+                };
+            } else if (node.isExpanded) {
+                // Centered position when expanded
+                return {
+                    x: (containerWidth - nodeWidth) / 2,
+                    y: 60 + rowHeight
+                };
+            } else {
+                // Spread out position
+                const totalInRow = rootChildren.length;
+                const rowWidth = totalInRow * nodeWidth + (totalInRow - 1) * horizontalSpacing;
+                const rowStartX = (containerWidth - rowWidth) / 2;
+                return {
+                    x: rowStartX + nodeIndex * (nodeWidth + horizontalSpacing),
+                    y: 60 + rowHeight
+                };
+            }
+        }
+
+        if (node.type === 'level2') {
+            const parentId = expandedNodeId;
+            const parentChildren = getChildren(parentId);
+            const nodeIndex = parentChildren.findIndex(c => c.id === node.id);
+            const totalInRow = parentChildren.length;
+
+            const rowWidth = totalInRow * nodeWidth + (totalInRow - 1) * horizontalSpacing;
+            const rowStartX = (containerWidth - rowWidth) / 2;
+
+            return {
+                x: rowStartX + nodeIndex * (nodeWidth + horizontalSpacing),
+                y: 60 + 2 * rowHeight
+            };
+        }
+
+        return { x: 0, y: 0 };
     };
 
-    // Calculate SVG dimensions
-    const maxRow = displayNodes.length > 0 ? Math.max(...displayNodes.map(n => n.row)) : 0;
-    const svgWidth = 1200;
-    const svgHeight = 60 + (maxRow + 1) * rowHeight + 60;
+    // Calculate opacity for a node
+    const calculateOpacity = (node) => {
+        // Fading out siblings
+        if (node.isFading) {
+            return 0;
+        }
 
-    // Wrap text
+        // Fading in siblings during collapse
+        if (node.isFadingIn) {
+            if (animationPhase === 'fadingInSiblings') {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+
+        // Level 2 children fading in/out
+        if (node.type === 'level2') {
+            if (animationPhase === 'fadingOutSiblings' || animationPhase === 'moving' || animationPhase === 'colorChange') {
+                return 0;
+            } else if (animationPhase === 'fadingInChildren' || animationPhase === 'idle') {
+                return 1;
+            } else if (animationPhase === 'fadingOutChildren' || animationPhase === 'colorChangeReverse' || animationPhase === 'movingReverse') {
+                return 0;
+            }
+        }
+
+        return 1;
+    };
+
+    // Calculate color for a node
+    const calculateColor = (node) => {
+        if (node.isExpanded) {
+            // Only show dark color after colorChange phase
+            if (animationPhase === 'colorChange' || animationPhase === 'fadingInChildren' || animationPhase === 'idle') {
+                return {
+                    fill: '#555555',
+                    text: 'white',
+                    stroke: '#333333'
+                };
+            }
+        }
+
+        return {
+            fill: '#e0e0e0',
+            text: 'black',
+            stroke: '#999999'
+        };
+    };
+
+    const svgWidth = 1200;
+    const svgHeight = 60 + 4 * rowHeight;
+
     const wrapText = (text, maxChars = 22) => {
         const words = text.split(' ');
         const lines = [];
         let current = '';
-
         words.forEach(word => {
             if ((current + ' ' + word).trim().length <= maxChars) {
                 current = (current + ' ' + word).trim();
@@ -198,90 +296,70 @@ function TreeVisualization() {
                 Click "Explore" to dive deeper. Click "Collapse" to go back up.
             </p>
 
-            <div
-                className="tree-container"
-                ref={containerRef}
-                style={{
-                    overflowY: 'auto',
-                    overflowX: 'hidden',
-                    maxHeight: '600px',
-                    position: 'relative'
-                }}
-            >
-                <svg width={svgWidth} height={svgHeight}>
-                    <style>
-                        {`
-                            .tree-node {
-                                transition: transform 0.5s ease-out, opacity 0.5s ease-out;
-                            }
-                            .tree-node rect {
-                                transition: fill 0.5s ease-out, stroke 0.5s ease-out;
-                            }
-                            .tree-node text {
-                                transition: fill 0.5s ease-out;
-                            }
-                        `}
-                    </style>
-                    {displayNodes.map(node => {
-                        const pos = positionNode(node);
+            <div className="tree-container" ref={containerRef}>
+                <svg width={svgWidth} height={svgHeight} style={{ overflow: 'visible' }}>
+                    {visibleNodes.map((node) => {
+                        const pos = calculatePosition(node);
+                        const opacity = calculateOpacity(node);
+                        const colors = calculateColor(node);
                         const hasChildren = getChildren(node.anchor.id).length > 0;
                         const lines = wrapText(node.anchor.title);
 
-                        // Determine what left button should show
                         let showLeftButton = false;
                         let leftButtonText = '';
                         let leftButtonAction = null;
 
-                        if (node.isRoot) {
+                        if (node.type === 'root') {
                             showLeftButton = true;
-                            if (focusedAnchorId === null) {
+                            if (expandedNodeId === null) {
                                 leftButtonText = 'Explore ▼';
                                 leftButtonAction = () => handleExplore('0-ROOT');
                             } else {
                                 leftButtonText = 'Collapse ▲';
                                 leftButtonAction = () => handleCollapse('0-ROOT');
                             }
-                        } else if (node.isFocused) {
+                        } else if (node.isExpanded) {
                             showLeftButton = true;
                             leftButtonText = 'Collapse ▲';
                             leftButtonAction = () => handleCollapse(node.anchor.id);
-                        } else if (hasChildren) {
+                        } else if (hasChildren && !node.isFading && opacity > 0) {
                             showLeftButton = true;
                             leftButtonText = 'Explore ▼';
                             leftButtonAction = () => handleExplore(node.anchor.id);
                         }
 
-                        // Styling
-                        const fillColor = node.isFocused ? '#555555' : '#e0e0e0';
-                        const textColor = node.isFocused ? 'white' : 'black';
-                        const strokeColor = node.isFocused ? '#333333' : '#999999';
-
                         return (
                             <g
-                                key={node.anchor.id}
-                                className="tree-node"
-                                transform={`translate(${pos.x}, ${pos.y})`}
+                                key={node.id}
+                                style={{
+                                    transform: `translate(${pos.x}px, ${pos.y}px)`,
+                                    transition: 'transform 0.4s cubic-bezier(0.4, 0.0, 0.2, 1), opacity 0.2s ease',
+                                    opacity: opacity,
+                                    pointerEvents: opacity > 0.1 ? 'all' : 'none'
+                                }}
                             >
-                                {/* Node rectangle */}
                                 <rect
                                     x={0}
                                     y={0}
                                     width={nodeWidth}
                                     height={nodeHeight}
-                                    fill={fillColor}
-                                    stroke={strokeColor}
+                                    fill={colors.fill}
+                                    stroke={colors.stroke}
                                     strokeWidth="2"
                                     rx="8"
+                                    style={{
+                                        transition: 'fill 0.15s ease, stroke 0.15s ease'
+                                    }}
                                 />
 
-                                {/* Title */}
                                 <text
                                     x={nodeWidth / 2}
                                     y={22}
                                     textAnchor="middle"
-                                    fill={textColor}
+                                    fill={colors.text}
                                     fontSize="12"
-                                    fontWeight={node.isFocused ? 'bold' : 'normal'}
+                                    fontWeight={colors.fill === '#555555' ? 'bold' : 'normal'}
+                                    style={{ transition: 'fill 0.15s ease' }}
                                 >
                                     {lines.map((line, i) => (
                                         <tspan key={i} x={nodeWidth / 2} dy={i === 0 ? 0 : '1.1em'}>
@@ -290,21 +368,16 @@ function TreeVisualization() {
                                     ))}
                                 </text>
 
-                                {/* Buttons */}
                                 <g>
-                                    {/* Left button (Explore/Collapse) */}
                                     {showLeftButton && (
-                                        <g
-                                            onClick={leftButtonAction}
-                                            style={{ cursor: 'pointer' }}
-                                        >
+                                        <g onClick={leftButtonAction} style={{ cursor: 'pointer' }}>
                                             <rect
                                                 x={10}
                                                 y={nodeHeight - 28}
                                                 width={nodeWidth / 2 - 15}
                                                 height={22}
-                                                fill={node.isFocused ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
-                                                stroke={node.isFocused ? 'white' : '#666'}
+                                                fill={node.isExpanded && colors.fill === '#555555' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
+                                                stroke={node.isExpanded && colors.fill === '#555555' ? 'white' : '#666'}
                                                 strokeWidth="1"
                                                 rx="4"
                                             />
@@ -312,7 +385,7 @@ function TreeVisualization() {
                                                 x={nodeWidth / 4 + 5}
                                                 y={nodeHeight - 13}
                                                 textAnchor="middle"
-                                                fill={textColor}
+                                                fill={colors.text}
                                                 fontSize="10"
                                                 fontWeight="bold"
                                             >
@@ -321,18 +394,14 @@ function TreeVisualization() {
                                         </g>
                                     )}
 
-                                    {/* Right button (Read - always present) */}
-                                    <g
-                                        onClick={() => handleReadNarrative(node.anchor.id)}
-                                        style={{ cursor: 'pointer' }}
-                                    >
+                                    <g onClick={() => console.log('Read:', node.anchor.id)} style={{ cursor: 'pointer' }}>
                                         <rect
                                             x={showLeftButton ? nodeWidth / 2 + 5 : 10}
                                             y={nodeHeight - 28}
                                             width={showLeftButton ? nodeWidth / 2 - 15 : nodeWidth - 20}
                                             height={22}
-                                            fill={node.isFocused ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
-                                            stroke={node.isFocused ? 'white' : '#666'}
+                                            fill={node.isExpanded && colors.fill === '#555555' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
+                                            stroke={node.isExpanded && colors.fill === '#555555' ? 'white' : '#666'}
                                             strokeWidth="1"
                                             rx="4"
                                         />
@@ -340,7 +409,7 @@ function TreeVisualization() {
                                             x={showLeftButton ? 3 * nodeWidth / 4 : nodeWidth / 2}
                                             y={nodeHeight - 13}
                                             textAnchor="middle"
-                                            fill={textColor}
+                                            fill={colors.text}
                                             fontSize="10"
                                             fontWeight="bold"
                                         >
