@@ -3,6 +3,83 @@
   padding: 2rem;
 }
 
+/* Navigation */
+.app-nav {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.app-nav button {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.3s;
+}
+
+.app-nav button:hover {
+  background: #2980b9;
+}
+
+/* Tree Visualization */
+.tree-visualization {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.tree-visualization h1 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.tree-description {
+  text-align: center;
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.tree-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  transition: all 0.5s ease-out;
+}
+
+.tree-container svg {
+  display: block;
+  margin: 0 auto;
+  transition: all 0.5s ease-out;
+}
+
+.tree-node:hover rect {
+  filter: brightness(1.1);
+}
+
+.tree-node.level-0 rect {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
+}
+
+.tree-node.level-1 rect {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+}
+
+.tree-node.level-2 rect {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
 /* Landing Page Styles */
 .landing-page {
   max-width: 1000px;

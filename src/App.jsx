@@ -2,6 +2,7 @@ import { useState } from 'react'
 import LandingPage from './components/LandingPage'
 import AnchorList from './components/AnchorList'
 import NarrativeReading from './components/NarrativeReading'
+import TreeVisualization from './components/TreeVisualization.jsx'
 import './App.css'
 
 function App() {
@@ -21,8 +22,19 @@ function App() {
 
   return (
     <div className="app">
+      {/* Navigation */}
+      <nav className="app-nav">
+        <button onClick={() => setCurrentView('landing')}>Home</button>
+        <button onClick={() => setCurrentView('tree')}>Tree View</button>
+        <button onClick={() => setCurrentView('anchors')}>30 Essentials</button>
+      </nav>
+
       {currentView === 'landing' && (
-        <LandingPage onStart={() => setCurrentView('anchors')} />
+        <LandingPage onStart={() => setCurrentView('tree')} />
+      )}
+
+      {currentView === 'tree' && (
+        <TreeVisualization />
       )}
 
       {currentView === 'anchors' && (
