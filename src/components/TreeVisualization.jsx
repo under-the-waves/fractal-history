@@ -7,6 +7,44 @@ function TreeVisualization() {
     const [fadingOutNodes, setFadingOutNodes] = useState([]); // Nodes currently fading out
     const containerRef = useRef(null);
 
+    // Layout constants
+    const rowHeight = 140;
+
+    // Scroll to center the expanded node (only for children, not ROOT)
+    useEffect(() => {
+        if (!containerRef.current) return;
+
+        const container = containerRef.current;
+
+        if (expandedNodeId === null || expandedNodeId === '0-ROOT') {
+            // ROOT at top - scroll to top
+            container.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        } else {
+            // A child is expanded - center that child
+            const childY = 60 + rowHeight; // Children are in row 1
+            const containerHeight = container.clientHeight;
+            const scrollTop = childY - containerHeight / 2 + 40;
+            container.scrollTo({
+                top: scrollTop,
+                behavior: 'smooth'
+            });
+        }
+    }, [expandedNodeId]);
+
+    // Initial scroll on mount - start at top
+    useEffect(() => {
+        if (!containerRef.current) return;
+
+        const container = containerRef.current;
+        container.scrollTo({
+            top: 0,
+            behavior: 'auto'
+        });
+    }, []);
+
     const handleExplore = (anchorId) => {
         if (animationPhase !== 'idle') return;
 
@@ -156,7 +194,6 @@ function TreeVisualization() {
     // Layout constants
     const nodeWidth = 200;
     const nodeHeight = 80;
-    const rowHeight = 140;
     const horizontalSpacing = 40;
 
     // Calculate position for a node
@@ -252,7 +289,8 @@ function TreeVisualization() {
 
     // Calculate color for a node
     const calculateColor = (node) => {
-        if (node.isExpanded) {
+        // Any expanded node (including ROOT) turns dark grey
+        if (node.isExpanded || (node.type === 'root' && expandedNodeId === '0-ROOT')) {
             // Only show dark color after colorChange phase
             if (animationPhase === 'colorChange' || animationPhase === 'fadingInChildren' || animationPhase === 'idle') {
                 return {
@@ -296,7 +334,15 @@ function TreeVisualization() {
                 Click "Explore" to dive deeper. Click "Collapse" to go back up.
             </p>
 
-            <div className="tree-container" ref={containerRef}>
+            <div
+                className="tree-container"
+                ref={containerRef}
+                style={{
+                    height: '600px',
+                    overflowY: 'auto',
+                    overflowX: 'hidden'
+                }}
+            >
                 <svg width={svgWidth} height={svgHeight} style={{ overflow: 'visible' }}>
                     {visibleNodes.map((node) => {
                         const pos = calculatePosition(node);
