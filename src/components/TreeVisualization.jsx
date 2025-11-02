@@ -2,44 +2,43 @@ import { useState, useEffect, useRef } from 'react';
 import { treeStructure, getChildren, getAnchorById } from '../data/treeStructure';
 
 function TreeVisualization() {
-    const [expandedNodeId, setExpandedNodeId] = useState(null); // Which node is currently expanded
-    const [animationPhase, setAnimationPhase] = useState('idle'); // Track animation state
-    const [fadingOutNodes, setFadingOutNodes] = useState([]); // Nodes currently fading out
+    const [expandedPath, setExpandedPath] = useState([]); // Array of expanded node IDs
+    const [animationPhase, setAnimationPhase] = useState('idle');
+    const [fadingOutNodes, setFadingOutNodes] = useState([]);
     const containerRef = useRef(null);
 
     // Layout constants
     const rowHeight = 140;
 
-    // Scroll to center the expanded node (only for children, not ROOT)
+    // Scroll to center the deepest expanded node
     useEffect(() => {
         if (!containerRef.current) return;
 
         const container = containerRef.current;
 
-        if (expandedNodeId === null || expandedNodeId === '0-ROOT') {
+        if (expandedPath.length === 0) {
             // ROOT at top - scroll to top
             container.scrollTo({
                 top: 0,
                 behavior: 'smooth'
             });
         } else {
-            // A child is expanded - center that child
-            const childY = 60 + rowHeight; // Children are in row 1
+            // Center the deepest expanded node
+            const depth = expandedPath.length;
+            const nodeY = 60 + depth * rowHeight;
             const containerHeight = container.clientHeight;
-            const scrollTop = childY - containerHeight / 2 + 40;
+            const scrollTop = nodeY - containerHeight / 2 + 40;
             container.scrollTo({
                 top: scrollTop,
                 behavior: 'smooth'
             });
         }
-    }, [expandedNodeId]);
+    }, [expandedPath]);
 
-    // Initial scroll on mount - start at top
+    // Initial scroll on mount
     useEffect(() => {
         if (!containerRef.current) return;
-
-        const container = containerRef.current;
-        container.scrollTo({
+        containerRef.current.scrollTo({
             top: 0,
             behavior: 'auto'
         });
@@ -48,10 +47,15 @@ function TreeVisualization() {
     const handleExplore = (anchorId) => {
         if (animationPhase !== 'idle') return;
 
-        // Determine which siblings need to fade out
-        if (anchorId !== '0-ROOT') {
-            const rootChildren = getChildren('0-ROOT');
-            const siblings = rootChildren.filter(child => child.id !== anchorId).map(child => child.id);
+        const anchor = getAnchorById(anchorId);
+        const isRoot = anchorId === '0-ROOT';
+
+        // Determine siblings that need to fade out
+        if (!isRoot) {
+            const parentId = anchor.parentId;
+            const siblings = getChildren(parentId)
+                .filter(child => child.id !== anchorId)
+                .map(child => child.id);
             setFadingOutNodes(siblings);
         }
 
@@ -61,8 +65,8 @@ function TreeVisualization() {
         setTimeout(() => {
             // Step 2: Move selected to center + remove faded siblings (200-600ms)
             setAnimationPhase('moving');
-            setExpandedNodeId(anchorId);
-            setFadingOutNodes([]); // Remove faded nodes from DOM
+            setExpandedPath([...expandedPath, anchorId]);
+            setFadingOutNodes([]);
         }, 200);
 
         setTimeout(() => {
@@ -84,32 +88,29 @@ function TreeVisualization() {
     const handleCollapse = (anchorId) => {
         if (animationPhase !== 'idle') return;
 
-        // Step 1: Fade out children (0-125ms) - reduced from 250ms
+        // Step 1: Fade out children (0-125ms)
         setAnimationPhase('fadingOutChildren');
 
         setTimeout(() => {
-            // Step 2: Change color back (125-200ms) - reduced from 250-400ms
+            // Step 2: Change color back (125-200ms)
             setAnimationPhase('colorChangeReverse');
         }, 125);
 
         setTimeout(() => {
-            // Step 3: Move back (200-600ms) - starts earlier, same duration
+            // Step 3: Move back (200-600ms)
             setAnimationPhase('movingReverse');
         }, 200);
 
         setTimeout(() => {
             // Step 4: Show and fade in siblings (600-800ms)
             setAnimationPhase('fadingInSiblings');
-            // Now update expandedNodeId to show siblings
-            if (anchorId === '0-ROOT') {
-                setExpandedNodeId(null);
-            } else {
-                setExpandedNodeId('0-ROOT');
-            }
+            // Remove this node from expanded path
+            const newPath = expandedPath.filter(id => id !== anchorId);
+            setExpandedPath(newPath);
         }, 600);
 
         setTimeout(() => {
-            // Done - total 800ms now instead of 1000ms
+            // Done
             setAnimationPhase('idle');
         }, 800);
     };
@@ -119,70 +120,94 @@ function TreeVisualization() {
         const nodes = [];
         const root = getAnchorById('0-ROOT');
 
-        // ROOT always visible
+        // ROOT always visible at top
+        const isRootExpanded = expandedPath.length > 0 && expandedPath[0] === '0-ROOT';
+        const isRootDeepest = expandedPath.length === 1 && expandedPath[0] === '0-ROOT';
+
         nodes.push({
             anchor: root,
             id: root.id,
-            type: 'root'
+            type: 'root',
+            depth: 0,
+            isExpanded: isRootDeepest // Only expanded if it's the deepest
         });
 
-        // If ROOT is expanded or a child is expanded, show level 1 children
-        if (expandedNodeId !== null) {
-            const rootChildren = getChildren('0-ROOT');
+        // If nothing expanded, we're done
+        if (expandedPath.length === 0) {
+            return nodes;
+        }
 
-            if (expandedNodeId === '0-ROOT') {
-                // All children visible
-                rootChildren.forEach(child => {
+        // Special case: If only ROOT is expanded, show all Level 1 children
+        if (expandedPath.length === 1 && expandedPath[0] === '0-ROOT') {
+            const level1Children = getChildren('0-ROOT');
+            level1Children.forEach(child => {
+                nodes.push({
+                    anchor: child,
+                    id: child.id,
+                    type: 'child',
+                    depth: 1,
+                    isExpanded: false
+                });
+            });
+            return nodes;
+        }
+
+        // Walk through the expanded path (skip ROOT since it's already added)
+        const pathWithoutRoot = expandedPath[0] === '0-ROOT' ? expandedPath.slice(1) : expandedPath;
+
+        for (let i = 0; i < pathWithoutRoot.length; i++) {
+            const expandedId = pathWithoutRoot[i];
+            const parentId = i === 0 ? '0-ROOT' : pathWithoutRoot[i - 1];
+            const allSiblings = getChildren(parentId);
+            const isDeepest = i === pathWithoutRoot.length - 1;
+
+            // Show the expanded node
+            const expandedAnchor = getAnchorById(expandedId);
+            nodes.push({
+                anchor: expandedAnchor,
+                id: expandedId,
+                type: 'expanded',
+                depth: i + 1,
+                isExpanded: isDeepest // Only the deepest is visually expanded
+            });
+
+            // If this is the deepest expanded node, show its children
+            if (isDeepest) {
+                const children = getChildren(expandedId);
+                children.forEach(child => {
                     nodes.push({
                         anchor: child,
                         id: child.id,
-                        type: 'level1',
+                        type: 'child',
+                        depth: i + 2,
                         isExpanded: false
                     });
                 });
-            } else {
-                // Only expanded child visible (plus fading siblings)
-                rootChildren.forEach(child => {
-                    if (child.id === expandedNodeId) {
-                        nodes.push({
-                            anchor: child,
-                            id: child.id,
-                            type: 'level1',
-                            isExpanded: true
-                        });
-                    } else if (fadingOutNodes.includes(child.id)) {
-                        // Sibling still in DOM while fading
-                        nodes.push({
-                            anchor: child,
-                            id: child.id,
-                            type: 'level1',
-                            isExpanded: false,
-                            isFading: true
-                        });
-                    } else if (animationPhase === 'fadingInSiblings') {
-                        // Siblings coming back during collapse - only during fadingInSiblings phase
-                        nodes.push({
-                            anchor: child,
-                            id: child.id,
-                            type: 'level1',
-                            isExpanded: false,
-                            isFadingIn: true
-                        });
+
+                // Also show siblings during certain animation phases
+                allSiblings.forEach(sibling => {
+                    if (sibling.id !== expandedId) {
+                        if (fadingOutNodes.includes(sibling.id)) {
+                            nodes.push({
+                                anchor: sibling,
+                                id: sibling.id,
+                                type: 'sibling',
+                                depth: i + 1,
+                                isExpanded: false,
+                                isFading: true
+                            });
+                        } else if (animationPhase === 'fadingInSiblings') {
+                            nodes.push({
+                                anchor: sibling,
+                                id: sibling.id,
+                                type: 'sibling',
+                                depth: i + 1,
+                                isExpanded: false,
+                                isFadingIn: true
+                            });
+                        }
                     }
                 });
-
-                // Show children of expanded node
-                if (expandedNodeId) {
-                    const expandedChildren = getChildren(expandedNodeId);
-                    expandedChildren.forEach(child => {
-                        nodes.push({
-                            anchor: child,
-                            id: child.id,
-                            type: 'level2',
-                            isExpanded: false
-                        });
-                    });
-                }
             }
         }
 
@@ -196,10 +221,11 @@ function TreeVisualization() {
     const nodeHeight = 80;
     const horizontalSpacing = 40;
 
-    // Calculate position for a node
+    // Calculate position for a node based on its depth and type
     const calculatePosition = (node) => {
         const containerWidth = 1200;
 
+        // ROOT always centered at top
         if (node.type === 'root') {
             return {
                 x: (containerWidth - nodeWidth) / 2,
@@ -207,54 +233,44 @@ function TreeVisualization() {
             };
         }
 
-        if (node.type === 'level1') {
-            const rootChildren = getChildren('0-ROOT');
-            const nodeIndex = rootChildren.findIndex(c => c.id === node.id);
+        const rowY = 60 + node.depth * rowHeight;
 
-            // During movingReverse, previously expanded box should move to spread-out position
-            if (node.isExpanded && (animationPhase === 'movingReverse' || animationPhase === 'fadingInSiblings')) {
-                // Calculate spread-out position
-                const totalInRow = rootChildren.length;
+        // Expanded nodes move to center
+        if (node.isExpanded) {
+            // During reverse animation, move back to spread position
+            if (animationPhase === 'movingReverse' || animationPhase === 'fadingInSiblings') {
+                // Calculate spread-out position among siblings
+                const parentId = node.anchor.parentId;
+                const siblings = getChildren(parentId);
+                const nodeIndex = siblings.findIndex(s => s.id === node.id);
+                const totalInRow = siblings.length;
                 const rowWidth = totalInRow * nodeWidth + (totalInRow - 1) * horizontalSpacing;
                 const rowStartX = (containerWidth - rowWidth) / 2;
                 return {
                     x: rowStartX + nodeIndex * (nodeWidth + horizontalSpacing),
-                    y: 60 + rowHeight
-                };
-            } else if (node.isExpanded) {
-                // Centered position when expanded
-                return {
-                    x: (containerWidth - nodeWidth) / 2,
-                    y: 60 + rowHeight
+                    y: rowY
                 };
             } else {
-                // Spread out position
-                const totalInRow = rootChildren.length;
-                const rowWidth = totalInRow * nodeWidth + (totalInRow - 1) * horizontalSpacing;
-                const rowStartX = (containerWidth - rowWidth) / 2;
+                // Centered when expanded
                 return {
-                    x: rowStartX + nodeIndex * (nodeWidth + horizontalSpacing),
-                    y: 60 + rowHeight
+                    x: (containerWidth - nodeWidth) / 2,
+                    y: rowY
                 };
             }
         }
 
-        if (node.type === 'level2') {
-            const parentId = expandedNodeId;
-            const parentChildren = getChildren(parentId);
-            const nodeIndex = parentChildren.findIndex(c => c.id === node.id);
-            const totalInRow = parentChildren.length;
+        // Children and siblings spread out
+        const parentId = node.anchor.parentId;
+        const siblings = getChildren(parentId);
+        const nodeIndex = siblings.findIndex(s => s.id === node.id);
+        const totalInRow = siblings.length;
+        const rowWidth = totalInRow * nodeWidth + (totalInRow - 1) * horizontalSpacing;
+        const rowStartX = (containerWidth - rowWidth) / 2;
 
-            const rowWidth = totalInRow * nodeWidth + (totalInRow - 1) * horizontalSpacing;
-            const rowStartX = (containerWidth - rowWidth) / 2;
-
-            return {
-                x: rowStartX + nodeIndex * (nodeWidth + horizontalSpacing),
-                y: 60 + 2 * rowHeight
-            };
-        }
-
-        return { x: 0, y: 0 };
+        return {
+            x: rowStartX + nodeIndex * (nodeWidth + horizontalSpacing),
+            y: rowY
+        };
     };
 
     // Calculate opacity for a node
@@ -266,15 +282,11 @@ function TreeVisualization() {
 
         // Fading in siblings during collapse
         if (node.isFadingIn) {
-            if (animationPhase === 'fadingInSiblings') {
-                return 1;
-            } else {
-                return 0;
-            }
+            return animationPhase === 'fadingInSiblings' ? 1 : 0;
         }
 
-        // Level 2 children fading in/out
-        if (node.type === 'level2') {
+        // Children fading in/out
+        if (node.type === 'child') {
             if (animationPhase === 'fadingOutSiblings' || animationPhase === 'moving' || animationPhase === 'colorChange') {
                 return 0;
             } else if (animationPhase === 'fadingInChildren' || animationPhase === 'idle') {
@@ -289,8 +301,8 @@ function TreeVisualization() {
 
     // Calculate color for a node
     const calculateColor = (node) => {
-        // Any expanded node (including ROOT) turns dark grey
-        if (node.isExpanded || (node.type === 'root' && expandedNodeId === '0-ROOT')) {
+        // Any expanded node turns dark grey
+        if (node.isExpanded) {
             // Only show dark color after colorChange phase
             if (animationPhase === 'colorChange' || animationPhase === 'fadingInChildren' || animationPhase === 'idle') {
                 return {
@@ -309,7 +321,7 @@ function TreeVisualization() {
     };
 
     const svgWidth = 1200;
-    const svgHeight = 60 + 4 * rowHeight;
+    const svgHeight = 60 + 6 * rowHeight; // Allow more rows for deeper nesting
 
     const wrapText = (text, maxChars = 22) => {
         const words = text.split(' ');
@@ -355,23 +367,18 @@ function TreeVisualization() {
                         let leftButtonText = '';
                         let leftButtonAction = null;
 
-                        if (node.type === 'root') {
-                            showLeftButton = true;
-                            if (expandedNodeId === null) {
-                                leftButtonText = 'Explore ▼';
-                                leftButtonAction = () => handleExplore('0-ROOT');
-                            } else {
-                                leftButtonText = 'Collapse ▲';
-                                leftButtonAction = () => handleCollapse('0-ROOT');
-                            }
-                        } else if (node.isExpanded) {
+                        if (node.isExpanded) {
                             showLeftButton = true;
                             leftButtonText = 'Collapse ▲';
                             leftButtonAction = () => handleCollapse(node.anchor.id);
                         } else if (hasChildren && !node.isFading && opacity > 0) {
-                            showLeftButton = true;
-                            leftButtonText = 'Explore ▼';
-                            leftButtonAction = () => handleExplore(node.anchor.id);
+                            // Don't show explore button on ROOT if already expanded
+                            const isRootAlreadyExpanded = node.id === '0-ROOT' && expandedPath.length > 0;
+                            if (!isRootAlreadyExpanded) {
+                                showLeftButton = true;
+                                leftButtonText = 'Explore ▼';
+                                leftButtonAction = () => handleExplore(node.anchor.id);
+                            }
                         }
 
                         return (
