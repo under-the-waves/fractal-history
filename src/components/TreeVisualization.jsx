@@ -268,8 +268,6 @@ function TreeVisualization() {
                         const lines = wrapText(node.anchor.title);
 
                         const isInPath = activePath.includes(node.id);
-                        const showExploreButton = !isInPath && hasChildren && opacity > 0;
-                        const showCollapseButton = isInPath;
 
                         return (
                             <g
@@ -329,86 +327,85 @@ function TreeVisualization() {
 
                                 {/* Action buttons */}
                                 <g>
-                                    {/* Only show buttons if ROOT is clicked (in path) OR if it's not ROOT */}
+                                    {/* Show buttons on all nodes except unclicked ROOT */}
                                     {(node.type !== 'root' || activePath.length > 0) && (
                                         <>
-                                            {/* Left button area - show breadth toggle if multiple breadth levels */}
-                                            {hasChildren && (() => {
-                                                const availableBreadth = getAvailableBreadthLevels(node.id);
-                                                if (availableBreadth.length > 1) {
-                                                    // Show breadth toggle for all nodes with multiple breadth
+                                            {/* Always show breadth toggle buttons (A, B, C) */}
+                                            <g>
+                                                {/* "Breadth" label */}
+                                                <text
+                                                    x={nodeWidth / 4 + 5}
+                                                    y={nodeHeight - 34}
+                                                    textAnchor="middle"
+                                                    fill={colors.text}
+                                                    fontSize="10"
+                                                    fontWeight="bold"
+                                                >
+                                                    Breadth
+                                                </text>
+
+                                                {/* Breadth buttons - always show A, B, C */}
+                                                {['A', 'B', 'C'].map((breadth, index) => {
                                                     const activeBreadth = getActiveBreadth(node.id);
-                                                    const primaryBreadth = availableBreadth.slice(0, 3);
+                                                    const isActive = breadth === activeBreadth;
+                                                    const hasChildrenAtBreadth = getChildren(node.id, breadth).length > 0;
+                                                    const buttonWidth = (nodeWidth / 2 - 15) / 3 - 2;
+                                                    const buttonX = 10 + index * (buttonWidth + 2);
+                                                    const breadthColor = getBreadthColor(breadth);
+
+                                                    // Only show color if this breadth is active AND node is expanded (in path)
+                                                    const shouldShowColor = isActive && isInPath;
 
                                                     return (
-                                                        <g>
-                                                            {/* "Breadth" label */}
+                                                        <g
+                                                            key={breadth}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+
+                                                                // Only respond if there are children at this breadth
+                                                                if (!hasChildrenAtBreadth) return;
+
+                                                                handleBreadthToggle(node.id, breadth);
+
+                                                                // If this node is in the path but not the last (i.e., it's a grandparent or ancestor)
+                                                                // collapse everything below it
+                                                                const nodeIndexInPath = activePath.indexOf(node.id);
+                                                                if (nodeIndexInPath !== -1 && nodeIndexInPath < activePath.length - 1) {
+                                                                    // Collapse to this node
+                                                                    const newPath = activePath.slice(0, nodeIndexInPath + 1);
+                                                                    setActivePath(newPath);
+                                                                } else if (!isInPath) {
+                                                                    // If not in path at all, expand it
+                                                                    handleExplore(node.id);
+                                                                }
+                                                            }}
+                                                            style={{ cursor: hasChildrenAtBreadth ? 'pointer' : 'default' }}
+                                                        >
+                                                            <rect
+                                                                x={buttonX}
+                                                                y={nodeHeight - 22}
+                                                                width={buttonWidth}
+                                                                height={16}
+                                                                fill={shouldShowColor ? breadthColor : (colors.fill === '#555555' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)')}
+                                                                stroke={shouldShowColor ? breadthColor : (colors.fill === '#555555' ? 'rgba(255,255,255,0.3)' : '#999')}
+                                                                strokeWidth="1"
+                                                                opacity={hasChildrenAtBreadth ? 1 : 0.3}
+                                                            />
                                                             <text
-                                                                x={nodeWidth / 4 + 5}
-                                                                y={nodeHeight - 34}
+                                                                x={buttonX + buttonWidth / 2}
+                                                                y={nodeHeight - 10}
                                                                 textAnchor="middle"
-                                                                fill={colors.text}
+                                                                fill={shouldShowColor ? 'white' : colors.text}
                                                                 fontSize="10"
-                                                                fontWeight="bold"
+                                                                fontWeight={shouldShowColor ? "bold" : "normal"}
+                                                                opacity={hasChildrenAtBreadth ? 1 : 0.3}
                                                             >
-                                                                Breadth
+                                                                {breadth}
                                                             </text>
-
-                                                            {/* Breadth buttons */}
-                                                            {primaryBreadth.map((breadth, index) => {
-                                                                const isActive = breadth === activeBreadth;
-                                                                const buttonWidth = (nodeWidth / 2 - 15) / primaryBreadth.length - 2;
-                                                                const buttonX = 10 + index * (buttonWidth + 2);
-                                                                const breadthColor = getBreadthColor(breadth);
-
-                                                                return (
-                                                                    <g
-                                                                        key={breadth}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleBreadthToggle(node.id, breadth);
-
-                                                                            // If this node is in the path but not the last (i.e., it's a grandparent or ancestor)
-                                                                            // collapse everything below it
-                                                                            const nodeIndexInPath = activePath.indexOf(node.id);
-                                                                            if (nodeIndexInPath !== -1 && nodeIndexInPath < activePath.length - 1) {
-                                                                                // Collapse to this node
-                                                                                const newPath = activePath.slice(0, nodeIndexInPath + 1);
-                                                                                setActivePath(newPath);
-                                                                            } else if (!isInPath) {
-                                                                                // If not in path at all, expand it
-                                                                                handleExplore(node.id);
-                                                                            }
-                                                                        }}
-                                                                        style={{ cursor: 'pointer' }}
-                                                                    >
-                                                                        <rect
-                                                                            x={buttonX}
-                                                                            y={nodeHeight - 22}
-                                                                            width={buttonWidth}
-                                                                            height={16}
-                                                                            fill={isActive ? breadthColor : (colors.fill === '#555555' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)')}
-                                                                            stroke={isActive ? breadthColor : (colors.fill === '#555555' ? 'rgba(255,255,255,0.3)' : '#999')}
-                                                                            strokeWidth="1"
-                                                                        />
-                                                                        <text
-                                                                            x={buttonX + buttonWidth / 2}
-                                                                            y={nodeHeight - 10}
-                                                                            textAnchor="middle"
-                                                                            fill={isActive ? 'white' : colors.text}
-                                                                            fontSize="10"
-                                                                            fontWeight={isActive ? "bold" : "normal"}
-                                                                        >
-                                                                            {breadth}
-                                                                        </text>
-                                                                    </g>
-                                                                );
-                                                            })}
                                                         </g>
                                                     );
-                                                }
-                                                return null;
-                                            })()}
+                                                })}
+                                            </g>
 
                                             {/* Right button: Read */}
                                             <g onClick={() => console.log('Read:', node.anchor.id)} style={{ cursor: 'pointer' }}>

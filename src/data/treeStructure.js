@@ -13,7 +13,7 @@ export const treeStructure = [
         position: 1
     },
 
-    // Level 1A: Transformative Turning Points (5 anchors)
+    // Level 1A: Transformative Turning Points (4 anchors - Scientific Revolution removed)
     {
         id: "1A-E8F2G",
         title: "Emergence of Life on Earth",
@@ -42,22 +42,13 @@ export const treeStructure = [
         position: 3
     },
     {
-        id: "1A-Z1A6B",
-        title: "Scientific Revolution",
-        level: 1,
-        breadth: "A",
-        parentId: "0-ROOT",
-        slug: "scientific-revolution",
-        position: 4
-    },
-    {
         id: "1A-C9D3E",
         title: "Industrial Revolution",
         level: 1,
         breadth: "A",
         parentId: "0-ROOT",
         slug: "industrial-revolution",
-        position: 5
+        position: 4
     },
 
     // Level 1B: Temporal Coverage (5 anchors)
@@ -250,44 +241,6 @@ export const treeStructure = [
         position: 4
     },
 
-    // Level 2A under 1A-Z1A6B: Scientific Revolution (4 anchors)
-    {
-        id: "2A-V3W9X",
-        title: "Heliocentrism",
-        level: 2,
-        breadth: "A",
-        parentId: "1A-Z1A6B",
-        slug: "heliocentrism",
-        position: 1
-    },
-    {
-        id: "2A-R4S8T",
-        title: "Mathematical Physics",
-        level: 2,
-        breadth: "A",
-        parentId: "1A-Z1A6B",
-        slug: "mathematical-physics",
-        position: 2
-    },
-    {
-        id: "2A-Y1Z7A",
-        title: "Experimental Method",
-        level: 2,
-        breadth: "A",
-        parentId: "1A-Z1A6B",
-        slug: "experimental-method",
-        position: 3
-    },
-    {
-        id: "2A-L6M3N",
-        title: "Scientific Institutions",
-        level: 2,
-        breadth: "A",
-        parentId: "1A-Z1A6B",
-        slug: "scientific-institutions",
-        position: 4
-    },
-
     // Level 2A under 1A-C9D3E: Industrial Revolution (5 anchors)
     {
         id: "2A-H5I2J",
@@ -335,7 +288,7 @@ export const treeStructure = [
         position: 5
     },
 
-    // Level 3 Anchors (all from original structure)
+    // Level 3 Anchors
 
     // Under 2A-M3N8P: Origin of Life
     {
@@ -679,122 +632,6 @@ export const treeStructure = [
         parentId: "2A-N2O6S",
         slug: "state-formation",
         position: 4
-    },
-
-    // Under 2A-V3W9X: Heliocentrism
-    {
-        id: "3A-C5D8E",
-        title: "Ancient Greek Cosmology",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-V3W9X",
-        slug: "ancient-greek-cosmology",
-        position: 1
-    },
-    {
-        id: "3A-F2G6H",
-        title: "Islamic Astronomical Critiques",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-V3W9X",
-        slug: "islamic-astronomical-critiques",
-        position: 2
-    },
-    {
-        id: "3A-I9J3K",
-        title: "Copernican Revolution",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-V3W9X",
-        slug: "copernican-revolution",
-        position: 3
-    },
-
-    // Under 2A-R4S8T: Mathematical Physics
-    {
-        id: "3A-P6Q2R",
-        title: "Greek Mathematical Science",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-R4S8T",
-        slug: "greek-mathematical-science",
-        position: 1
-    },
-    {
-        id: "3A-S8T4U",
-        title: "Medieval Mechanics",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-R4S8T",
-        slug: "medieval-mechanics",
-        position: 2
-    },
-    {
-        id: "3A-Y5Z9A",
-        title: "Newtonian Synthesis",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-R4S8T",
-        slug: "newtonian-synthesis",
-        position: 3
-    },
-
-    // Under 2A-Y1Z7A: Experimental Method
-    {
-        id: "3A-B3C8D",
-        title: "Ancient and Islamic Empiricism",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-Y1Z7A",
-        slug: "ancient-and-islamic-empiricism",
-        position: 1
-    },
-    {
-        id: "3A-E6F1G",
-        title: "Bacon's Scientific Method",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-Y1Z7A",
-        slug: "bacons-scientific-method",
-        position: 2
-    },
-    {
-        id: "3A-H9I4J",
-        title: "Instrument Revolution",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-Y1Z7A",
-        slug: "instrument-revolution",
-        position: 3
-    },
-
-    // Under 2A-L6M3N: Scientific Institutions
-    {
-        id: "3A-N8O5P",
-        title: "House of Wisdom and Translation Movement",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-L6M3N",
-        slug: "house-of-wisdom-and-translation-movement",
-        position: 1
-    },
-    {
-        id: "3A-Q3R9S",
-        title: "Universities and Scientific Societies",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-L6M3N",
-        slug: "universities-and-scientific-societies",
-        position: 2
-    },
-    {
-        id: "3A-T6U2V",
-        title: "Scientific Journals and Professionalization",
-        level: 3,
-        breadth: "A",
-        parentId: "2A-L6M3N",
-        slug: "scientific-journals-and-professionalization",
-        position: 3
     },
 
     // Under 2A-H5I2J: Coal and Steam Power
