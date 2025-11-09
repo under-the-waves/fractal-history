@@ -1,30 +1,25 @@
-import { config } from 'dotenv';
 import { neon } from '@neondatabase/serverless';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { config } from 'dotenv';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Load environment variables from .env.local
+config({ path: '.env.local' });
 
-// Load .env.local with absolute path
-config({ path: join(__dirname, '.env.local') });
+const sql = neon(process.env.DATABASE_URL);
 
-console.log('DATABASE_URL exists?', process.env.DATABASE_URL ? 'YES' : 'NO');
+console.log('Checking database contents...\n');
 
-async function testConnection() {
-    try {
-        console.log('Testing database connection...');
+// Check tree_positions
+const positions = await sql`SELECT * FROM tree_positions ORDER BY position_id`;
+console.log('=== TREE POSITIONS ===');
+console.log(`Found ${positions.length} positions:`);
+positions.forEach(p => {
+    console.log(`  ${p.position_id} → anchor: ${p.anchor_id}, parent: ${p.parent_position_id}`);
+});
 
-        const sql = neon(process.env.DATABASE_URL);
-
-        const result = await sql`SELECT * FROM anchors WHERE id = 'ROOT'`;
-
-        console.log('✅ Connection successful!');
-        console.log('ROOT anchor:', result[0]);
-
-    } catch (error) {
-        console.error('❌ Connection failed:', error.message);
-    }
-}
-
-testConnection();
+console.log('\n=== ANCHORS ===');
+// Check anchors
+const anchors = await sql`SELECT * FROM anchors ORDER BY id`;
+console.log(`Found ${anchors.length} anchors:`);
+anchors.forEach(a => {
+    console.log(`  ${a.id}: ${a.title}`);
+});
