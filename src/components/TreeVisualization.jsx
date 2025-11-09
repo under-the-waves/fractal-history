@@ -359,8 +359,42 @@ function TreeVisualization() {
                                                     return (
                                                         <g
                                                             key={breadth}
-                                                            onClick={(e) => {
+                                                            onClick={async (e) => {
                                                                 e.stopPropagation();
+
+                                                                // If children don't exist yet and this is breadth A, generate them
+                                                                if (!hasChildrenAtBreadth && breadth === 'A') {
+                                                                    console.log(`Generating children for ${node.id}...`);
+
+                                                                    try {
+                                                                        const response = await fetch('/api/generate-anchors', {
+                                                                            method: 'POST',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({
+                                                                                parentId: node.id,
+                                                                                parentTitle: node.anchor.title,
+                                                                                parentScope: node.anchor.scope || 'No scope available',
+                                                                                breadth: 'A'
+                                                                            })
+                                                                        });
+
+                                                                        const data = await response.json();
+
+                                                                        if (data.success) {
+                                                                            console.log(`Generated ${data.anchorsGenerated} anchors!`);
+                                                                            alert(`Generated ${data.anchorsGenerated} anchors! Page will refresh.`);
+                                                                            // Refresh the page to show new anchors
+                                                                            window.location.reload();
+                                                                        } else {
+                                                                            console.error('Failed to generate anchors:', data.error);
+                                                                            alert('Failed to generate anchors: ' + data.error);
+                                                                        }
+                                                                    } catch (error) {
+                                                                        console.error('Error calling API:', error);
+                                                                        alert('Error generating anchors. Check console for details.');
+                                                                    }
+                                                                    return;
+                                                                }
 
                                                                 // Only respond if there are children at this breadth
                                                                 if (!hasChildrenAtBreadth) return;
@@ -379,7 +413,7 @@ function TreeVisualization() {
                                                                     handleExplore(node.id);
                                                                 }
                                                             }}
-                                                            style={{ cursor: hasChildrenAtBreadth ? 'pointer' : 'default' }}
+                                                            style={{ cursor: (hasChildrenAtBreadth || breadth === 'A') ? 'pointer' : 'default' }}
                                                         >
                                                             <rect
                                                                 x={buttonX}
@@ -389,7 +423,7 @@ function TreeVisualization() {
                                                                 fill={shouldShowColor ? breadthColor : (colors.fill === '#555555' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)')}
                                                                 stroke={shouldShowColor ? breadthColor : (colors.fill === '#555555' ? 'rgba(255,255,255,0.3)' : '#999')}
                                                                 strokeWidth="1"
-                                                                opacity={hasChildrenAtBreadth ? 1 : 0.3}
+                                                                opacity={(hasChildrenAtBreadth || breadth === 'A') ? 1 : 0.3}
                                                             />
                                                             <text
                                                                 x={buttonX + buttonWidth / 2}

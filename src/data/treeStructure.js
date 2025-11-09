@@ -204,42 +204,7 @@ export const treeStructure = [
     },
 
     // Level 2A under 1A-G7H2K: Agricultural Revolution (4 anchors)
-    {
-        id: "2A-Z5A3B",
-        title: "Plant Domestication",
-        level: 2,
-        breadth: "A",
-        parentId: "1A-G7H2K",
-        slug: "plant-domestication",
-        position: 1
-    },
-    {
-        id: "2A-J7K1L",
-        title: "Animal Domestication",
-        level: 2,
-        breadth: "A",
-        parentId: "1A-G7H2K",
-        slug: "animal-domestication",
-        position: 2
-    },
-    {
-        id: "2A-P8Q5R",
-        title: "Permanent Settlements",
-        level: 2,
-        breadth: "A",
-        parentId: "1A-G7H2K",
-        slug: "permanent-settlements",
-        position: 3
-    },
-    {
-        id: "2A-N2O6S",
-        title: "Social Complexity",
-        level: 2,
-        breadth: "A",
-        parentId: "1A-G7H2K",
-        slug: "social-complexity",
-        position: 4
-    },
+
 
     // Level 2A under 1A-C9D3E: Industrial Revolution (5 anchors)
     {
