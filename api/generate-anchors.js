@@ -119,9 +119,9 @@ export default async function handler(req, res) {
             });
         }
 
-        if (breadth !== 'A') {
+        if (breadth !== 'A' && breadth !== 'B') {
             return res.status(400).json({
-                error: 'Only Breadth A anchor generation is currently supported'
+                error: 'Only Breadth A and B anchor generation is currently supported'
             });
         }
 
@@ -133,14 +133,22 @@ export default async function handler(req, res) {
 
         console.log(`Found ${ancestorPath.length} ancestors and ${existingSiblings.length} existing siblings`);
 
-        // Build the enhanced prompt with full context
-        const systemPrompt = buildBreadthAPrompt(
-            parentId,
-            parentTitle,
-            parentScope || 'No scope provided',
-            ancestorPath,
-            existingSiblings
-        );
+        // Build the appropriate prompt based on breadth type
+        const systemPrompt = breadth === 'A'
+            ? buildBreadthAPrompt(
+                parentId,
+                parentTitle,
+                parentScope || 'No scope provided',
+                ancestorPath,
+                existingSiblings
+            )
+            : buildBreadthBPrompt(
+                parentId,
+                parentTitle,
+                parentScope || 'No scope provided',
+                ancestorPath,
+                existingSiblings
+            );
 
         console.log('Calling OpenAI API...');
 
@@ -166,8 +174,10 @@ export default async function handler(req, res) {
         console.log(response);
         console.log('=== END RESPONSE ===\n');
 
-        // Parse the LLM response to extract anchor data
-        const anchors = parseAnchorResponse(response, parentId);
+        // Parse the LLM response based on breadth type
+        const anchors = breadth === 'A'
+            ? parseAnchorResponse(response, parentId)
+            : parseTemporalAnchorResponse(response, parentId);
 
         // Insert anchors into database
         const insertedAnchors = [];
@@ -315,6 +325,43 @@ A-anchors can be:
 - **Institutions:** Structures that shaped outcomes
 - **Technologies:** Inventions that transformed society
 
+### **A-Anchors Can Include Geographic Instances**
+
+While C-anchors provide **complete geographic coverage** (all major civilizations/regions), A-anchors should include **specific places or civilizations when they were the most causally significant aspect** of the parent topic.
+
+**When to include a geographic instance as an A-anchor:**
+- ✅ If **Mesopotamia** was THE primary driver of early civilization formation → It's an A-anchor
+- ✅ If **Athens** was THE most causally significant city-state for understanding democracy → It's an A-anchor
+- ✅ If **Britain** was THE key actor in industrialization → It's an A-anchor
+
+**The key question:** Was this specific place/civilization one of the MOST important aspects for understanding the parent topic?
+
+**Important distinction:**
+- **A-anchors (Analytical/Essential)**: The most important things - which CAN include a specific civilization if it was causally dominant
+- **C-anchors (Geographic breadth)**: Complete spatial coverage - ALL major civilizations/regions
+
+**Example:**
+
+    Parent: Formation of Early Civilizations(5,000 - 3,000 BCE)
+
+    A - Anchors(most essential aspects):
+├─ Mesopotamian City - States(causally dominant civilization)
+├─ Development of Writing Systems
+└─ Agricultural Surplus and Social Stratification
+
+    C - Anchors(complete geographic coverage):
+├─ Mesopotamia
+├─ Egypt
+├─ Indus Valley
+└─ Early Chinese Cultures
+        
+
+Notice **Mesopotamia** could appear in BOTH:
+- As an A-anchor (if it was the MOST causally important)
+- As a C-anchor (as one region in complete coverage)
+
+This is acceptable and creates multiple pathways to the same content.
+
 ---
 
 ## Selection Criteria: Dual Rating System
@@ -332,7 +379,7 @@ For each candidate anchor:
 - How persistent were these effects across time?
 
 ### Final Score Calculation
-**Final Score = (Causal Significance × 0.6) + (Human Impact × 0.4)**
+**Final Score = (Causal Significance * 0.6) + (Human Impact * 0.4)**
 
 This weighting reflects our primary mission of explaining "how the world works" while still honoring human experiences.
 
@@ -375,6 +422,20 @@ DO NOT default to always choosing 5 anchors.
 - **4 anchors:** Topic divides into four distinct domains or phases
 - **5 anchors:** Complex topic with 5 genuinely essential aspects; no clear groupings
 
+**CRITICAL:** Never wrap anchor titles in quotation marks.
+
+âŒ **WRONG:**
+- "Industrial Revolution"
+- "Ideological Conflict: Capitalism vs. Communism"
+- "Great Oxidation Event"
+
+âœ… **CORRECT:**
+- Industrial Revolution
+- Ideological Conflict: Capitalism vs. Communism
+- Great Oxidation Event
+
+**Why this matters:** The system uses exact title matching to detect duplicate anchors across the fractal tree. Quotation marks break this matching and cause the same anchor to be created multiple times in different locations.
+
 ### **Rule 3: Each Anchor Needs Scope Description**
 
 For each anchor, provide:
@@ -388,7 +449,7 @@ Scope: [2-3 sentences describing:
         - What's explicitly excluded/saved for other anchors]
 Causal Significance: [X/10 with brief justification]
 Human Impact: [Y/10 with brief justification]
-Final Score: [Calculated: (X × 0.6) + (Y × 0.4)]
+Final Score: [Calculated: (X * 0.6) + (Y * 0.4)]
 \`\`\`
 
 **Why scope matters:**
@@ -397,6 +458,7 @@ Final Score: [Calculated: (X × 0.6) + (Y × 0.4)]
 - Prevents scope creep when writing narratives
 - Ensures no gaps in coverage
 - **Prevents accidentally recreating parent or ancestor topics**
+
 
 ### **Rule 4: Ruthless Prioritization**
 
@@ -438,7 +500,7 @@ Generate more candidates than you need. For each:
    Justification: [Why this rating - be specific]
    Human Impact: Y/10
    Justification: [Why this rating - be specific]
-   Final Score: [Calculated: (X × 0.6) + (Y × 0.4)]
+   Final Score: [Calculated: (X * 0.6) + (Y * 0.4)]
    Anti-Circularity Check: [Confirm this is NOT in ancestor path and is sufficiently specific]
 \`\`\`
 
@@ -497,9 +559,323 @@ Reasoning: [Why this number]
 [Repeat for each selected anchor]
 \`\`\`
 
+**CRITICAL FORMATTING RULES:**
+
+1. **NO quotation marks around titles** - Ever. Not in candidate list, not in final selection, nowhere.
+2. **NO markdown code blocks** - Output plain text in the specified format
+3. **Follow the exact structure** - Makes parsing reliable
+
+**Example of correct formatting:**
+
+
+    1. Title: Great Oxidation Event
+    Type: Phenomenon
+    Scope: Atmospheric transformation ~2.4 BYA when cyanobacteria's photosynthesis filled atmosphere with oxygen.
+   Causal Significance: 10 / 10
+   ...
+    
+
+**NOT:**
+
+    1. Title: "Great Oxidation Event"  ← WRONG - no quotes!
+
+    ---
+
+        Remember: Your anchors must go DEEPER into "${parentTitle}" while respecting the learning path that got here.Avoid circularity by checking against ancestor titles and making topics sufficiently specific to the current scope.`;
+}
+
+// Build prompt for Breadth-B (Temporal) anchor generation
+function buildBreadthBPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings) {
+    // Format ancestor path with emphasis on temporal and scope constraints
+    const ancestorContext = ancestorPath.length > 0
+        ? ancestorPath.map((a, i) => {
+            let constraintType = '';
+            if (a.breadth === 'A') constraintType = '(Analytical/Thematic constraint)';
+            else if (a.breadth === 'B') constraintType = '(Temporal constraint)';
+            else if (a.breadth === 'C') constraintType = '(Geographic constraint)';
+
+            return `Level ${a.level}: ** ${a.title}** ${constraintType} \n   Scope: ${a.scope} `;
+        }).join('\n\n')
+        : 'No ancestor path (this is a top-level anchor)';
+
+    // Format existing siblings
+    const siblingContext = existingSiblings.length > 0
+        ? existingSiblings.map((s, i) =>
+            `${i + 1}. ${s.title} \n   Scope: ${s.scope || 'No scope'} `
+        ).join('\n\n')
+        : 'None yet - you are generating the first temporal divisions';
+
+    // Identify inherited constraints from ancestors
+    const constraints = {
+        topic: [],
+        geographic: [],
+        temporal: [],
+        analytical: []
+    };
+
+    ancestorPath.forEach(a => {
+        if (a.breadth === 'A') constraints.analytical.push(a.title);
+        else if (a.breadth === 'B') constraints.temporal.push(a.title);
+        else if (a.breadth === 'C') constraints.geographic.push(a.title);
+        else constraints.topic.push(a.title);
+    });
+
+    const constraintSummary = `
+        ** Inherited Scope Constraints:**
+            ${constraints.topic.length > 0 ? `- Topic: ${constraints.topic.join(' → ')}` : ''}
+${constraints.geographic.length > 0 ? `- Geography: Limited to ${constraints.geographic[constraints.geographic.length - 1]}` : '- Geography: No geographic limitations'}
+${constraints.temporal.length > 0 ? `- Time: Subdividing ${constraints.temporal[constraints.temporal.length - 1]}` : '- Time: Full historical timespan available'}
+${constraints.analytical.length > 0 ? `- Thematic focus: ${constraints.analytical.join(', ')}` : ''}
+
+Your temporal anchors must respect ALL these constraints.
+    `.trim();
+
+    return `# Breadth - B Temporal Anchor Selection Task
+
+## Your Task
+
+You are selecting ** Breadth - B anchors ** (temporal - chronological divisions) for the parent anchor:
+
+** Parent ID:** ${parentId}
+** Parent Title:** ${parentTitle}
+** Parent Scope:** ${parentScope}
+
+Your goal is to divide the parent topic into 3 - 5 meaningful temporal periods that provide ** complete chronological coverage ** of the topic.
+
 ---
 
-Remember: Your anchors must go DEEPER into "${parentTitle}" while respecting the learning path that got here. Avoid circularity by checking against ancestor titles and making topics sufficiently specific to the current scope.`;
+## CRITICAL CONTEXT: Learning Path That Led Here
+
+        ** Full ancestor path(how we reached this anchor):**
+
+            ${ancestorContext}
+
+${constraintSummary}
+
+** SCOPE INHERITANCE RULES:**
+        The temporal periods you create must respect ALL constraints from the ancestor path:
+- ** Topic constraints **: What subject matter we're covering
+        - ** Geographic constraints **: If any ancestor limited scope to a region, your periods must stay within that region
+            - ** Temporal constraints **: If parent is already temporal, subdivide that period further
+                - ** Analytical constraints **: If any ancestor focused on a specific theme / aspect, your periods must stay within that theme
+
+    ---
+
+## Sibling Context: What Already Exists at This Level
+
+${existingSiblings.length > 0 ? '**Existing B-anchors already generated:**\n\n' + siblingContext : siblingContext}
+
+${existingSiblings.length > 0 ? '**Important:** Ensure your new temporal periods do not duplicate these existing siblings.\n' : ''}
+
+    ---
+
+## What are B - Anchors(Temporal) ?
+
+        B - anchors represent ** chronological divisions ** of a topic.They answer: "How does this topic unfold over time?"
+
+            ** Key principles:**
+
+                1. ** Complete Coverage **: Your periods must cover the entire timespan of the parent topic(or slightly beyond for context)
+        2. ** No Gaps **: Every moment in the parent's timespan should fall within at least one period
+    3. ** Natural Breakpoints **: Periods should reflect meaningful historical transitions
+    4. ** Comprehensive Scope **: Each period contains EVERYTHING happening during that time(within inherited constraints)
+    5. ** Flexible Boundaries **: Slight overlap is acceptable.Extending ≤20 % beyond parent's boundaries is OK for context
+
+    ---
+
+## How to Determine Temporal Boundaries
+
+        ** Step 1: Extract or infer the parent's timespan**
+
+Look at:
+    - Parent title(often contains dates)
+        - Parent scope(describes timespan)
+            - Ancestor context(provides temporal framework)
+
+If dates aren't explicit, use historical knowledge to infer boundaries.
+
+        ** Step 2: Identify natural breakpoints **
+            - Major turning points
+                - Phase changes
+                    - Shifts in dominant patterns
+
+                        ** Step 3: Create meaningful labels **
+
+                            Format: ** "[Descriptive Name]: [START] - [END]" **
+
+                                Examples:
+    - "Japanese Expansion: 1931-1942"
+        - "Neolithic Revolution: 10,000-6,000 BCE"
+
+    ---
+
+## Critical Rules
+
+    1. ** Complete Coverage **: All periods together must cover parent's full timespan
+    2. ** Respect Boundaries **: Stay within parent's temporal scope (±20% max for context)
+    3. ** Choose 3 - 5 Periods **: Variable based on topic complexity and timespan
+    4. ** Clear Boundaries **: Each period needs explicit start / end dates
+    5. ** Compound Scope **: Respect ALL inherited constraints(topic, geography, theme, time)
+
+    ---
+
+## Output Format
+
+Provide your response as valid JSON:
+
+    \`\`\`json
+{
+  "temporalBoundariesInferred": {
+    "start": "YEAR/DATE",
+    "end": "YEAR/DATE",
+    "rationale": "How you determined these boundaries"
+  },
+  "anchors": [
+    {
+      "position": 1,
+      "title": "Period Name: START - END",
+      "timeBoundaries": {
+        "start": "YEAR/DATE",
+        "end": "YEAR/DATE"
+      },
+      "scope": "2-3 sentences describing this period",
+      "historicalMeaningfulness": 8,
+      "coverageNecessity": 9,
+      "rationale": "Why this is a meaningful division"
+    }
+  ],
+  "coverageJustification": "Why these periods provide complete coverage"
+}
+\`\`\`
+
+**CRITICAL:** 
+- Output ONLY valid JSON, nothing else
+- No markdown code blocks, no explanatory text
+- Just the raw JSON object
+- Ensure all property names are in quotes
+- Ensure all string values are in quotes
+
+**CRITICAL:** Use human-readable date formats, NOT raw numbers.
+
+**For billions of years ago:**
+- âœ… Correct: "4 BYA", "3.5 BYA", "2.4 BYA"
+- âŒ Wrong: "4,000,000,000", "4000000000"
+
+**For millions of years ago:**
+- âœ… Correct: "3 MYA", "200,000 years ago", "1.8 MYA"
+- âŒ Wrong: "3,000,000", "200000"
+
+**For thousands of years BCE:**
+- âœ… Correct: "10,000 BCE", "3,000 BCE", "8,000 BCE"
+- âŒ Wrong: "10000", "-10000"
+
+**For recent history:**
+- âœ… Correct: "1939", "1945", "1941 CE"
+- âœ… Also okay: "1900s", "1940s" (for decade-level precision)
+
+**Choose the most natural, readable format** for the time scale you're working with.
+
+---
+
+## Examples
+
+### Example 1: Broad Topic
+**Parent: Agricultural Revolution (~10,000 BCE - 3,000 BCE)**
+
+\`\`\`json
+{
+  "temporalBoundariesInferred": {
+    "start": "10,000 BCE",
+    "end": "3,000 BCE",
+    "rationale": "Standard periodization for Neolithic transition based on parent scope"
+  },
+  "anchors": [
+    {
+      "position": 1,
+      "title": "Early Domestication: 10,000-8,000 BCE",
+      "timeBoundaries": {"start": "10,000 BCE", "end": "8,000 BCE"},
+      "scope": "Initial plant cultivation experiments in Fertile Crescent. Gradual shift from foraging. First cereals domesticated.",
+      "historicalMeaningfulness": 9,
+      "coverageNecessity": 10,
+      "rationale": "Marks crucial transition to food production"
+    },
+    {
+      "position": 2,
+      "title": "Neolithic Expansion: 8,000-5,000 BCE",
+      "timeBoundaries": {"start": "8,000 BCE", "end": "5,000 BCE"},
+      "scope": "Spread of agriculture across Eurasia. Multiple independent centers develop. Animal domestication. Village formation.",
+      "historicalMeaningfulness": 9,
+      "coverageNecessity": 9,
+      "rationale": "Agricultural diffusion phase"
+    },
+    {
+      "position": 3,
+      "title": "Early Civilizations: 5,000-3,000 BCE",
+      "timeBoundaries": {"start": "5,000 BCE", "end": "3,000 BCE"},
+      "scope": "Agricultural surplus enables cities and states. Irrigation systems. Social hierarchies. Proto-writing emerges.",
+      "historicalMeaningfulness": 10,
+      "coverageNecessity": 10,
+      "rationale": "Agricultural maturity enabling civilization"
+    }
+  ],
+  "coverageJustification": "Three periods provide complete coverage from initial domestication through early state formation, with natural breakpoints at major transitions."
+}
+\`\`\`
+
+### Example 2: Geographic Parent
+**Parent: Pacific Theatre (WW2, inherits geographic constraint)**
+
+\`\`\`json
+{
+  "temporalBoundariesInferred": {
+    "start": "1931",
+    "end": "1945",
+    "rationale": "Pacific conflict begins with Manchurian invasion, extends slightly before Pearl Harbor for context"
+  },
+  "anchors": [
+    {
+      "position": 1,
+      "title": "Pre-War Expansion: 1931-1941",
+      "timeBoundaries": {"start": "1931", "end": "1941"},
+      "scope": "Japanese expansion in China and Manchuria. Rising tensions with Western powers. Embargo and diplomatic breakdown leading to Pacific War.",
+      "historicalMeaningfulness": 8,
+      "coverageNecessity": 9,
+      "rationale": "Essential context for understanding Pacific War origins"
+    },
+    {
+      "position": 2,
+      "title": "Japanese Ascendancy: 1941-1942",
+      "timeBoundaries": {"start": "1941", "end": "1942"},
+      "scope": "Pearl Harbor to Midway. Rapid Japanese conquest. Allied retreat. Battle of Coral Sea and Midway turning point.",
+      "historicalMeaningfulness": 10,
+      "coverageNecessity": 10,
+      "rationale": "Distinct phase of Japanese offensive success"
+    },
+    {
+      "position": 3,
+      "title": "Allied Counteroffensive: 1942-1945",
+      "timeBoundaries": {"start": "1942", "end": "1945"},
+      "scope": "Island-hopping campaigns. Submarine warfare. Philippines liberation. Iwo Jima, Okinawa. Atomic bombs. Japanese surrender.",
+      "historicalMeaningfulness": 10,
+      "coverageNecessity": 10,
+      "rationale": "Final phase of Allied victory in Pacific"
+    }
+  ],
+  "coverageJustification": "Three periods cover the full Pacific War arc from prelude through victory, respecting geographic constraint to Pacific theatre only."
+}
+\`\`\`
+
+---
+
+## Remember
+
+1. Extract temporal boundaries from parent info or infer reasonably
+2. Respect ALL inherited constraints from ancestor path
+3. Achieve complete coverage with no gaps
+4. Use natural historical breakpoints
+5. Output ONLY valid JSON
+6. Choose 3-5 periods based on topic needs
+`;
 }
 
 // Parse the LLM response to extract anchor data
@@ -507,8 +883,12 @@ function parseAnchorResponse(response, parentId) {
     const anchors = [];
 
     try {
+        // Remove markdown code blocks if present
+        let cleaned = response.trim();
+        cleaned = cleaned.replace(/```\n?/g, '');  // Remove triple backticks
+
         // Look for STEP 3: FINAL SELECTION section
-        const step3Match = response.match(/STEP 3:.*?FINAL SELECTION([\s\S]*)/i);
+        const step3Match = cleaned.match(/STEP 3:.*?FINAL SELECTION([\s\S]*)/i);
         if (!step3Match) {
             throw new Error('Could not find STEP 3 section in response');
         }
@@ -578,5 +958,42 @@ function parseAnchorResponse(response, parentId) {
         console.error('Error parsing response:', error);
         console.error('Response was:', response);
         throw new Error(`Failed to parse LLM response: ${error.message}`);
+    }
+}
+
+// Parse LLM response for Breadth-B (Temporal) anchors
+function parseTemporalAnchorResponse(response, parentId) {
+    try {
+        // Remove markdown code blocks if present
+        let cleaned = response.trim();
+        cleaned = cleaned.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+
+        // Parse JSON
+        const data = JSON.parse(cleaned);
+
+        // Validate structure
+        if (!data.anchors || !Array.isArray(data.anchors)) {
+            throw new Error('Response missing anchors array');
+        }
+
+        // Transform to expected format
+        return data.anchors.map(anchor => ({
+            position: anchor.position,
+            title: anchor.title,
+            scope: anchor.scope,
+            timeBoundaries: anchor.timeBoundaries,
+            historicalMeaningfulness: anchor.historicalMeaningfulness,
+            coverageNecessity: anchor.coverageNecessity,
+            rationale: anchor.rationale || '',
+            // For consistency with Breadth-A scoring
+            causalSignificance: anchor.historicalMeaningfulness,
+            humanImpact: anchor.coverageNecessity,
+            finalScore: (anchor.historicalMeaningfulness * 0.6) + (anchor.coverageNecessity * 0.4)
+        }));
+
+    } catch (error) {
+        console.error('Error parsing temporal anchor response:', error);
+        console.error('Raw response:', response);
+        throw new Error(`Failed to parse temporal anchor response: ${error.message}`);
     }
 }

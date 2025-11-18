@@ -362,7 +362,7 @@ function TreeVisualization() {
                             x={10}
                             y={10}
                             width={300}
-                            height={100}
+                            height={110}
                             fill="white"
                             stroke="#999"
                             strokeWidth="2"
@@ -486,11 +486,11 @@ function TreeVisualization() {
                                                             onClick={async (e) => {
                                                                 e.stopPropagation();
 
-                                                                // Special handling for breadth A (may need generation)
+                                                                // Special handling for breadths that may need generation (A or B)
                                                                 // But never generate for ROOT - it has hardcoded children
-                                                                if (breadth === 'A' && !hasChildrenAtBreadth && node.id !== '0-ROOT') {
+                                                                if ((breadth === 'A' || breadth === 'B') && !hasChildrenAtBreadth) {
                                                                     // Check database first
-                                                                    const response = await fetch(`/api/get-tree?parentId=${node.id}&breadth=A`);
+                                                                    const response = await fetch(`/api/get-tree?parentId=${node.id}&breadth=${breadth}`);
                                                                     const data = await response.json();
 
                                                                     // If database has children, load them directly (no second fetch)
@@ -508,35 +508,75 @@ function TreeVisualization() {
                                                                             };
                                                                         });
                                                                         setTreeData(newTreeData);
-                                                                    } else {
-                                                                        // No children in database - generate them
+
+                                                                        // Switch to this breadth
+                                                                        handleBreadthToggle(node.id, breadth);
+                                                                        return;
+                                                                    }
+
+                                                                    // If no children in database, generate them
+                                                                    if (!data.count || data.count === 0) {
+                                                                        // Show generating overlay
                                                                         setGenerating(true);
+
                                                                         try {
-                                                                            const genResponse = await fetch('/api/generate-anchors', {
+                                                                            const generateResponse = await fetch('/api/generate-anchors', {
                                                                                 method: 'POST',
-                                                                                headers: { 'Content-Type': 'application/json' },
+                                                                                headers: {
+                                                                                    'Content-Type': 'application/json',
+                                                                                },
                                                                                 body: JSON.stringify({
                                                                                     parentId: node.id,
                                                                                     parentTitle: node.anchor.title,
-                                                                                    parentScope: node.anchor.scope || 'No scope available',
-                                                                                    breadth: 'A'
+                                                                                    parentScope: node.anchor.scope || '',
+                                                                                    breadth: breadth
                                                                                 })
                                                                             });
-                                                                            const genData = await genResponse.json();
 
-                                                                            if (genData.success) {
-                                                                                await fetchChildren(node.id, 'A');
-                                                                                setGenerating(false);
+                                                                            const generateData = await generateResponse.json();
+
+                                                                            if (generateData.success) {
+                                                                                console.log(`Generated ${generateData.anchorsGenerated} ${breadth}-anchors`);
+
+                                                                                // Refresh from database to get newly generated anchors
+                                                                                const refreshResponse = await fetch(`/api/get-tree?parentId=${node.id}&breadth=${breadth}`);
+                                                                                const refreshData = await refreshResponse.json();
+
+                                                                                if (refreshData.success) {
+                                                                                    const newTreeData = { ...treeData };
+                                                                                    refreshData.anchors.forEach(anchor => {
+                                                                                        newTreeData[anchor.id] = {
+                                                                                            id: anchor.id,
+                                                                                            title: anchor.title,
+                                                                                            scope: anchor.scope,
+                                                                                            level: anchor.level,
+                                                                                            breadth: anchor.breadth,
+                                                                                            position: anchor.position,
+                                                                                            parentId: node.id
+                                                                                        };
+                                                                                    });
+                                                                                    setTreeData(newTreeData);
+
+                                                                                    // Switch to this breadth
+                                                                                    handleBreadthToggle(node.id, breadth);
+
+                                                                                    // Ensure node is in activePath so children display
+                                                                                    if (!activePath.includes(node.id)) {
+                                                                                        setActivePath([...activePath, node.id]);
+                                                                                    }
+                                                                                }
                                                                             } else {
-                                                                                alert('Failed to generate anchors: ' + genData.error);
-                                                                                setGenerating(false);
-                                                                                return;
+                                                                                console.error(`Failed to generate ${breadth}-anchors:`, generateData.error);
+                                                                                alert(`Failed to generate ${breadth}-anchors: ${generateData.error}`);
                                                                             }
                                                                         } catch (error) {
-                                                                            alert('Error generating anchors.');
+                                                                            console.error(`Error generating ${breadth}-anchors:`, error);
+                                                                            alert(`Error generating ${breadth}-anchors. Please try again.`);
+                                                                        } finally {
                                                                             setGenerating(false);
-                                                                            return;
                                                                         }
+
+                                                                        return; // IMPORTANT: Return here to prevent executing the code below
                                                                     }
                                                                 }
 
@@ -552,28 +592,31 @@ function TreeVisualization() {
                                                                     // If not in path, expand it
                                                                     handleExplore(node.id);
                                                                 }
-                                                            }
-                                                            }
+                                                            }}
                                                         >
                                                             <rect
                                                                 x={buttonX}
                                                                 y={nodeHeight - 22}
                                                                 width={buttonWidth}
                                                                 height={16}
-                                                                fill={shouldShowColor ? breadthColor : (colors.fill === '#555555' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)')}
-                                                                stroke={shouldShowColor ? breadthColor : (colors.fill === '#555555' ? 'rgba(255,255,255,0.3)' : '#999')}
+                                                                fill={shouldShowColor ? breadthColor : '#e8e8e8'}
+                                                                stroke={shouldShowColor ? breadthColor : '#555'}
                                                                 strokeWidth="1"
-                                                                opacity={(hasChildrenAtBreadth || breadth === 'A') ? 1 : 0.3}
-                                                                style={{ cursor: 'pointer' }}
+                                                                opacity={1}
+                                                                rx="2"
+                                                                style={{
+                                                                    cursor: 'pointer',
+                                                                    transition: 'all 0.2s ease'
+                                                                }}
                                                             />
                                                             <text
                                                                 x={buttonX + buttonWidth / 2}
-                                                                y={nodeHeight - 10}
+                                                                y={nodeHeight - 22 + 12}
                                                                 textAnchor="middle"
-                                                                fill={shouldShowColor ? 'white' : colors.text}
-                                                                fontSize="10"
-                                                                fontWeight={shouldShowColor ? "bold" : "normal"}
-                                                                opacity={hasChildrenAtBreadth ? 1 : 0.3}
+                                                                fill={shouldShowColor ? 'white' : '#333'}
+                                                                fontSize="11"
+                                                                fontWeight="600"
+                                                                pointerEvents="none"
                                                             >
                                                                 {breadth}
                                                             </text>
