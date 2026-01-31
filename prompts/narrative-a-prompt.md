@@ -1,6 +1,28 @@
 # A-Breadth Narrative Generation Task
 
-You are writing a ~1000-word historical narrative for the Fractal History learning system.
+## CRITICAL: Read This First
+
+You are writing a historical narrative that must be **genuinely engaging**—the kind of writing someone would actually want to read. Not a textbook summary. Not an encyclopedia entry. Not a dutiful recitation of facts.
+
+If your output reads like it was written by an AI assistant trying to be helpful and educational, you have failed.
+
+Your writing must sound like a knowledgeable historian sharing a fascinating story with a friend—someone like Dan Carlin, whose Hardcore History podcast makes people listen for four hours straight because the storytelling is that compelling.
+
+**Before you write anything, understand what we're NOT looking for:**
+
+BAD (generic AI writing):
+> "It began as a singular event—an unimaginable explosion that seeded the very fabric of reality we know today. The Big Bang, some 13.8 billion years ago, set the cosmos in motion..."
+
+This is dead prose. It opens with a direct explanation. It uses vague impressive-sounding phrases ("unimaginable explosion," "very fabric of reality"). It has no hook, no human element, no reason for anyone to keep reading.
+
+GOOD (Dan Carlin style):
+> "In 1964, two radio astronomers in New Jersey pointed their antenna at the sky and heard something they couldn't explain: a persistent hiss, coming from everywhere, that wouldn't go away. They checked for equipment problems. They even cleared out pigeon droppings from the antenna, thinking that might be the cause. Nothing worked. What Arno Penzias and Robert Wilson had accidentally discovered was the cosmic microwave background—the faint afterglow of the Big Bang itself, still radiating through the universe 13.8 billion years later. They were listening to the echo of creation."
+
+This opens with a specific anecdote. It has concrete details (New Jersey, 1964, pigeon droppings). It creates curiosity. It earns the big concept by grounding it in a real human moment first.
+
+**Your narrative must follow the GOOD pattern, not the BAD one.**
+
+---
 
 ## What You Are Writing
 
@@ -9,9 +31,9 @@ You are writing a ~1000-word historical narrative for the Fractal History learni
 **Scope:** {{anchorScope}}
 **Breadth:** A (Analytical/Essential)
 
-You are writing the **A-breadth narrative** for this anchor. This means organizing your narrative around the 5 most essential analytical aspects of this topic—the things someone must understand if they learn nothing else.
+You are writing the **A-breadth narrative** for this anchor—organized around the 5 most essential analytical aspects of this topic.
 
-## Context: Where This Anchor Sits in the Learning Path
+## Context
 
 **Ancestor path (how users reached this anchor):**
 {{ancestorPath}}
@@ -20,180 +42,185 @@ You are writing the **A-breadth narrative** for this anchor. This means organizi
 
 ## The 5 A-Anchors You Must Teach
 
-These are the 5 most causally important aspects of this topic. Your narrative MUST:
+Your narrative MUST:
 - Introduce and explain each of these concepts
-- **Bold each A-anchor title** when it first appears meaningfully in the narrative
+- **Bold each A-anchor title** (using `<strong>` tags) when it first appears meaningfully
 - Ensure a reader understands why each matters
 
 {{childAnchors}}
 
 ---
 
-## Narrative Voice
+## Opening Hook: THIS IS NON-NEGOTIABLE
 
-Your writing should emulate the storytelling style of Dan Carlin's Hardcore History podcast. This means:
+Your first 150-200 words must be a **specific anecdote, moment, or discovery**. Not a thesis statement. Not a summary of what the topic is about. A story.
 
-**Vivid, specific details**: Make history feel immediate and consequential. Instead of "the battle was brutal," describe what actually happened—the terrain, the tactics, the documented numbers.
+### What Makes a Good Hook
 
-**Real human stakes**: What did people actually risk, gain, or lose? Ground abstract historical forces in concrete human experience.
+1. **A specific moment in time**: A date, a place, a person doing something concrete
+2. **Genuine intrigue**: Something unexpected, puzzling, or dramatic that makes readers want to understand
+3. **Minimal names**: Use roles and descriptions ("a radio astronomer," "a German archaeologist") rather than proper names unless the name is essential
+4. **Context provided**: Assume the reader knows nothing. Explain where places are, when events happened, who people were
+5. **One primary source maximum**: A quote, letter, or documented account that brings the moment alive
 
-**Concrete scenes**: Draw from documented historical accounts to create scenes readers can visualize. Never fabricate—use what sources actually tell us.
+### What to AVOID in Your Hook
 
-**Building tension**: Even when readers know the outcome, create a sense of uncertainty by showing what participants did not know at the time.
+DO NOT begin with:
+- A direct definition or explanation of the topic
+- "Throughout history..." or "Since the dawn of time..."
+- "Imagine yourself..." or "Picture this..."
+- Any sentence that could serve as a Wikipedia opening paragraph
+- Vague grandiose language ("unimaginable," "incredible," "remarkable")
 
-**Connecting to larger patterns**: Help readers see how specific events reflect broader historical forces, without overstating significance.
+### Hook Examples
 
-**Conversational authority**: Write as someone who has deeply studied this topic and is sharing it with genuine enthusiasm—not as a textbook or encyclopedia.
+**Agricultural Revolution:**
+> "In 1991, two hikers in the Alps spotted something brown protruding from melting ice. They thought it was trash or a recent mountaineering accident. When archaeologists examined the body, they made an extraordinary discovery: this man had died 5,300 years ago. His possessions told a strange story: a copper axe, arrows with stone points, but also a pouch containing wheat grains and wild berries. His last meal, preserved in his stomach, included both cultivated grain and wild game. Here was a man frozen at the exact moment humanity was caught between two entirely different ways of living."
+
+**World War One:**
+> "On Christmas Eve 1914, British soldiers in their trenches along the Western Front in Belgium heard something unexpected: German soldiers singing Christmas carols. Some Germans placed small Christmas trees with candles along their trench lines. Cautiously, British soldiers began singing back. On Christmas morning, soldiers from both sides climbed out of their trenches, met in the muddy ground between the lines, exchanged cigarettes and chocolate, showed each other family photographs, and played informal football matches. One British officer wrote: 'Here was I, the man who had been trying to kill, and there he was, who had been trying to kill me.' By the following Christmas, military commanders on both sides had issued strict orders ensuring such fraternization could never happen again."
+
+After your hook, **pivot** to the chronological beginning of the main narrative. Vary your transition—don't always use "To understand this, we need to go back to..."
+
+---
+
+## Narrative Voice: Dan Carlin Style
+
+Your writing must have **voice**—the sense of a real person who finds this material fascinating and wants you to understand why.
+
+### Techniques to Use
+
+**Vivid concrete details**: Not "the battle was brutal" but "by nightfall, 20,000 men lay dead in an area the size of a few football fields."
+
+**Real human stakes**: What did people actually risk? What did they stand to lose? What were they afraid of?
+
+**Documented scenes**: Describe moments that actually happened, drawing from historical accounts. Never invent scenes or emotions.
+
+**Building tension**: Even when the outcome is known, recreate the uncertainty participants felt. What did they not know? What could have gone differently?
+
+**Causation**: Don't just say what happened—explain WHY it happened. What were the underlying forces? What made this outcome likely or surprising?
+
+**Conversational authority**: Write as someone sharing knowledge, not reciting it. Occasional asides, moments of emphasis, genuine reactions to the material.
+
+### Patterns to AVOID
+
+These are telltale signs of generic AI writing. DO NOT USE:
+
+- Em-dashes (—) anywhere in the text
+- "This was a pivotal moment..."
+- "This would prove to be..."
+- "Little did they know..."
+- "It's worth noting that..."
+- "This isn't just X, it's Y" or "These weren't merely X—they were Y"
+- "The seeds were planted for..."
+- "...forever changing the course of history"
+- "...which would have profound implications"
+- Any phrase that sounds like a documentary voiceover cliché
+
+If you catch yourself writing something that sounds like every other piece of educational content, stop and rewrite it.
 
 ---
 
 ## Historical Accuracy
 
-This is an educational project. Factual accuracy is non-negotiable.
+This is an educational project. Errors destroy trust.
 
-**Verify before stating**: Only include facts you are confident are historically accurate. If you are uncertain about a date, number, or sequence of events, use appropriate hedging ("around," "approximately," "historians estimate").
+**Be certain before stating**: Only include facts you know are accurate. If uncertain, use hedging ("around," "approximately," "historians estimate," "some scholars argue").
 
-**Dates and sequences matter**: Getting the order of events wrong, or misattributing causation, undermines the entire learning purpose.
+**Dates and sequences**: Getting chronology wrong undermines learning. Double-check that your timeline is accurate.
 
-**Names and places**: Spell names correctly. Locate places accurately. Use modern geographic references to help readers orient themselves.
+**Causation**: Distinguish between what caused something and what merely preceded it. Be careful about claiming direct causal links.
 
-**Causation**: Be careful about causal claims. Distinguish between what directly caused something and what merely preceded it.
+**Contested history**: Where historians disagree, acknowledge debate rather than presenting one view as settled.
 
-**Contested history**: Where historians genuinely disagree, acknowledge this rather than presenting one interpretation as settled fact.
-
-If you are not certain about a specific fact, either verify it against your training knowledge or omit it. Never invent historical details.
+Never invent historical details. If you don't know something specific, write around it rather than making it up.
 
 ---
 
 ## Handling Sensitive Topics
 
-History includes violence, war, slavery, genocide, colonialism, religious persecution, famine, and other traumatic events. This project does not shy away from these realities.
+History includes violence, slavery, genocide, colonialism, famine, and atrocity. Do not sanitize these realities.
 
-**Be honest**: Describe what happened. Do not sanitize atrocities or minimize suffering to make the narrative more comfortable.
+**Be honest**: Describe what happened, including difficult truths.
 
-**Be objective**: Present events based on historical evidence, not modern political framing. Let readers draw their own conclusions about moral judgments.
+**Be objective**: Present events based on evidence, not modern political framing.
 
-**Be respectful**: When describing mass suffering, remember these were real people. Avoid sensationalism or treating trauma as entertainment.
+**Be respectful**: These were real people who suffered. Avoid sensationalism.
 
-**Provide context**: Help readers understand why events happened, what conditions enabled them, and what their consequences were.
+**Provide context**: Help readers understand why events happened and what their consequences were.
 
-**Use appropriate language**: Describe events accurately without gratuitous detail. The goal is understanding, not shock value.
-
-Example: When covering Atlantic slavery, describe the scale, the conditions, the mortality rates, and the economic systems that drove it. Do not avoid the horror, but also do not dwell on graphic details beyond what serves comprehension.
+The goal is understanding, not comfort. But also not gratuitous shock value.
 
 ---
 
-## Opening Hook (First 150-200 words)
+## Main Narrative Structure (600-700 words)
 
-Begin with a **discrete anecdote, moment, or discovery** that illuminates your topic.
+After your hook and pivot:
 
-### Requirements:
+1. **Establish context**: What does the reader need to understand before the story begins?
 
-- Use a specific, documented event—not a general statement about the topic
-- Assume the reader knows nothing. Explain who people are (roles before names), where places are (modern geographic references), when things happened
-- Minimize proper names. Use descriptions: "a Spanish conquistador" not "Hernán Cortés"
-- Create mystery or tension that makes the reader want to understand more
-- End the hook by stating what it reveals (not with clickbait questions like "what happened next will shock you")
-- Include ONE piece of primary source evidence maximum (a quote, letter, or account) if it genuinely illuminates the point
+2. **Move chronologically**: Present events in time order, not by thematic category
 
-**Then pivot** to the chronological beginning of your narrative. Vary your pivot technique.
+3. **Weave in the A-anchors**: Each of the 5 child anchors should emerge naturally within your narrative. Bold the title when you introduce it substantively. Don't list them—integrate them.
 
-### Example of a Strong Opening Hook
+4. **Explain causation**: When something happens, help readers understand why. Connect events to underlying forces.
 
-**Topic: World War One**
+5. **Use specific details**: Locations (with modern geographic references), dates, numbers, documented facts. Specificity creates credibility and interest.
 
-"On Christmas Eve 1914, British soldiers in their trenches along the Western Front in Belgium heard something unexpected: German soldiers across the battlefield singing Christmas carols. Some Germans placed small Christmas trees with candles along their trench lines. Cautiously, British soldiers began singing back. On Christmas morning, soldiers from both sides climbed out of their trenches, met in the muddy ground between the lines, exchanged cigarettes and chocolate, showed each other family photographs, and played informal football matches. They helped each other bury their dead. One British officer wrote: 'Here was I, the man who had been trying to kill, and there he was, who had been trying to kill me.' By the following Christmas, military commanders on both sides had issued strict orders ensuring such fraternization could never happen again.
-
-This spontaneous truce captures something that would be lost as the war dragged on: the sense that soldiers on different sides were still fundamentally human beings caught in the same nightmare. How did Europe's great powers end up in this nightmare? The trigger came in summer 1914, when the assassination of an Austrian archduke set off a chain reaction..."
-
-**Why this works:**
-- Discrete anecdote (Christmas Truce)
-- Minimal names (just nationalities: British, German)
-- Explains context (Christmas Eve 1914, Western Front in Belgium, trenches)
-- Creates poignancy (humanity briefly breaking through)
-- Uses ONE primary source effectively (officer's quote)
-- Ends with significance (commanders prevented it happening again)
-- Clear pivot to chronological beginning (summer 1914)
-
-**Important:** This example demonstrates the technique. Do not copy its structure. Find an equally compelling but different anecdote appropriate to your specific topic.
-
----
-
-## Main Narrative (600-700 words)
-
-### Structure and Flow
-
-- **Chronological organization**: Present events in time order, not by category or importance
-- **First principles**: Explain why things happened, not just what happened. When you describe a striking pattern or coincidence, explain the underlying causes
-- **Build progressively**: Start with context readers need, then move to specific developments
-- **Weave in the A-anchors naturally**: The 5 A-anchors should emerge within your chronological story, not as a checklist. Bold each title when you introduce it substantively
-
-### Context and Perspective
-
-- **Geographic context**: Always locate places using modern references ("Jericho, in modern-day Palestine")
-- **Global perspective**: Avoid Western-centric framing. Acknowledge what you are not covering
-- **Appropriate precision**: Use "roughly," "around," "approximately" for ancient dates and uncertain estimates
-
-### Evidence and Drama
-
-- **Evidence-based drama**: Find drama in real stakes, documented events, actual consequences
-- **Never fabricate**: Do not invent emotions, reactions, or perspectives unless you have documentary evidence
-- **Real human stakes**: What did people actually risk, gain, or lose?
+6. **Maintain global perspective**: Don't default to Western-centric framing. Acknowledge what you're covering and what you're not.
 
 ---
 
 ## Closing (100-150 words)
 
-End by connecting this topic to what comes next or its lasting significance. Do not summarize what you already wrote. Instead, point forward or offer a final insight that rewards the reader.
+End with genuine insight, not summary. Options:
 
----
+- Connect to what comes next historically
+- Offer a perspective that rewards the reader for finishing
+- Return to your opening anecdote with new understanding
+- Pose a genuine question the material raises
 
-## Forbidden Patterns
-
-NEVER use these:
-- "This isn't just X, it's Y" or "These weren't X—they were Y" (dramatic reframing)
-- "Imagine yourself..." or "Picture yourself..." (cliché openings)
-- Em-dashes (—) anywhere in the text
-- Fabricated reactions, emotions, or perspectives from historical figures
-- "What happened next will shock you" or similar clickbait
-- Rhetorical questions when a direct statement works better
-- Listing the 5 A-anchors as bullet points—they must be woven into prose
+DO NOT end with:
+- A recap of what you just said
+- Generic statements about "appreciating" or "understanding" history
+- Preachy conclusions about lessons learned
+- "As we look to the future..."
 
 ---
 
 ## Output Format
 
-Return your response as JSON:
+Return ONLY valid JSON with this exact structure:
 
 {
-  "narrative": "<p>Your ~1000-word narrative here, with HTML paragraph tags. Bold the A-anchor titles using <strong> tags.</p>",
+  "narrative": "<p>Your ~1000-word narrative here with HTML paragraph tags. Bold A-anchor titles using <strong> tags.</p>",
   "keyConcepts": [
-    "First key takeaway (corresponding to A-anchor 1)",
-    "Second key takeaway (corresponding to A-anchor 2)",
-    "Third key takeaway (corresponding to A-anchor 3)",
-    "Fourth key takeaway (corresponding to A-anchor 4)",
-    "Fifth key takeaway (corresponding to A-anchor 5)"
+    "First key takeaway (one sentence, corresponding to A-anchor 1)",
+    "Second key takeaway (one sentence, corresponding to A-anchor 2)",
+    "Third key takeaway (one sentence, corresponding to A-anchor 3)",
+    "Fourth key takeaway (one sentence, corresponding to A-anchor 4)",
+    "Fifth key takeaway (one sentence, corresponding to A-anchor 5)"
   ],
   "questions": [
     {
-      "question": "Simple 'what' or 'roughly when' question about A-anchor 1",
-      "answer": "Clear, specific answer"
+      "question": "Simple factual question about A-anchor 1",
+      "answer": "Clear, specific answer findable in the narrative"
     },
     {
-      "question": "Simple 'what' or 'roughly when' question about A-anchor 2",
-      "answer": "Clear, specific answer"
+      "question": "Simple factual question about A-anchor 2",
+      "answer": "Clear, specific answer findable in the narrative"
     },
     {
-      "question": "Simple 'what' or 'roughly when' question about A-anchor 3",
-      "answer": "Clear, specific answer"
+      "question": "Simple factual question about A-anchor 3",
+      "answer": "Clear, specific answer findable in the narrative"
     },
     {
-      "question": "Simple 'what' or 'roughly when' question about A-anchor 4",
-      "answer": "Clear, specific answer"
+      "question": "Simple factual question about A-anchor 4",
+      "answer": "Clear, specific answer findable in the narrative"
     },
     {
-      "question": "Simple 'what' or 'roughly when' question about A-anchor 5",
-      "answer": "Clear, specific answer"
+      "question": "Simple factual question about A-anchor 5",
+      "answer": "Clear, specific answer findable in the narrative"
     }
   ],
   "estimatedReadTime": 5
@@ -203,15 +230,26 @@ Return your response as JSON:
 
 ## Knowledge Check Questions
 
-The 5 questions test whether readers absorbed the key information from each A-anchor. Their purpose is reinforcement—helping users commit essential facts to memory.
+Each question tests whether the reader absorbed one key fact from one A-anchor.
 
-### Guidelines:
+- **One question per A-anchor** (exactly 5)
+- **Simple factual recall**: "What..." or "Roughly when..." or "Where..."
+- **Single focus**: Never ask two things in one question
+- **Answerable from narrative**: The answer must appear in your text
+- **Not circular**: Don't embed the answer in the question
 
-- **One question per A-anchor**: Each question corresponds to one of the 5 concepts you taught
-- **Complexity Level 1 only**: Simple factual recall ("what happened" or "roughly when did X happen")
-- **Single-focus**: Never ask two things in one question
-- **Answerable from the narrative**: Every answer must be clearly stated in your text
-- **Not circular**: Do not embed the answer in the question (e.g., "What Mars-sized impact created the Moon?" is bad because "Mars-sized impact" is the answer)
-- **Meaningful**: Test knowledge that helps readers understand how the world works, not trivia
+---
 
-These questions will appear after the narrative as a brief quiz before users proceed.
+## Final Checklist Before Submitting
+
+Ask yourself:
+
+1. Does my opening hook tell a specific story, or does it explain the topic directly? (Must be a story)
+2. Would someone actually want to read this, or does it feel like homework? (Must be genuinely engaging)
+3. Have I used any em-dashes? (Must not)
+4. Have I used any cliché phrases like "pivotal moment" or "forever changed"? (Must not)
+5. Are my A-anchors woven into the narrative naturally, or do they feel like a checklist? (Must be natural)
+6. Did I explain WHY things happened, not just WHAT happened? (Must explain causation)
+7. Does my closing offer genuine insight, or is it a summary? (Must be insight)
+
+If any answer is wrong, revise before submitting.
