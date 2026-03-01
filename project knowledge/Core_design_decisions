@@ -1,0 +1,134 @@
+# Fractal History: Core Design Decisions
+
+## Three-Dimensional Structure
+
+Every historical topic can be organized along three axes:
+- **TIME**: When did things happen?
+- **SPACE**: Where did things happen?
+- **THEMES**: Why/how did things happen? (analytical frameworks)
+
+## Notation System
+
+- **Letters (A, B, C, D, E...)**: Breadth (different topics at same level)
+- **Numbers (3, 4, 5, 6...)**: Depth (zooming into a topic)
+
+## Anchor Types at Each Level
+
+### A-Anchors (Analytical - Most Essential)
+- The 3-5 most important aspects for understanding the topic
+- Can be: themes, events, people, institutions, concepts
+- NOT time periods or geographic regions (those are B/C)
+- Always prioritize what matters most
+
+### B-Anchors (Usually Time or Space)
+For history-focused learning, B-anchors should usually be:
+- **Temporal**: Complete chronological coverage (3-4 eras)
+- **OR Geographic**: Complete spatial coverage (3-4 regions + "Rest of World")
+- Whichever dimension is more fundamental for this topic
+
+### C-Anchors (Usually Space or Time)
+- Whichever complete coverage dimension wasn't used for B
+- If B=time, then C=space
+- If B=space, then C=time
+
+### D/E/F-Anchors (More Analytical)
+- Secondary and tertiary analytical themes
+- Can expand indefinitely as needed
+- Only in rare conceptual cases should B/C also be analytical
+
+## Anchor Count Guidelines
+
+**Use 3-5 anchors per level**, preferring fewer:
+- **3 anchors**: Natural three-part structure
+- **4 anchors**: Common, well-balanced
+- **5 anchors**: Maximum before cognitive overload
+- **6+ anchors**: Too many - go deeper instead
+
+## Time/Space Subdivision Rules
+
+### Temporal Anchors
+- **Define by**: Time windows
+- **Label by**: Dominant character/theme of period (e.g., "Axis Expansion 1939-1942")
+- **Contain**: Everything happening during that period (not just the label theme)
+- **Subdivisions must**: Stay within parent's time boundaries
+- **Cannot**: Extend beyond parent dates or jump to "legacy" (that's elsewhere)
+
+### Geographic Anchors
+- **Define by**: Spatial boundaries
+- **Label by**: Regional character (e.g., "Pacific Theater")
+- **Contain**: Everything about the topic in that region
+- **Must include**: "Rest of World" or equivalent for global context
+- **Subdivisions must**: Stay within parent's geographic boundaries
+- **Cannot**: Extend beyond parent region or discuss global legacy (that's elsewhere)
+
+### Key Distinctions
+- **Temporal/Geographic anchors**: Comprehensive (everything in that time/place)
+- **Analytical anchors**: Focused (only that theme/event/concept)
+- **Events vs. Periods**: "Pearl Harbor" (event) ≠ "Axis Expansion 1939-42" (period containing Pearl Harbor)
+
+## Flexibility Principles
+
+### Unequal Sizes Are Fine
+- Temporal eras can vary widely (Roman Kingdom 244 years, Byzantine 977 years)
+- Geographic regions can vary (Eastern Front huge, smaller theaters important too)
+- Match divisions to meaningful distinctions, not arbitrary equality
+
+### Overlap Is Allowed
+- Temporal: "Global War 1941-45" can overlap "Allied Offensive 1943-45"
+- Geographic: Frontier zones can overlap with core territories
+- Match what aids understanding, not strict partitioning
+
+### Organization Varies by Topic
+Choose organizational scheme that best fits the topic's nature:
+- Political histories: Chronology often primary
+- Wars with distinct theaters: Geography often primary  
+- Conceptual topics: Multiple analytical levels may precede time/space
+
+## Recursive Pattern
+
+**At every level, any anchor can be explored via:**
+1. **Themes** (A-anchors): What matters most about THIS topic?
+2. **Time** (usually B or C): How does THIS topic divide chronologically?
+3. **Space** (usually B or C): How does THIS topic divide geographically?
+4. **More themes** (D/E/F): What other angles matter?
+
+**This works recursively:**
+- World War Two → Pacific Theater (geographic) → Allied Offensive 1943-45 (temporal) → Island-Hopping Strategy (thematic)
+- World War Two → Allied Victory 1942-45 (temporal) → Pacific (geographic) → Island-Hopping Strategy (thematic)
+- Same content, different pathways
+
+## Historical Focus
+
+**This is history education, not an encyclopedia:**
+- Time and space should appear at B/C level for nearly all topics
+- Multiple analytical breadth levels rare (only for very conceptual topics)
+- Students learning history want chronological and geographic frameworks
+- Even analytical topics (Roman Law, Democracy) matter for their historical development and influence
+
+## Content Boundaries
+
+### Where "Legacy" Content Goes
+- **NOT in**: Temporal/geographic subdivisions of original period
+- **YES in**: Dedicated analytical anchors (e.g., "Post-War Consequences")
+- **OR in**: Later temporal periods (e.g., "Post-War Settlement 1945-49")
+- Prevents redundancy and double coverage
+
+### Bounding Principle
+- Temporal subdivisions stay within parent's time range
+- Geographic subdivisions stay within parent's spatial boundaries
+- Ensures clean hierarchy and prevents content orphaning
+
+## Example Structure: World War Two
+
+### Level 3
+- **3A** (Analytical): Holocaust, Total War, Why Allies Won, Turning Points, Post-War Order
+- **3B** (Geographic): Western Front, Eastern Front, Pacific Theater, China & Global Context
+- **3C** (Temporal): Axis Expansion 1939-42, Allied Victory 1942-45, Post-War 1945-49
+- **3D** (More Analytical): Resistance, Intelligence, Women's Roles, Technology
+
+### Level 4 (Under 3B-3: Pacific Theater)
+- **4A** (Analytical): Naval Warfare, Island-Hopping, Occupation & Resistance, Atomic Weapons, Racial Dimensions
+- **4B** (Geographic): Central Pacific, Southwest Pacific, Southeast Asia, China-Burma-India
+- **4C** (Temporal): Japanese Expansion 1941-42, Turning Point 1942-43, Allied Offensive 1943-45
+
+**Pattern repeats at every level with same flexibility.**

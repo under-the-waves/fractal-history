@@ -1,0 +1,9 @@
+Core Concept: Fractal structure where each historical topic has 5 key "anchors" (essential concepts), and each anchor can be explored deeper with its own 5 sub-anchors, creating infinite branching possibilities.
+
+Anchor System: Each anchor has a unique ID format (Level-Hash, e.g., "3-A7F2X9"), title, 1000-word Dan Carlin-style narrative, and prerequisite requirements. Multiple pathways can reach the same anchor.
+
+Learning Pathway: 50-anchor foundation sequence covering universal world history, from Agricultural Revolution to AI emergence. Users can follow guided paths or explore freely, but prerequisites ensure coherent understanding.
+
+Content Generation: LLMs create compelling narratives, flashcards, and learning materials. Each anchor narrative embeds 5 key concepts in storytelling format rather than textbook style.
+
+App Features: Spaced repetition flashcards, progress tracking, prerequisite-based unlocking system, visual skill trees showing learning pathways.

@@ -1,53 +1,49 @@
-import { useState } from 'react'
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import LandingPage from './components/LandingPage'
 import AnchorList from './components/AnchorList'
 import NarrativeReading from './components/NarrativeReading'
 import TreeVisualization from './components/TreeVisualization.jsx'
 import './App.css'
 
-function App() {
-  const [currentView, setCurrentView] = useState('landing')
-  const [selectedAnchor, setSelectedAnchor] = useState(null)
+function AppContent() {
+  const navigate = useNavigate()
 
   const handleSelectAnchor = (anchor) => {
-    setSelectedAnchor(anchor)
-    setCurrentView('reading')
-  }
-
-  const handleComplete = () => {
-    // For now, just go back to anchor list
-    // Later we'll add quiz functionality
-    setCurrentView('anchors')
+    navigate(`/narrative/${anchor.id}`)
   }
 
   return (
     <div className="app">
       {/* Navigation */}
       <nav className="app-nav">
-        <button onClick={() => setCurrentView('landing')}>Home</button>
-        <button onClick={() => setCurrentView('tree')}>Tree View</button>
-        <button onClick={() => setCurrentView('anchors')}>30 Essentials</button>
+        <button onClick={() => navigate('/')}>Home</button>
+        <button onClick={() => navigate('/tree')}>Tree View</button>
+        <button onClick={() => navigate('/anchors')}>30 Essentials</button>
       </nav>
 
-      {currentView === 'landing' && (
-        <LandingPage onStart={() => setCurrentView('tree')} />
-      )}
-
-      {currentView === 'tree' && (
-        <TreeVisualization />
-      )}
-
-      {currentView === 'anchors' && (
-        <AnchorList onSelectAnchor={handleSelectAnchor} />
-      )}
-
-      {currentView === 'reading' && selectedAnchor && (
-        <NarrativeReading
-          anchor={selectedAnchor}
-          onComplete={handleComplete}
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <LandingPage
+              onStart={() => navigate('/tree')}
+              onAbout={() => navigate('/about')}
+            />
+          }
         />
-      )}
+        <Route path="/tree" element={<TreeVisualization />} />
+        <Route path="/anchors" element={<AnchorList onSelectAnchor={handleSelectAnchor} />} />
+        <Route path="/narrative/:id" element={<NarrativeReading />} />
+      </Routes>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
   )
 }
 
