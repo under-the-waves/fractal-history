@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useAuth, SignInButton } from '@clerk/clerk-react'
+import { useClerkEnabled } from '../hooks/useClerkAuth'
 
 // Loading stages for generation process
 const LOADING_STAGES = {
@@ -18,10 +20,115 @@ const BREADTH_LABELS = {
     'C': 'Regional Perspectives'
 }
 
+// Separate component that safely uses Clerk hooks (only rendered inside ClerkProvider)
+function FlashcardSaveSection({ anchorId, breadth, questions }) {
+    const auth = useAuth()
+    const [savedCards, setSavedCards] = useState(new Set())
+    const [savingAll, setSavingAll] = useState(false)
+
+    const saveFlashcard = async (question, answer) => {
+        try {
+            const token = await auth.getToken()
+            const response = await fetch('/api/flashcards', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ anchorId, breadth, question, answer })
+            })
+            const data = await response.json()
+            if (data.success) {
+                setSavedCards(prev => new Set([...prev, question]))
+            }
+        } catch (err) {
+            console.error('Failed to save flashcard:', err)
+        }
+    }
+
+    const saveAllFlashcards = async () => {
+        setSavingAll(true)
+        try {
+            const token = await auth.getToken()
+            const response = await fetch('/api/flashcards', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    anchorId,
+                    breadth,
+                    flashcards: questions
+                })
+            })
+            const data = await response.json()
+            if (data.success) {
+                setSavedCards(new Set(questions.map(q => q.question)))
+            }
+        } catch (err) {
+            console.error('Failed to save flashcards:', err)
+        } finally {
+            setSavingAll(false)
+        }
+    }
+
+    if (!auth.isSignedIn) {
+        return (
+            <section className="flashcard-save-section">
+                <h2 className="flashcard-save-heading">Save as Flashcards</h2>
+                <div className="flashcard-sign-in-prompt">
+                    <p>Sign in to save flashcards from this narrative.</p>
+                    <SignInButton mode="modal">
+                        <button className="sign-in-prompt-button">Sign in to save flashcards</button>
+                    </SignInButton>
+                </div>
+            </section>
+        )
+    }
+
+    return (
+        <section className="flashcard-save-section">
+            <h2 className="flashcard-save-heading">Save as Flashcards</h2>
+            <div className="flashcard-save-actions">
+                <button
+                    className="save-all-button"
+                    onClick={saveAllFlashcards}
+                    disabled={savingAll || savedCards.size === questions.length}
+                >
+                    {savedCards.size === questions.length
+                        ? 'All saved'
+                        : savingAll
+                            ? 'Saving...'
+                            : `Save all ${questions.length} as flashcards`}
+                </button>
+            </div>
+            <div className="flashcard-save-list">
+                {questions.map((q, index) => (
+                    <div key={index} className="flashcard-save-item">
+                        <div className="flashcard-save-content">
+                            <p className="flashcard-save-question"><strong>Q:</strong> {q.question}</p>
+                            <p className="flashcard-save-answer"><strong>A:</strong> {q.answer}</p>
+                        </div>
+                        <button
+                            className={`flashcard-save-button ${savedCards.has(q.question) ? 'saved' : ''}`}
+                            onClick={() => saveFlashcard(q.question, q.answer)}
+                            disabled={savedCards.has(q.question)}
+                        >
+                            {savedCards.has(q.question) ? 'Saved' : 'Save'}
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </section>
+    )
+}
+
 function NarrativeReading() {
     const { id } = useParams()
     const [searchParams, setSearchParams] = useSearchParams()
     const navigate = useNavigate()
+    const clerkEnabled = useClerkEnabled()
 
     // Get breadth from URL query param, default to 'A'
     const breadth = searchParams.get('breadth') || 'A'
@@ -233,7 +340,7 @@ function NarrativeReading() {
 
                 {/* Breadth selector tabs */}
                 <div className="breadth-tabs">
-                    {['A', 'B', 'C'].map((b) => (
+                    {['A', 'B'].map((b) => (
                         <button
                             key={b}
                             className={`breadth-tab ${breadth === b ? 'active' : ''}`}
@@ -242,6 +349,13 @@ function NarrativeReading() {
                             {BREADTH_LABELS[b]}
                         </button>
                     ))}
+                    <button
+                        className="breadth-tab disabled"
+                        disabled
+                        title="Coming soon"
+                    >
+                        {BREADTH_LABELS['C']}
+                    </button>
                 </div>
             </header>
 
@@ -288,17 +402,15 @@ function NarrativeReading() {
                 </section>
             )}
 
-            {/* Quiz button */}
-            {anchor.questions && anchor.questions.length > 0 && (
-                <div className="quiz-section">
-                    <button
-                        className="quiz-button"
-                        onClick={() => navigate(`/quiz/${anchor.id}?breadth=${breadth}`)}
-                    >
-                        Take Knowledge Check →
-                    </button>
-                </div>
+            {/* Flashcard save section */}
+            {anchor.questions && anchor.questions.length > 0 && clerkEnabled && (
+                <FlashcardSaveSection
+                    anchorId={id}
+                    breadth={breadth}
+                    questions={anchor.questions}
+                />
             )}
+
         </div>
     )
 }

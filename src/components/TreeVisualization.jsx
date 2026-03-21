@@ -26,6 +26,9 @@ function TreeVisualization() {
     // State for collapsible legend
     const [legendExpanded, setLegendExpanded] = useState(false);
 
+    // Error state for user-facing messages
+    const [errorMessage, setErrorMessage] = useState(null);
+
     // Helper functions to work with treeData
     const getChildren = (parentId, breadth = 'A') => {
         return Object.values(treeData).filter(anchor =>
@@ -497,10 +500,17 @@ function TreeVisualization() {
             {generatingOverlay}
             {loadingOverlay}
 
+            {/* Error banner */}
+            {errorMessage && (
+                <div className="tree-error-banner" onClick={() => setErrorMessage(null)}>
+                    {errorMessage}
+                </div>
+            )}
+
             {/* Frozen header */}
             <div className="tree-header">
                 <h1>Fractal History Tree</h1>
-                <span className="tree-subtitle">Click to expand. Toggle A/B/C for different perspectives.</span>
+                <span className="tree-subtitle">Click to expand. Toggle A/B for different perspectives.</span>
 
                 {/* Collapsible legend */}
                 <div className="breadth-legend">
@@ -508,7 +518,7 @@ function TreeVisualization() {
                         className="legend-toggle"
                         onClick={() => setLegendExpanded(!legendExpanded)}
                     >
-                        Breadth: <span style={{ color: '#3498db' }}>A</span>=Analytical <span style={{ color: '#27ae60' }}>B</span>=Temporal <span style={{ color: '#e67e22' }}>C</span>=Geographic {legendExpanded ? '▲' : '▼'}
+                        Breadth: <span style={{ color: '#3498db' }}>A</span>=Analytical <span style={{ color: '#27ae60' }}>B</span>=Temporal {legendExpanded ? '▲' : '▼'}
                     </button>
                     {legendExpanded && (
                         <div className="legend-expanded">
@@ -519,10 +529,6 @@ function TreeVisualization() {
                             <div className="legend-item">
                                 <span className="legend-color" style={{ backgroundColor: '#27ae60' }}></span>
                                 <span><strong>Breadth B:</strong> Temporal anchors - complete time coverage</span>
-                            </div>
-                            <div className="legend-item">
-                                <span className="legend-color" style={{ backgroundColor: '#e67e22' }}></span>
-                                <span><strong>Breadth C:</strong> Geographic anchors - complete space coverage</span>
                             </div>
                         </div>
                     )}
@@ -624,8 +630,8 @@ function TreeVisualization() {
                                                     Breadth
                                                 </text>
 
-                                                {/* Breadth buttons - always show A, B, C */}
-                                                {['A', 'B', 'C'].map((breadth, index) => {
+                                                {/* Breadth buttons */}
+                                                {['A', 'B'].map((breadth, index) => {
                                                     const activeBreadth = getActiveBreadth(node.id);
                                                     const isActive = breadth === activeBreadth;
                                                     // Check both local treeData and static data
@@ -709,18 +715,20 @@ function TreeVisualization() {
                                                                                 await fetchBreadthData(node.id, node.anchor.title, breadth);
                                                                             } else {
                                                                                 console.error(`Failed to generate ${breadth}-anchors:`, generateData.error);
-                                                                                alert(`Failed to generate ${breadth}-anchors: ${generateData.error}`);
+                                                                                setErrorMessage(`Failed to generate ${breadth}-anchors: ${generateData.error}`);
+                                                                                setTimeout(() => setErrorMessage(null), 5000);
                                                                             }
                                                                         } catch (error) {
                                                                             console.error(`Error generating ${breadth}-anchors:`, error);
-                                                                            alert(`Error generating ${breadth}-anchors. Please try again.`);
+                                                                                setErrorMessage(`Error generating ${breadth}-anchors. Please try again.`);
+                                                                                setTimeout(() => setErrorMessage(null), 5000);
                                                                         } finally {
                                                                             setGenerating(false);
                                                                         }
                                                                         return;
                                                                     }
 
-                                                                    // For breadth C or others without generation support
+                                                                    // Fallback for any breadth without generation support
                                                                     await fetchBreadthData(node.id, node.anchor.title, breadth);
                                                                 } finally {
                                                                     setLoadingBreadth(null);
