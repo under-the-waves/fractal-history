@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { ClerkProvider } from '@clerk/clerk-react'
+import { ClerkProvider } from '@clerk/react'
 import { ClerkEnabledContext } from './hooks/useClerkAuth'
 import './index.css'
 import App from './App.jsx'

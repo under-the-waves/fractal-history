@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
+import { Show, SignInButton, UserButton } from '@clerk/react'
 import { useClerkEnabled } from './hooks/useClerkAuth'
 import LandingPage from './components/LandingPage'
 import AnchorList from './components/AnchorList'
@@ -25,21 +25,21 @@ function AppContent() {
         <button onClick={() => navigate('/tree')}>Tree View</button>
         <button onClick={() => navigate('/anchors')}>30 Essentials</button>
         {clerkEnabled && (
-          <SignedIn>
+          <Show when="signed-in">
             <button onClick={() => navigate('/flashcards')}>Flashcards</button>
-          </SignedIn>
+          </Show>
         )}
         <button onClick={() => navigate('/about')}>About</button>
         {clerkEnabled && (
           <div className="nav-auth">
-            <SignedIn>
+            <Show when="signed-in">
               <UserButton />
-            </SignedIn>
-            <SignedOut>
+            </Show>
+            <Show when="signed-out">
               <SignInButton mode="modal">
                 <button className="sign-in-button">Sign In</button>
               </SignInButton>
-            </SignedOut>
+            </Show>
           </div>
         )}
       </nav>

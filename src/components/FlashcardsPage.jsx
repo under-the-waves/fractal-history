@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useAuth, RedirectToSignIn } from '@clerk/clerk-react'
+import { useAuth, RedirectToSignIn } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
 
 function FlashcardsPageInner() {
