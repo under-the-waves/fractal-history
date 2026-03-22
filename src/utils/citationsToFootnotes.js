@@ -17,7 +17,7 @@ export function citationsToFootnotes(html) {
         (_match, url, text) => {
             count++;
             footnotes.push({ number: count, url, text });
-            return `${text}<sup><a href="${url}" target="_blank" rel="noopener" class="footnote-ref">[${count}]</a></sup>`;
+            return `${text}<sup><a href="${url}" target="_blank" rel="noopener" class="footnote-ref">${count}</a></sup>`;
         }
     );
 
