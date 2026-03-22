@@ -166,7 +166,9 @@ async function handlePost(req, res, userId) {
     }
 }
 
-// SM-2 algorithm with Anki's 4-button simplification
+// Anki-style SRS with two phases:
+//   Learning (reps 0-1): fixed graduating intervals
+//   Review   (reps 2+):  SM-2 with ease factor
 // Rating: 0 = Again, 1 = Hard, 2 = Good, 3 = Easy
 function calculateSRS(card, rating) {
     let { ease_factor, interval_days, repetitions } = card;
@@ -176,43 +178,39 @@ function calculateSRS(card, rating) {
 
     let newEase = ease_factor;
     let newInterval;
-    let newReps = repetitions;
+    let newReps;
 
-    switch (rating) {
-        case 0: // Again
-            newEase = Math.max(1.3, ease_factor - 0.20);
-            newInterval = 0;
-            newReps = 0;
-            break;
-        case 1: // Hard
+    if (rating === 0) {
+        // Again — always reset to re-show
+        newEase = Math.max(1.3, ease_factor - 0.20);
+        newInterval = 0;
+        newReps = 0;
+    } else if (repetitions === 0) {
+        // New card — fixed graduating intervals
+        newReps = 1;
+        if (rating === 1) { newInterval = 1; newEase = Math.max(1.3, ease_factor - 0.15); }
+        else if (rating === 2) { newInterval = 3; }
+        else { newInterval = 5; newEase = ease_factor + 0.15; } // Easy
+    } else if (repetitions === 1) {
+        // Second review — Anki graduating interval
+        newReps = 2;
+        if (rating === 1) { newInterval = Math.max(interval_days + 1, Math.round(interval_days * 1.2)); newEase = Math.max(1.3, ease_factor - 0.15); }
+        else if (rating === 2) { newInterval = 6; }
+        else { newInterval = 8; newEase = ease_factor + 0.15; } // Easy
+    } else {
+        // Mature card — SM-2
+        newReps = repetitions + 1;
+        const base = Math.round(interval_days * ease_factor);
+        if (rating === 1) {
             newEase = Math.max(1.3, ease_factor - 0.15);
-            newInterval = Math.max(1, Math.round(interval_days * 1.2));
-            break;
-        case 2: // Good
-            newEase = ease_factor;
-            newReps = repetitions + 1;
-            if (repetitions === 0) {
-                newInterval = 1;
-            } else if (repetitions === 1) {
-                newInterval = 6;
-            } else {
-                newInterval = Math.round(interval_days * ease_factor);
-            }
-            break;
-        case 3: // Easy
+            newInterval = Math.max(interval_days + 1, Math.round(interval_days * 1.2));
+        } else if (rating === 2) {
+            newInterval = Math.max(interval_days + 1, base);
+        } else {
+            // Easy
             newEase = ease_factor + 0.15;
-            newReps = repetitions + 1;
-            if (repetitions === 0) {
-                newInterval = 4;
-            } else if (repetitions === 1) {
-                newInterval = 6;
-            } else {
-                newInterval = Math.round(interval_days * ease_factor);
-            }
-            newInterval = Math.round(newInterval * 1.3);
-            break;
-        default:
-            throw new Error(`Invalid rating: ${rating}`);
+            newInterval = Math.max(interval_days + 1, Math.round(base * 1.3));
+        }
     }
 
     return {

@@ -26,23 +26,24 @@ function previewIntervals(card) {
     const reps = card.repetitions || 0
 
     const calc = (rating) => {
-        switch (rating) {
-            case 0: return 0 // Again — re-show in session
-            case 1: return Math.max(1, Math.round(interval * 1.2)) // Hard
-            case 2: { // Good
-                if (reps === 0) return 1
-                if (reps === 1) return 6
-                return Math.round(interval * ease)
-            }
-            case 3: { // Easy
-                let base
-                if (reps === 0) base = 4
-                else if (reps === 1) base = 6
-                else base = Math.round(interval * ease)
-                return Math.round(base * 1.3)
-            }
-            default: return 1
+        if (rating === 0) return 0 // Again — re-show in session
+        if (reps === 0) {
+            // New card — fixed graduating intervals
+            if (rating === 1) return 1
+            if (rating === 2) return 3
+            return 5 // Easy
         }
+        if (reps === 1) {
+            // Second review — graduating
+            if (rating === 1) return Math.max(interval + 1, Math.round(interval * 1.2))
+            if (rating === 2) return 6
+            return 8 // Easy
+        }
+        // Mature — SM-2
+        const base = Math.round(interval * ease)
+        if (rating === 1) return Math.max(interval + 1, Math.round(interval * 1.2))
+        if (rating === 2) return Math.max(interval + 1, base)
+        return Math.max(interval + 1, Math.round(base * 1.3)) // Easy
     }
 
     return RATING_BUTTONS.map(b => ({

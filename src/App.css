@@ -929,16 +929,17 @@
 
 /* Sub-anchor links (child anchors in narrative text) */
 .sub-anchor-link {
-  color: #c49a6c;
+  color: #1a1a1a;
   font-weight: 700;
   text-decoration: none;
-  border-bottom: 1.5px solid rgba(196, 154, 108, 0.4);
-  transition: border-color 0.2s, color 0.2s;
+  background: linear-gradient(to top, rgba(196, 154, 108, 0.3) 40%, transparent 40%);
+  padding: 0 2px;
+  border-radius: 2px;
+  transition: background 0.2s;
 }
 
 .sub-anchor-link:hover {
-  color: #a67c4e;
-  border-bottom-color: #a67c4e;
+  background: rgba(196, 154, 108, 0.45);
 }
 
 /* Key concepts box */
