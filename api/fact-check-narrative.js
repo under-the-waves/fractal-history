@@ -30,33 +30,30 @@ function loadPrompt() {
     return fs.readFileSync(promptPath, 'utf-8');
 }
 
-async function braveSearch(query) {
-    const apiKey = process.env.BRAVE_SEARCH_API_KEY;
+async function webSearch(query) {
+    const apiKey = process.env.SERPER_API_KEY;
     if (!apiKey) {
-        throw new Error('BRAVE_SEARCH_API_KEY not configured');
+        throw new Error('SERPER_API_KEY not configured');
     }
 
-    const url = new URL('https://api.search.brave.com/res/v1/web/search');
-    url.searchParams.set('q', query);
-    url.searchParams.set('count', '5');
-
-    const response = await fetch(url.toString(), {
+    const response = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
         headers: {
-            'Accept': 'application/json',
-            'Accept-Encoding': 'gzip',
-            'X-Subscription-Token': apiKey,
-        }
+            'X-API-KEY': apiKey,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ q: query, num: 5 }),
     });
 
     if (!response.ok) {
-        throw new Error(`Brave Search failed: ${response.status}`);
+        throw new Error(`Serper search failed: ${response.status}`);
     }
 
     const data = await response.json();
-    const results = (data.web?.results || []).map(r => ({
+    const results = (data.organic || []).map(r => ({
         title: r.title,
-        url: r.url,
-        description: r.description,
+        url: r.link,
+        description: r.snippet,
     }));
 
     return results;
@@ -150,7 +147,7 @@ export default async function handler(req, res) {
                 for (const block of assistantContent) {
                     if (block.type === 'tool_use' && block.name === 'web_search') {
                         try {
-                            const results = await braveSearch(block.input.query);
+                            const results = await webSearch(block.input.query);
                             toolResults.push({
                                 type: 'tool_result',
                                 tool_use_id: block.id,
