@@ -1,14 +1,384 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth, RedirectToSignIn } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
+import { Link } from 'react-router-dom'
+
+const RATING_BUTTONS = [
+    { label: 'Again', rating: 0, className: 'rating-again' },
+    { label: 'Hard', rating: 1, className: 'rating-hard' },
+    { label: 'Good', rating: 2, className: 'rating-good' },
+    { label: 'Easy', rating: 3, className: 'rating-easy' },
+]
+
+function formatInterval(days) {
+    if (days < 1) return '< 1d'
+    if (days === 1) return '1d'
+    if (days < 30) return `${days}d`
+    if (days < 365) return `${Math.round(days / 30)}mo`
+    return `${(days / 365).toFixed(1)}y`
+}
+
+// Preview what the interval would be after each rating
+function previewIntervals(card) {
+    const ease = card.ease_factor || 2.5
+    const interval = card.interval_days || 0
+    const reps = card.repetitions || 0
+
+    const calc = (rating) => {
+        switch (rating) {
+            case 0: return 1 // Again
+            case 1: return Math.max(1, Math.round(interval * 1.2)) // Hard
+            case 2: { // Good
+                if (reps === 0) return 1
+                if (reps === 1) return 6
+                return Math.round(interval * ease)
+            }
+            case 3: { // Easy
+                let base
+                if (reps === 0) base = 1
+                else if (reps === 1) base = 6
+                else base = Math.round(interval * ease)
+                return Math.round(base * 1.3)
+            }
+            default: return 1
+        }
+    }
+
+    return RATING_BUTTONS.map(b => ({
+        ...b,
+        interval: formatInterval(calc(b.rating))
+    }))
+}
+
+function StudyMode({ auth, onSwitchToBrowse }) {
+    const [cards, setCards] = useState([])
+    const [currentIndex, setCurrentIndex] = useState(0)
+    const [showAnswer, setShowAnswer] = useState(false)
+    const [loading, setLoading] = useState(true)
+    const [reviewing, setReviewing] = useState(false)
+    const [sessionStats, setSessionStats] = useState({ total: 0, again: 0, hard: 0, good: 0, easy: 0 })
+    const [sessionComplete, setSessionComplete] = useState(false)
+    const [stats, setStats] = useState(null)
+
+    const fetchReviewCards = useCallback(async () => {
+        try {
+            setLoading(true)
+            const token = await auth.getToken()
+            const response = await fetch('/api/flashcards?mode=review', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const data = await response.json()
+            if (data.success) {
+                setCards(data.flashcards)
+                setCurrentIndex(0)
+                setShowAnswer(false)
+                setSessionComplete(false)
+                setSessionStats({ total: 0, again: 0, hard: 0, good: 0, easy: 0 })
+            }
+        } catch (err) {
+            console.error('Failed to fetch review cards:', err)
+        } finally {
+            setLoading(false)
+        }
+    }, [auth])
+
+    const fetchStats = useCallback(async () => {
+        try {
+            const token = await auth.getToken()
+            const response = await fetch('/api/flashcards?mode=stats', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const data = await response.json()
+            if (data.success) {
+                setStats(data.stats)
+            }
+        } catch (err) {
+            console.error('Failed to fetch stats:', err)
+        }
+    }, [auth])
+
+    useEffect(() => {
+        fetchReviewCards()
+        fetchStats()
+    }, [fetchReviewCards, fetchStats])
+
+    const handleRating = async (rating) => {
+        if (reviewing) return
+        setReviewing(true)
+
+        const card = cards[currentIndex]
+        const ratingNames = ['again', 'hard', 'good', 'easy']
+
+        try {
+            const token = await auth.getToken()
+            await fetch('/api/flashcards', {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id: card.id, rating })
+            })
+
+            setSessionStats(prev => ({
+                ...prev,
+                total: prev.total + 1,
+                [ratingNames[rating]]: prev[ratingNames[rating]] + 1
+            }))
+
+            if (currentIndex + 1 >= cards.length) {
+                setSessionComplete(true)
+                fetchStats()
+            } else {
+                setCurrentIndex(prev => prev + 1)
+                setShowAnswer(false)
+            }
+        } catch (err) {
+            console.error('Failed to submit review:', err)
+        } finally {
+            setReviewing(false)
+        }
+    }
+
+    if (loading) {
+        return <div className="flashcards-loading">Loading study session...</div>
+    }
+
+    if (cards.length === 0) {
+        return (
+            <div className="study-empty">
+                <h2>Nothing to review</h2>
+                <p>
+                    {stats && stats.total > 0
+                        ? 'All caught up. Come back later when cards are due.'
+                        : 'Read some narratives and save flashcards to start studying.'}
+                </p>
+                {stats && (
+                    <div className="study-stats-summary">
+                        <span>{stats.total} total</span>
+                        <span>{stats.reviewedToday} reviewed today</span>
+                    </div>
+                )}
+                <button onClick={onSwitchToBrowse} className="study-browse-link">
+                    Browse all cards
+                </button>
+            </div>
+        )
+    }
+
+    if (sessionComplete) {
+        return (
+            <div className="study-complete">
+                <h2>Session complete</h2>
+                <div className="study-complete-stats">
+                    <p className="study-complete-total">{sessionStats.total} cards reviewed</p>
+                    <div className="study-complete-breakdown">
+                        {sessionStats.again > 0 && <span className="rating-again">{sessionStats.again} Again</span>}
+                        {sessionStats.hard > 0 && <span className="rating-hard">{sessionStats.hard} Hard</span>}
+                        {sessionStats.good > 0 && <span className="rating-good">{sessionStats.good} Good</span>}
+                        {sessionStats.easy > 0 && <span className="rating-easy">{sessionStats.easy} Easy</span>}
+                    </div>
+                </div>
+                {stats && (
+                    <p className="study-next-due">
+                        {stats.due > 0
+                            ? `${stats.due} more cards due`
+                            : 'No more cards due today'}
+                    </p>
+                )}
+                <div className="study-complete-actions">
+                    <button onClick={fetchReviewCards} className="study-again-button">
+                        Study more
+                    </button>
+                    <button onClick={onSwitchToBrowse} className="study-browse-link">
+                        Browse all cards
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
+    const card = cards[currentIndex]
+    const intervals = previewIntervals(card)
+
+    return (
+        <div className="study-session">
+            <div className="study-progress">
+                <div className="study-progress-bar">
+                    <div
+                        className="study-progress-fill"
+                        style={{ width: `${(currentIndex / cards.length) * 100}%` }}
+                    />
+                </div>
+                <span className="study-progress-text">
+                    Card {currentIndex + 1} of {cards.length}
+                </span>
+            </div>
+
+            <div className="study-card-context">
+                <Link
+                    to={`/narrative/${card.anchor_id}?breadth=${card.breadth}`}
+                    className="study-narrative-link"
+                >
+                    {card.anchor_title}
+                </Link>
+                <span className={`study-breadth-badge breadth-${card.breadth}`}>
+                    {card.breadth}
+                </span>
+            </div>
+
+            <div className="study-card">
+                <div className="study-card-front">
+                    <p className="study-question">{card.question}</p>
+                </div>
+
+                {!showAnswer ? (
+                    <button
+                        className="study-show-answer"
+                        onClick={() => setShowAnswer(true)}
+                    >
+                        Show Answer
+                    </button>
+                ) : (
+                    <>
+                        <div className="study-card-divider" />
+                        <div className="study-card-back">
+                            <p className="study-answer">{card.answer}</p>
+                        </div>
+                        <div className="study-rating-buttons">
+                            {intervals.map(({ label, rating, className, interval }) => (
+                                <button
+                                    key={rating}
+                                    className={`study-rating-btn ${className}`}
+                                    onClick={() => handleRating(rating)}
+                                    disabled={reviewing}
+                                >
+                                    <span className="rating-label">{label}</span>
+                                    <span className="rating-interval">{interval}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    )
+}
+
+function BrowseMode({ auth, flashcards, setFlashcards }) {
+    const [flippedCards, setFlippedCards] = useState(new Set())
+    const [deletingId, setDeletingId] = useState(null)
+
+    const toggleFlip = (id) => {
+        setFlippedCards(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }
+
+    const handleDelete = async (id) => {
+        setDeletingId(id)
+        try {
+            const token = await auth.getToken()
+            const response = await fetch(`/api/flashcards?id=${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const data = await response.json()
+            if (data.success) {
+                setFlashcards(prev => prev.filter(f => f.id !== id))
+            }
+        } catch (err) {
+            console.error('Failed to delete flashcard:', err)
+        } finally {
+            setDeletingId(null)
+        }
+    }
+
+    const getSrsBadge = (card) => {
+        if (!card.next_review_date) return { label: 'New', className: 'srs-new' }
+        const due = new Date(card.next_review_date)
+        if (due <= new Date()) return { label: 'Due', className: 'srs-due' }
+        return { label: formatInterval(card.interval_days), className: 'srs-scheduled' }
+    }
+
+    // Group flashcards by anchor
+    const grouped = flashcards.reduce((acc, card) => {
+        const key = card.anchor_title || card.anchor_id
+        if (!acc[key]) acc[key] = { cards: [], anchorId: card.anchor_id, breadth: card.breadth }
+        acc[key].cards.push(card)
+        return acc
+    }, {})
+
+    if (flashcards.length === 0) {
+        return (
+            <div className="flashcards-empty">
+                <h2>No flashcards yet</h2>
+                <p>Read narratives and save questions to build your collection.</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="flashcards-groups">
+            {Object.entries(grouped).map(([anchorTitle, { cards, anchorId, breadth }]) => (
+                <section key={anchorTitle} className="flashcard-group">
+                    <div className="flashcard-group-header">
+                        <h2 className="flashcard-group-title">{anchorTitle}</h2>
+                        <Link
+                            to={`/narrative/${anchorId}?breadth=${breadth}`}
+                            className="flashcard-narrative-link"
+                        >
+                            View narrative
+                        </Link>
+                    </div>
+                    <div className="flashcard-grid">
+                        {cards.map(card => {
+                            const badge = getSrsBadge(card)
+                            return (
+                                <div
+                                    key={card.id}
+                                    className={`flashcard ${flippedCards.has(card.id) ? 'flipped' : ''}`}
+                                    onClick={() => toggleFlip(card.id)}
+                                >
+                                    <div className="flashcard-inner">
+                                        <div className="flashcard-front">
+                                            <span className={`srs-badge ${badge.className}`}>{badge.label}</span>
+                                            <p className="flashcard-question">{card.question}</p>
+                                            <span className="flashcard-hint">Click to reveal answer</span>
+                                        </div>
+                                        <div className="flashcard-back">
+                                            <p className="flashcard-answer">{card.answer}</p>
+                                            <button
+                                                className="flashcard-delete"
+                                                disabled={deletingId === card.id}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleDelete(card.id)
+                                                }}
+                                            >
+                                                {deletingId === card.id ? 'Removing...' : 'Remove'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </section>
+            ))}
+        </div>
+    )
+}
 
 function FlashcardsPageInner() {
     const auth = useAuth()
+    const [activeTab, setActiveTab] = useState('study')
     const [flashcards, setFlashcards] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
-    const [flippedCards, setFlippedCards] = useState(new Set())
-    const [deletingId, setDeletingId] = useState(null)
 
     const fetchFlashcards = useCallback(async () => {
         if (!auth.isSignedIn) return
@@ -49,53 +419,6 @@ function FlashcardsPageInner() {
         return <RedirectToSignIn />
     }
 
-    const toggleFlip = (id) => {
-        setFlippedCards(prev => {
-            const next = new Set(prev)
-            if (next.has(id)) {
-                next.delete(id)
-            } else {
-                next.add(id)
-            }
-            return next
-        })
-    }
-
-    const handleDelete = async (id) => {
-        setDeletingId(id)
-        try {
-            const token = await auth.getToken()
-            const response = await fetch(`/api/flashcards?id=${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            const data = await response.json()
-            if (data.success) {
-                setFlashcards(prev => prev.filter(f => f.id !== id))
-            }
-        } catch (err) {
-            console.error('Failed to delete flashcard:', err)
-        } finally {
-            setDeletingId(null)
-        }
-    }
-
-    // Group flashcards by anchor
-    const grouped = flashcards.reduce((acc, card) => {
-        const key = card.anchor_title || card.anchor_id
-        if (!acc[key]) acc[key] = []
-        acc[key].push(card)
-        return acc
-    }, {})
-
-    if (loading) {
-        return (
-            <div className="flashcards-page">
-                <div className="flashcards-loading">Loading your flashcards...</div>
-            </div>
-        )
-    }
-
     if (error) {
         return (
             <div className="flashcards-page">
@@ -111,60 +434,43 @@ function FlashcardsPageInner() {
     return (
         <div className="flashcards-page">
             <header className="flashcards-header">
-                <h1>Your Flashcards</h1>
-                <p className="flashcards-count">
-                    {flashcards.length} {flashcards.length === 1 ? 'card' : 'cards'}
-                </p>
+                <h1>Flashcards</h1>
+                <div className="flashcards-tabs">
+                    <button
+                        className={`flashcards-tab ${activeTab === 'study' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('study')}
+                    >
+                        Study
+                    </button>
+                    <button
+                        className={`flashcards-tab ${activeTab === 'browse' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('browse')}
+                    >
+                        Browse
+                    </button>
+                </div>
             </header>
 
-            {flashcards.length === 0 ? (
-                <div className="flashcards-empty">
-                    <h2>No flashcards yet</h2>
-                    <p>Read narratives and save questions to build your collection.</p>
-                </div>
+            {activeTab === 'study' ? (
+                <StudyMode
+                    auth={auth}
+                    onSwitchToBrowse={() => setActiveTab('browse')}
+                />
             ) : (
-                <div className="flashcards-groups">
-                    {Object.entries(grouped).map(([anchorTitle, cards]) => (
-                        <section key={anchorTitle} className="flashcard-group">
-                            <h2 className="flashcard-group-title">{anchorTitle}</h2>
-                            <div className="flashcard-grid">
-                                {cards.map(card => (
-                                    <div
-                                        key={card.id}
-                                        className={`flashcard ${flippedCards.has(card.id) ? 'flipped' : ''}`}
-                                        onClick={() => toggleFlip(card.id)}
-                                    >
-                                        <div className="flashcard-inner">
-                                            <div className="flashcard-front">
-                                                <p className="flashcard-question">{card.question}</p>
-                                                <span className="flashcard-hint">Click to reveal answer</span>
-                                            </div>
-                                            <div className="flashcard-back">
-                                                <p className="flashcard-answer">{card.answer}</p>
-                                                <button
-                                                    className="flashcard-delete"
-                                                    disabled={deletingId === card.id}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleDelete(card.id)
-                                                    }}
-                                                >
-                                                    {deletingId === card.id ? 'Removing...' : 'Remove'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-                    ))}
-                </div>
+                loading ? (
+                    <div className="flashcards-loading">Loading your flashcards...</div>
+                ) : (
+                    <BrowseMode
+                        auth={auth}
+                        flashcards={flashcards}
+                        setFlashcards={setFlashcards}
+                    />
+                )
             )}
         </div>
     )
 }
 
-// Outer component handles the case where Clerk is not configured
 function FlashcardsPage() {
     const clerkEnabled = useClerkEnabled()
 
