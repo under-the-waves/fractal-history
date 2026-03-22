@@ -4,10 +4,13 @@ import { getAuthenticatedUser } from './utils/auth.js';
 const sql = neon(process.env.DATABASE_URL);
 
 export default async function handler(req, res) {
+    console.log('Flashcards API:', req.method, req.url);
     const userId = await getAuthenticatedUser(req);
     if (!userId) {
+        console.log('Flashcards API: Auth failed, returning 401');
         return res.status(401).json({ error: 'Authentication required' });
     }
+    console.log('Flashcards API: Authenticated as', userId);
 
     if (req.method === 'GET') {
         return handleGet(req, res, userId);

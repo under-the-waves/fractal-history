@@ -15,7 +15,7 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ClerkEnabledContext.Provider value={!!PUBLISHABLE_KEY}>
       {PUBLISHABLE_KEY ? (
-        <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+        <ClerkProvider afterSignOutUrl="/">
           <App />
         </ClerkProvider>
       ) : (
