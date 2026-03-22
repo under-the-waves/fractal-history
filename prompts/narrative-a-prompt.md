@@ -203,6 +203,10 @@ Return ONLY valid JSON with this exact structure:
   ],
   "questions": [
     {
+      "question": "Question about the opening anecdote/hook",
+      "answer": "Clear, specific answer findable in the narrative"
+    },
+    {
       "question": "Simple factual question about A-anchor 1",
       "answer": "Clear, specific answer findable in the narrative"
     },
@@ -232,7 +236,7 @@ Return ONLY valid JSON with this exact structure:
 
 Each question tests whether the reader absorbed one key fact from one A-anchor.
 
-- **One question per A-anchor** (exactly 5)
+- **One question per A-anchor, plus one about the opening hook** (exactly 6)
 - **Simple factual recall**: "What..." or "Roughly when..." or "Where..."
 - **Single focus**: Never ask two things in one question
 - **Answerable from narrative**: The answer must appear in your text

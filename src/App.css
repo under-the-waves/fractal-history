@@ -927,6 +927,20 @@
   color: #666;
 }
 
+/* Sub-anchor links (child anchors in narrative text) */
+.sub-anchor-link {
+  color: #c49a6c;
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1.5px solid rgba(196, 154, 108, 0.4);
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.sub-anchor-link:hover {
+  color: #a67c4e;
+  border-bottom-color: #a67c4e;
+}
+
 /* Key concepts box */
 /* Fact-check section */
 .fact-check-badge {
@@ -2235,6 +2249,51 @@
   text-decoration: underline;
 }
 
+/* Browse mode table */
+.flashcard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Source Sans Pro', -apple-system, sans-serif;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.flashcard-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #666;
+  border-bottom: 2px solid #e5e5e5;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.flashcard-table tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.15s;
+}
+
+.flashcard-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.flashcard-table td {
+  padding: 10px 12px;
+  vertical-align: top;
+}
+
+.flashcard-table-question {
+  font-weight: 500;
+  color: #333;
+  max-width: 320px;
+}
+
+.flashcard-table-answer {
+  color: #555;
+  max-width: 320px;
+}
+
 @media (max-width: 768px) {
   .flashcard-save-item {
     flex-direction: column;
@@ -2244,8 +2303,13 @@
     align-self: flex-start;
   }
 
-  .flashcard-grid {
-    grid-template-columns: 1fr;
+  .flashcard-table {
+    font-size: 13px;
+  }
+
+  .flashcard-table-question,
+  .flashcard-table-answer {
+    max-width: 200px;
   }
 
   .flashcards-page {

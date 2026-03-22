@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { linkChildAnchors } from './utils/linkChildAnchors.js';
 
 const sql = neon(process.env.DATABASE_URL);
 
@@ -166,6 +167,13 @@ export default async function handler(req, res) {
         const textContent = narrativeData.narrative.replace(/<[^>]*>/g, ' ');
         const wordCount = textContent.split(/\s+/).filter(word => word.length > 0).length;
 
+        // Post-process: convert child anchor <strong> tags to navigational links
+        const childLinks = childAnchors.map(c => ({ id: c.id, title: c.title }));
+        const linkedNarrative = linkChildAnchors(narrativeData.narrative, childLinks);
+        const linkedFactChecked = narrativeData.fact_checked_narrative
+            ? linkChildAnchors(narrativeData.fact_checked_narrative, childLinks)
+            : null;
+
         return res.status(200).json({
             success: true,
             anchor: {
@@ -173,8 +181,8 @@ export default async function handler(req, res) {
                 title: anchor.title,
                 scope: anchor.scope,
                 breadth,
-                narrative: narrativeData.narrative,
-                factCheckedNarrative: narrativeData.fact_checked_narrative || null,
+                narrative: linkedNarrative,
+                factCheckedNarrative: linkedFactChecked,
                 sources: narrativeData.sources || null,
                 factCheckedAt: narrativeData.fact_checked_at || null,
                 keyConcepts: narrativeData.key_concepts || [],

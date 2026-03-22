@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import { factCheckNarrative } from './utils/factCheck.js';
+import { linkChildAnchors } from './utils/linkChildAnchors.js';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -410,6 +411,10 @@ export default async function handler(req, res) {
         const narrativeData = parseNarrativeResponse(response);
         console.log('Narrative parsed successfully');
 
+        // Post-process: convert child anchor <strong> tags to navigational links
+        const childLinks = children.map(c => ({ id: c.id, title: c.title }));
+        narrativeData.narrative = linkChildAnchors(narrativeData.narrative, childLinks);
+
         // Step 7: Store in database
         const storedNarrative = await storeNarrative(anchorId, breadth, narrativeData);
         console.log('Narrative stored in database');
@@ -425,7 +430,7 @@ export default async function handler(req, res) {
                 );
 
                 if (factCheckResult) {
-                    factCheckedNarrative = factCheckResult.narrative;
+                    factCheckedNarrative = linkChildAnchors(factCheckResult.narrative, childLinks);
                     sources = factCheckResult.sources;
 
                     await getSql()`

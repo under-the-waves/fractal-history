@@ -181,7 +181,7 @@ function calculateSRS(card, rating) {
     switch (rating) {
         case 0: // Again
             newEase = Math.max(1.3, ease_factor - 0.20);
-            newInterval = 1;
+            newInterval = 0;
             newReps = 0;
             break;
         case 1: // Hard
@@ -203,7 +203,7 @@ function calculateSRS(card, rating) {
             newEase = ease_factor + 0.15;
             newReps = repetitions + 1;
             if (repetitions === 0) {
-                newInterval = 1;
+                newInterval = 4;
             } else if (repetitions === 1) {
                 newInterval = 6;
             } else {

@@ -15,8 +15,8 @@ const LOADING_STAGES = {
 
 // Breadth labels for display
 const BREADTH_LABELS = {
-    'A': 'Essential Aspects',
-    'B': 'Timeline',
+    'A': 'Analytical anchors',
+    'B': 'Temporal anchors',
     'C': 'Regional Perspectives'
 }
 
@@ -25,6 +25,30 @@ function FlashcardSaveSection({ anchorId, breadth, questions }) {
     const auth = useAuth()
     const [savedCards, setSavedCards] = useState(new Set())
     const [savingAll, setSavingAll] = useState(false)
+
+    // Load already-saved flashcards on mount
+    useEffect(() => {
+        const loadSavedCards = async () => {
+            try {
+                const token = await auth.getToken()
+                const response = await fetch(`/api/flashcards?anchorId=${anchorId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                const data = await response.json()
+                if (data.success) {
+                    const matching = data.flashcards
+                        .filter(f => f.breadth === breadth)
+                        .map(f => f.question)
+                    setSavedCards(new Set(matching))
+                }
+            } catch (err) {
+                console.error('Failed to load saved flashcards:', err)
+            }
+        }
+        if (auth.isSignedIn) {
+            loadSavedCards()
+        }
+    }, [auth, anchorId, breadth])
 
     const saveFlashcard = async (question, answer) => {
         try {
@@ -361,11 +385,6 @@ function NarrativeReading() {
 
             {/* Narrative area */}
             <article className="narrative-content">
-                {anchor.factCheckedNarrative && (
-                    <div className="fact-check-badge">
-                        Sources verified
-                    </div>
-                )}
                 <div
                     className="narrative-text"
                     dangerouslySetInnerHTML={{
@@ -374,26 +393,11 @@ function NarrativeReading() {
                 />
             </article>
 
-            {/* Key concepts box */}
-            {anchor.keyConcepts && anchor.keyConcepts.length > 0 && (
-                <section className="key-concepts-box">
-                    <h2 className="concepts-heading">Key Takeaways</h2>
-                    <ol className="concepts-list">
-                        {anchor.keyConcepts.map((concept, index) => (
-                            <li key={index} className="concept-item">{concept}</li>
-                        ))}
-                    </ol>
-                    <p className="concepts-note">
-                        Each of these concepts can be explored deeper as its own anchor in the fractal tree.
-                    </p>
-                </section>
-            )}
-
             {/* Child anchors (if available) */}
             {anchor.childAnchors && anchor.childAnchors.length > 0 && (
                 <section className="child-anchors-box">
                     <h2 className="child-anchors-heading">
-                        Explore {BREADTH_LABELS[breadth]}
+                        Dive deeper
                     </h2>
                     <div className="child-anchors-grid">
                         {anchor.childAnchors.map((child) => (

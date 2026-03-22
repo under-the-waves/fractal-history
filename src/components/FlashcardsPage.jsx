@@ -11,6 +11,7 @@ const RATING_BUTTONS = [
 ]
 
 function formatInterval(days) {
+    if (days === 0) return '< 10m'
     if (days < 1) return '< 1d'
     if (days === 1) return '1d'
     if (days < 30) return `${days}d`
@@ -26,7 +27,7 @@ function previewIntervals(card) {
 
     const calc = (rating) => {
         switch (rating) {
-            case 0: return 1 // Again
+            case 0: return 0 // Again — re-show in session
             case 1: return Math.max(1, Math.round(interval * 1.2)) // Hard
             case 2: { // Good
                 if (reps === 0) return 1
@@ -35,7 +36,7 @@ function previewIntervals(card) {
             }
             case 3: { // Easy
                 let base
-                if (reps === 0) base = 1
+                if (reps === 0) base = 4
                 else if (reps === 1) base = 6
                 else base = Math.round(interval * ease)
                 return Math.round(base * 1.3)
@@ -126,7 +127,16 @@ function StudyMode({ auth, onSwitchToBrowse }) {
                 [ratingNames[rating]]: prev[ratingNames[rating]] + 1
             }))
 
-            if (currentIndex + 1 >= cards.length) {
+            if (rating === 0) {
+                // Again: move card to end of queue for re-show later in session
+                setCards(prev => {
+                    const next = [...prev]
+                    const [again] = next.splice(currentIndex, 1)
+                    next.push(again)
+                    return next
+                })
+                setShowAnswer(false)
+            } else if (currentIndex + 1 >= cards.length) {
                 setSessionComplete(true)
                 fetchStats()
             } else {
@@ -266,17 +276,7 @@ function StudyMode({ auth, onSwitchToBrowse }) {
 }
 
 function BrowseMode({ auth, flashcards, setFlashcards }) {
-    const [flippedCards, setFlippedCards] = useState(new Set())
     const [deletingId, setDeletingId] = useState(null)
-
-    const toggleFlip = (id) => {
-        setFlippedCards(prev => {
-            const next = new Set(prev)
-            if (next.has(id)) next.delete(id)
-            else next.add(id)
-            return next
-        })
-    }
 
     const handleDelete = async (id) => {
         setDeletingId(id)
@@ -297,11 +297,18 @@ function BrowseMode({ auth, flashcards, setFlashcards }) {
         }
     }
 
-    const getSrsBadge = (card) => {
-        if (!card.next_review_date) return { label: 'New', className: 'srs-new' }
+    const formatDue = (card) => {
+        if (!card.next_review_date) return 'New'
         const due = new Date(card.next_review_date)
-        if (due <= new Date()) return { label: 'Due', className: 'srs-due' }
-        return { label: formatInterval(card.interval_days), className: 'srs-scheduled' }
+        if (due <= new Date()) return 'Due'
+        return formatInterval(card.interval_days)
+    }
+
+    const getDueClass = (card) => {
+        if (!card.next_review_date) return 'srs-new'
+        const due = new Date(card.next_review_date)
+        if (due <= new Date()) return 'srs-due'
+        return 'srs-scheduled'
     }
 
     // Group flashcards by anchor
@@ -334,39 +341,38 @@ function BrowseMode({ auth, flashcards, setFlashcards }) {
                             View narrative
                         </Link>
                     </div>
-                    <div className="flashcard-grid">
-                        {cards.map(card => {
-                            const badge = getSrsBadge(card)
-                            return (
-                                <div
-                                    key={card.id}
-                                    className={`flashcard ${flippedCards.has(card.id) ? 'flipped' : ''}`}
-                                    onClick={() => toggleFlip(card.id)}
-                                >
-                                    <div className="flashcard-inner">
-                                        <div className="flashcard-front">
-                                            <span className={`srs-badge ${badge.className}`}>{badge.label}</span>
-                                            <p className="flashcard-question">{card.question}</p>
-                                            <span className="flashcard-hint">Click to reveal answer</span>
-                                        </div>
-                                        <div className="flashcard-back">
-                                            <p className="flashcard-answer">{card.answer}</p>
-                                            <button
-                                                className="flashcard-delete"
-                                                disabled={deletingId === card.id}
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    handleDelete(card.id)
-                                                }}
-                                            >
-                                                {deletingId === card.id ? 'Removing...' : 'Remove'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
+                    <table className="flashcard-table">
+                        <thead>
+                            <tr>
+                                <th>Question</th>
+                                <th>Answer</th>
+                                <th>Due</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {cards.map(card => (
+                                <tr key={card.id}>
+                                    <td className="flashcard-table-question">{card.question}</td>
+                                    <td className="flashcard-table-answer">{card.answer}</td>
+                                    <td>
+                                        <span className={`srs-badge ${getDueClass(card)}`}>
+                                            {formatDue(card)}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button
+                                            className="flashcard-delete"
+                                            disabled={deletingId === card.id}
+                                            onClick={() => handleDelete(card.id)}
+                                        >
+                                            {deletingId === card.id ? '...' : 'Remove'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </section>
             ))}
         </div>

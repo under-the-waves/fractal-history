@@ -177,6 +177,10 @@ Return your response as JSON:
   ],
   "questions": [
     {
+      "question": "Question about the opening anecdote/hook",
+      "answer": "Clear, specific answer"
+    },
+    {
       "question": "Simple 'what' or 'roughly when' question about period 1",
       "answer": "Clear, specific answer"
     },
@@ -208,7 +212,8 @@ The 5 questions test whether readers absorbed the key information from each peri
 
 ### Guidelines:
 
-- **One question per period**: Each question corresponds to one of the 5 chronological periods you taught
+- **One question per period, plus one about the opening hook**: 6 questions total (one per chronological period + one about the opening anecdote)
+- **Questions must test the reader's knowledge of the chronological periods and their key events/dates.** Do NOT ask about analytical concepts or thematic ideas from the A-breadth perspective.
 - **Complexity Level 1 only**: Simple factual recall ("what happened" or "roughly when did X happen")
 - **Single-focus**: Never ask two things in one question
 - **Answerable from the narrative**: Every answer must be clearly stated in your text
