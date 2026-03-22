@@ -767,7 +767,7 @@ function TreeVisualization() {
                                             </g>
 
                                             {/* Right button: Read */}
-                                            <g onClick={() => navigate(`/narrative/${node.anchor.id}?breadth=A`)} style={{ cursor: 'pointer' }}>
+                                            <g onClick={() => navigate(`/narrative/${node.anchor.id}?breadth=${getActiveBreadth(node.id)}`)} style={{ cursor: 'pointer' }}>
                                                 <rect
                                                     x={nodeWidth / 2 + 5}
                                                     y={nodeHeight - 28}

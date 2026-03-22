@@ -83,38 +83,30 @@ Example: When covering Atlantic slavery, describe the scale, the conditions, the
 
 ---
 
-## Opening Hook (First 150-200 words)
+## Opening: Precursor History (150-200 words)
 
-Begin with a **discrete anecdote, moment, or discovery** that illuminates your topic.
+Begin by setting the stage: what was the world like **before** the first temporal period begins? This section provides the historical context that makes the chronological narrative comprehensible.
 
 ### Requirements:
 
-- Use a specific, documented event—not a general statement about the topic
-- Assume the reader knows nothing. Explain who people are (roles before names), where places are (modern geographic references), when things happened
-- Minimize proper names. Use descriptions: "a Roman general" not "Gaius Marius"
-- Create mystery or tension that makes the reader want to understand more
-- End the hook by stating what it reveals (not with clickbait questions)
-- Include ONE piece of primary source evidence maximum if it genuinely illuminates the point
+- Describe the conditions, forces, or events that preceded the first period
+- Explain what the reader needs to know to understand why the first period began when and how it did
+- Use specific, concrete details: dates, places (with modern geographic references), documented facts
+- Assume the reader knows nothing about this topic
+- Do NOT use an anecdote or hook — go straight into the historical context
+- End by transitioning naturally into the first period
 
-**Then pivot** to the beginning of your chronological narrative—the first period.
+### Example
 
-### Example of a Strong Opening Hook
+**Topic: World War II**
 
-**Topic: Agricultural Revolution**
-
-"In 1991, two hikers in the Alps spotted something brown protruding from melting ice. They thought it was trash or a recent mountaineering accident. When archaeologists examined the body, they made an extraordinary discovery: this man had died 5,300 years ago. His possessions told a strange story: a copper axe, arrows with stone points, but also a pouch containing wheat grains and wild berries. His last meal, preserved in his stomach, included both cultivated grain and wild game. Here was a man carrying both the tools of hunters and the crops of farmers, frozen at a moment when humanity was caught between two entirely different ways of living.
-
-This transition had been building for thousands of years. Around 12,000 years ago, as the last Ice Age ended, Earth's climate stabilized in ways that made farming possible..."
+"By the late 1930s, the international order established after the First World War was collapsing. Germany, humiliated by the Treaty of Versailles and ravaged by economic depression, had turned to Adolf Hitler's National Socialist Party. Japan had already invaded Manchuria in 1931 and was pushing deeper into China. Italy under Mussolini had seized Ethiopia. The League of Nations, designed to prevent exactly this kind of aggression, proved toothless. Britain and France pursued appeasement, hoping territorial concessions would satisfy expansionist ambitions. They were wrong."
 
 **Why this works:**
-- Discrete anecdote (the Iceman discovery)
-- Minimal names (none needed: just "hikers" and "archaeologists")
-- Explains context (Alps, 1991, 5,300 years ago)
-- Creates mystery (why both hunter and farmer tools?)
-- Points to fundamental transition (between two ways of living)
-- Clear pivot to chronological beginning (12,000 years ago)
-
-**Important:** This example demonstrates the technique. Do not copy its structure. Find an equally compelling but different anecdote appropriate to your specific topic.
+- Sets the geopolitical stage before the war begins
+- Concrete details (Treaty of Versailles, Manchuria 1931, Ethiopia)
+- Explains the forces that made the first period inevitable
+- Natural transition into the chronological narrative
 
 ---
 
@@ -143,9 +135,15 @@ Your narrative should move **sequentially through the periods**, helping readers
 
 ---
 
-## Closing (100-150 words)
+## Closing: Aftermath (100-150 words)
 
-End by reflecting on the full arc of change: what was different at the end compared to the beginning? Point forward to what comes next or offer a final insight about the significance of this transformation.
+End with the **aftermath** — what happened after the final period concludes? Describe the immediate consequences, the new world that emerged, and the lasting effects. This is not a summary of what you already covered; it is new information about what came next.
+
+- What changed permanently as a result of these events?
+- What immediate consequences followed the end of the final period?
+- What new problems, institutions, or realities were created?
+
+Do NOT end with generic reflections, lessons learned, or summaries of what you just said. End with concrete historical facts about what happened next.
 
 ---
 
@@ -177,7 +175,7 @@ Return your response as JSON:
   ],
   "questions": [
     {
-      "question": "Question about the opening anecdote/hook",
+      "question": "Question about the precursor history or aftermath",
       "answer": "Clear, specific answer"
     },
     {
@@ -212,7 +210,7 @@ The 5 questions test whether readers absorbed the key information from each peri
 
 ### Guidelines:
 
-- **One question per period, plus one about the opening hook**: 6 questions total (one per chronological period + one about the opening anecdote)
+- **One question per period, plus one about the precursor history or aftermath**: 6 questions total
 - **Questions must test the reader's knowledge of the chronological periods and their key events/dates.** Do NOT ask about analytical concepts or thematic ideas from the A-breadth perspective.
 - **Complexity Level 1 only**: Simple factual recall ("what happened" or "roughly when did X happen")
 - **Single-focus**: Never ask two things in one question
