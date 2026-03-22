@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
+import { citationsToFootnotes } from '../utils/citationsToFootnotes'
 
 // Loading stages for generation process
 const LOADING_STAGES = {
@@ -146,6 +147,31 @@ function FlashcardSaveSection({ anchorId, breadth, questions }) {
             </div>
         </section>
     )
+}
+
+function NarrativeBody({ html }) {
+    const { html: processedHtml, footnotes } = useMemo(
+        () => citationsToFootnotes(html),
+        [html]
+    );
+
+    return (
+        <>
+            <div
+                className="narrative-text"
+                dangerouslySetInnerHTML={{ __html: processedHtml }}
+            />
+            {footnotes.length > 0 && (
+                <ol className="footnotes-list">
+                    {footnotes.map(f => (
+                        <li key={f.number} id={`fn-${f.number}`}>
+                            <a href={f.url} target="_blank" rel="noopener">{f.text}</a>
+                        </li>
+                    ))}
+                </ol>
+            )}
+        </>
+    );
 }
 
 function NarrativeReading() {
@@ -385,12 +411,7 @@ function NarrativeReading() {
 
             {/* Narrative area */}
             <article className="narrative-content">
-                <div
-                    className="narrative-text"
-                    dangerouslySetInnerHTML={{
-                        __html: anchor.factCheckedNarrative || anchor.narrative
-                    }}
-                />
+                <NarrativeBody html={anchor.factCheckedNarrative || anchor.narrative} />
             </article>
 
             {/* Child anchors (if available) */}

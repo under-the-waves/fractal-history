@@ -927,17 +927,47 @@
   color: #666;
 }
 
-/* Citation links (fact-check sources) — subdued so sub-anchor chips stand out */
-.narrative-text a:not(.sub-anchor-link) {
+/* Superscript footnote references */
+.footnote-ref {
   color: #888;
+  text-decoration: none;
+  font-size: 0.75em;
+  font-family: 'Source Sans Pro', -apple-system, sans-serif;
+  padding: 0 1px;
+  transition: color 0.15s;
+}
+
+.footnote-ref:hover {
+  color: #2a5a8c;
+}
+
+/* Footnotes list at bottom of narrative */
+.footnotes-list {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px 24px 0;
+  border-top: 1px solid #e5e5e5;
+  font-family: 'Source Sans Pro', -apple-system, sans-serif;
+  font-size: 0.85rem;
+  color: #666;
+  line-height: 1.6;
+}
+
+.footnotes-list li {
+  margin-bottom: 6px;
+  padding-left: 4px;
+}
+
+.footnotes-list a {
+  color: #555;
   text-decoration: none;
   border-bottom: 1px dotted #aaa;
   transition: color 0.15s, border-color 0.15s;
 }
 
-.narrative-text a:not(.sub-anchor-link):hover {
-  color: #555;
-  border-bottom-color: #555;
+.footnotes-list a:hover {
+  color: #2a5a8c;
+  border-bottom-color: #2a5a8c;
 }
 
 /* Sub-anchor links (child anchors in narrative text) */
