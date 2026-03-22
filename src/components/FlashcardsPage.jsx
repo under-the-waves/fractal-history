@@ -82,7 +82,7 @@ function StudyMode({ auth, onSwitchToBrowse }) {
         } finally {
             setLoading(false)
         }
-    }, [auth])
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchStats = useCallback(async () => {
         try {
@@ -97,12 +97,12 @@ function StudyMode({ auth, onSwitchToBrowse }) {
         } catch (err) {
             console.error('Failed to fetch stats:', err)
         }
-    }, [auth])
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         fetchReviewCards()
         fetchStats()
-    }, [fetchReviewCards, fetchStats])
+    }, [])
 
     const handleRating = async (rating) => {
         if (reviewing) return
@@ -299,26 +299,10 @@ function BrowseMode({ auth, flashcards, setFlashcards }) {
     }
 
     const formatDue = (card) => {
-        if (!card.next_review_date) return 'New'
+        if (!card.next_review_date) return 'Not yet studied'
         const due = new Date(card.next_review_date)
-        if (due <= new Date()) return 'Due'
-        return formatInterval(card.interval_days)
+        return due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     }
-
-    const getDueClass = (card) => {
-        if (!card.next_review_date) return 'srs-new'
-        const due = new Date(card.next_review_date)
-        if (due <= new Date()) return 'srs-due'
-        return 'srs-scheduled'
-    }
-
-    // Group flashcards by anchor
-    const grouped = flashcards.reduce((acc, card) => {
-        const key = card.anchor_title || card.anchor_id
-        if (!acc[key]) acc[key] = { cards: [], anchorId: card.anchor_id, breadth: card.breadth }
-        acc[key].cards.push(card)
-        return acc
-    }, {})
 
     if (flashcards.length === 0) {
         return (
@@ -331,51 +315,45 @@ function BrowseMode({ auth, flashcards, setFlashcards }) {
 
     return (
         <div className="flashcards-groups">
-            {Object.entries(grouped).map(([anchorTitle, { cards, anchorId, breadth }]) => (
-                <section key={anchorTitle} className="flashcard-group">
-                    <div className="flashcard-group-header">
-                        <h2 className="flashcard-group-title">{anchorTitle}</h2>
-                        <Link
-                            to={`/narrative/${anchorId}?breadth=${breadth}`}
-                            className="flashcard-narrative-link"
-                        >
-                            View narrative
-                        </Link>
-                    </div>
-                    <table className="flashcard-table">
-                        <thead>
-                            <tr>
-                                <th>Question</th>
-                                <th>Answer</th>
-                                <th>Due</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {cards.map(card => (
-                                <tr key={card.id}>
-                                    <td className="flashcard-table-question">{card.question}</td>
-                                    <td className="flashcard-table-answer">{card.answer}</td>
-                                    <td>
-                                        <span className={`srs-badge ${getDueClass(card)}`}>
-                                            {formatDue(card)}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <button
-                                            className="flashcard-delete"
-                                            disabled={deletingId === card.id}
-                                            onClick={() => handleDelete(card.id)}
-                                        >
-                                            {deletingId === card.id ? '...' : 'Remove'}
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </section>
-            ))}
+            <table className="flashcard-table">
+                <thead>
+                    <tr>
+                        <th>Narrative</th>
+                        <th>Type</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Due</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {flashcards.map(card => (
+                        <tr key={card.id}>
+                            <td>
+                                <Link
+                                    to={`/narrative/${card.anchor_id}?breadth=${card.breadth}`}
+                                    className="flashcard-narrative-link"
+                                >
+                                    {card.anchor_title}
+                                </Link>
+                            </td>
+                            <td>{card.breadth === 'A' ? 'Analytical' : 'Temporal'}</td>
+                            <td className="flashcard-table-question">{card.question}</td>
+                            <td className="flashcard-table-answer">{card.answer}</td>
+                            <td className="flashcard-table-due">{formatDue(card)}</td>
+                            <td>
+                                <button
+                                    className="flashcard-delete"
+                                    disabled={deletingId === card.id}
+                                    onClick={() => handleDelete(card.id)}
+                                >
+                                    {deletingId === card.id ? '...' : 'Remove'}
+                                </button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
     )
 }
