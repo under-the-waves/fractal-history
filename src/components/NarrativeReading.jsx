@@ -215,13 +215,6 @@ function NarrativeReading() {
             // Narrative needs generation
             setIsGenerating(true)
 
-            // Determine initial stage based on whether children exist
-            if (!checkData.anchor.childAnchorsExist) {
-                setLoadingStage('generating_children')
-            } else {
-                setLoadingStage('generating_narrative')
-            }
-
             // Store basic anchor info for loading display
             setAnchor({
                 id: checkData.anchor.id,
@@ -230,7 +223,27 @@ function NarrativeReading() {
                 breadth
             })
 
-            // Call the generate endpoint
+            // If children don't exist, generate them first (separate call to avoid timeout)
+            if (!checkData.anchor.childAnchorsExist) {
+                setLoadingStage('generating_children')
+                const anchorsResponse = await fetch('/api/generate-anchors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        parentId: id,
+                        parentTitle: checkData.anchor.title,
+                        parentScope: checkData.anchor.scope,
+                        breadth
+                    })
+                })
+                if (!anchorsResponse.ok) {
+                    const errData = await anchorsResponse.json()
+                    throw new Error(errData.error || 'Failed to generate child anchors')
+                }
+            }
+
+            // Now generate the narrative (children guaranteed to exist)
+            setLoadingStage('generating_narrative')
             const generateResponse = await fetch(`/api/generate-narrative?id=${id}&breadth=${breadth}`)
             const generateData = await generateResponse.json()
 

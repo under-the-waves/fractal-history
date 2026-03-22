@@ -1,4 +1,8 @@
 {
+  "functions": {
+    "api/generate-narrative.js": { "maxDuration": 60 },
+    "api/generate-anchors.js": { "maxDuration": 60 }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ]

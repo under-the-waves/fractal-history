@@ -312,63 +312,11 @@ export default async function handler(req, res) {
         let children = await getChildAnchors(anchorId, breadth);
         console.log(`Found ${children.length} existing ${breadth}-children for ${anchorId}`);
 
-        // Step 3: Generate children if needed
+        // Children must exist before narrative generation (frontend generates them separately)
         if (children.length === 0) {
-            // Check if we can generate this breadth type
-            if (breadth === 'C') {
-                // C-breadth anchor generation is not yet implemented
-                return res.status(400).json({
-                    success: false,
-                    error: 'Geographic (C-breadth) narrative generation is not yet available. Please try Essential Aspects (A) or Timeline (B) instead.',
-                    details: 'C-breadth anchor generation is planned for a future update.',
-                    stage: 'generating_children'
-                });
-            }
-
-            console.log(`No ${breadth}-children found. Generating them first...`);
-
-            // Call the anchor generation endpoint internally
-            // For now, we make an internal fetch - in production this could be a direct function call
-            try {
-                const baseUrl = process.env.VERCEL_ENV
-                    ? `https://${process.env.VERCEL_URL}`
-                    : `http://localhost:${process.env.PORT || 3000}`;
-                const generateResponse = await fetch(`${baseUrl}/api/generate-anchors`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        parentId: anchorId,
-                        parentTitle: anchor.title,
-                        parentScope: anchor.scope,
-                        breadth: breadth
-                    })
-                });
-
-                if (!generateResponse.ok) {
-                    const errorData = await generateResponse.json();
-                    throw new Error(errorData.error || 'Failed to generate child anchors');
-                }
-
-                const generateResult = await generateResponse.json();
-                console.log(`Generated ${generateResult.anchorsGenerated} ${breadth}-children`);
-
-                // Refresh children list
-                children = await getChildAnchors(anchorId, breadth);
-            } catch (genError) {
-                console.error('Error generating child anchors:', genError);
-                return res.status(500).json({
-                    success: false,
-                    error: 'Failed to generate child anchors',
-                    details: genError.message,
-                    stage: 'generating_children'
-                });
-            }
-        }
-
-        if (children.length === 0) {
-            return res.status(500).json({
+            return res.status(400).json({
                 success: false,
-                error: 'No child anchors available after generation',
+                error: 'No child anchors exist. Generate child anchors first.',
                 stage: 'generating_children'
             });
         }
@@ -419,37 +367,11 @@ export default async function handler(req, res) {
         const storedNarrative = await storeNarrative(anchorId, breadth, narrativeData);
         console.log('Narrative stored in database');
 
-        // Step 8: Fact-check with web sources
+        // Fact-checking skipped on deploy (done locally via run-factcheck.js to avoid timeout)
         let factCheckedNarrative = null;
         let sources = null;
-        try {
-            if (process.env.SERPER_API_KEY) {
-                console.log('Fact-checking narrative with web sources...');
-                const factCheckResult = await factCheckNarrative(
-                    narrativeData.narrative, anchor.title, anchor.scope, breadth
-                );
 
-                if (factCheckResult) {
-                    factCheckedNarrative = linkChildAnchors(factCheckResult.narrative, childLinks, breadth);
-                    sources = factCheckResult.sources;
-
-                    await getSql()`
-                        UPDATE narratives
-                        SET fact_checked_narrative = ${factCheckedNarrative},
-                            sources = ${JSON.stringify(sources)},
-                            fact_checked_at = NOW()
-                        WHERE anchor_id = ${anchorId} AND breadth = ${breadth}
-                    `;
-                    console.log(`Fact-check complete: ${sources.length} sources found`);
-                }
-            } else {
-                console.log('SERPER_API_KEY not set, skipping fact-check');
-            }
-        } catch (fcError) {
-            console.error('Fact-check failed (narrative still saved):', fcError.message);
-        }
-
-        // Step 9: Return to frontend
+        // Return to frontend
         return res.status(200).json({
             success: true,
             cached: false,
