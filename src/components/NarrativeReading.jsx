@@ -374,30 +374,6 @@ function NarrativeReading() {
                 />
             </article>
 
-            {/* Sources section */}
-            {anchor.sources && anchor.sources.length > 0 && (
-                <details className="sources-section">
-                    <summary className="sources-heading">
-                        Sources ({anchor.sources.length})
-                    </summary>
-                    <ol className="sources-list">
-                        {anchor.sources.map((source, index) => (
-                            <li key={index} className="source-item">
-                                <a
-                                    href={source.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="source-link"
-                                >
-                                    {source.title}
-                                </a>
-                                <span className="source-claim">{source.claim}</span>
-                            </li>
-                        ))}
-                    </ol>
-                </details>
-            )}
-
             {/* Key concepts box */}
             {anchor.keyConcepts && anchor.keyConcepts.length > 0 && (
                 <section className="key-concepts-box">
