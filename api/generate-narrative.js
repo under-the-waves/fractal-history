@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
+import { factCheckNarrative } from './utils/factCheck.js';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -287,6 +288,8 @@ export default async function handler(req, res) {
                         scope: anchor?.scope || '',
                         breadth,
                         narrative: existingNarrative.narrative,
+                        factCheckedNarrative: existingNarrative.fact_checked_narrative || null,
+                        sources: existingNarrative.sources || null,
                         keyConcepts: existingNarrative.key_concepts,
                         questions: existingNarrative.questions,
                         estimatedReadTime: existingNarrative.estimated_read_time,
@@ -411,7 +414,37 @@ export default async function handler(req, res) {
         const storedNarrative = await storeNarrative(anchorId, breadth, narrativeData);
         console.log('Narrative stored in database');
 
-        // Step 8: Return to frontend
+        // Step 8: Fact-check with web sources
+        let factCheckedNarrative = null;
+        let sources = null;
+        try {
+            if (process.env.SERPER_API_KEY) {
+                console.log('Fact-checking narrative with web sources...');
+                const factCheckResult = await factCheckNarrative(
+                    narrativeData.narrative, anchor.title, anchor.scope, breadth
+                );
+
+                if (factCheckResult) {
+                    factCheckedNarrative = factCheckResult.narrative;
+                    sources = factCheckResult.sources;
+
+                    await getSql()`
+                        UPDATE narratives
+                        SET fact_checked_narrative = ${factCheckedNarrative},
+                            sources = ${JSON.stringify(sources)},
+                            fact_checked_at = NOW()
+                        WHERE anchor_id = ${anchorId} AND breadth = ${breadth}
+                    `;
+                    console.log(`Fact-check complete: ${sources.length} sources found`);
+                }
+            } else {
+                console.log('SERPER_API_KEY not set, skipping fact-check');
+            }
+        } catch (fcError) {
+            console.error('Fact-check failed (narrative still saved):', fcError.message);
+        }
+
+        // Step 9: Return to frontend
         return res.status(200).json({
             success: true,
             cached: false,
@@ -422,6 +455,8 @@ export default async function handler(req, res) {
                 scope: anchor.scope,
                 breadth,
                 narrative: narrativeData.narrative,
+                factCheckedNarrative,
+                sources,
                 keyConcepts: narrativeData.keyConcepts,
                 questions: narrativeData.questions,
                 estimatedReadTime: narrativeData.estimatedReadTime,
