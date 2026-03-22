@@ -127,7 +127,10 @@ export default async function handler(req, res) {
                 narrative,
                 key_concepts,
                 questions,
-                estimated_read_time
+                estimated_read_time,
+                fact_checked_narrative,
+                sources,
+                fact_checked_at
             FROM narratives
             WHERE anchor_id = ${id} AND breadth = ${breadth}
             LIMIT 1
@@ -171,6 +174,9 @@ export default async function handler(req, res) {
                 scope: anchor.scope,
                 breadth,
                 narrative: narrativeData.narrative,
+                factCheckedNarrative: narrativeData.fact_checked_narrative || null,
+                sources: narrativeData.sources || null,
+                factCheckedAt: narrativeData.fact_checked_at || null,
                 keyConcepts: narrativeData.key_concepts || [],
                 questions: narrativeData.questions || [],
                 estimatedReadTime: narrativeData.estimated_read_time || 5,

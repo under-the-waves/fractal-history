@@ -138,6 +138,8 @@ function NarrativeReading() {
     const [loadingStage, setLoadingStage] = useState('checking')
     const [error, setError] = useState(null)
     const [isGenerating, setIsGenerating] = useState(false)
+    const [factChecking, setFactChecking] = useState(false)
+    const [factCheckError, setFactCheckError] = useState(null)
 
     // Change breadth
     const changeBreadth = useCallback((newBreadth) => {
@@ -226,6 +228,33 @@ function NarrativeReading() {
             return `${minutes} min read`
         }
         return '5 min read'
+    }
+
+    const handleFactCheck = async () => {
+        setFactChecking(true)
+        setFactCheckError(null)
+        try {
+            const response = await fetch('/api/fact-check-narrative', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ anchorId: id, breadth })
+            })
+            const data = await response.json()
+            if (data.success) {
+                setAnchor(prev => ({
+                    ...prev,
+                    factCheckedNarrative: data.narrative,
+                    sources: data.sources,
+                    factCheckedAt: new Date().toISOString()
+                }))
+            } else {
+                setFactCheckError(data.error || 'Fact-check failed')
+            }
+        } catch (err) {
+            setFactCheckError('Failed to fact-check narrative. Please try again.')
+        } finally {
+            setFactChecking(false)
+        }
     }
 
     // Loading state during generation
@@ -361,11 +390,60 @@ function NarrativeReading() {
 
             {/* Narrative area */}
             <article className="narrative-content">
+                {anchor.factCheckedNarrative && (
+                    <div className="fact-check-badge">
+                        Sources verified
+                    </div>
+                )}
                 <div
                     className="narrative-text"
-                    dangerouslySetInnerHTML={{ __html: anchor.narrative }}
+                    dangerouslySetInnerHTML={{
+                        __html: anchor.factCheckedNarrative || anchor.narrative
+                    }}
                 />
             </article>
+
+            {/* Fact-check section */}
+            {!anchor.factCheckedNarrative && (
+                <div className="fact-check-section">
+                    <button
+                        className="fact-check-button"
+                        onClick={handleFactCheck}
+                        disabled={factChecking}
+                    >
+                        {factChecking
+                            ? 'Verifying claims and adding sources... (30-60 seconds)'
+                            : 'Fact-check this narrative'}
+                    </button>
+                    {factCheckError && (
+                        <p className="fact-check-error">{factCheckError}</p>
+                    )}
+                </div>
+            )}
+
+            {/* Sources section */}
+            {anchor.sources && anchor.sources.length > 0 && (
+                <details className="sources-section">
+                    <summary className="sources-heading">
+                        Sources ({anchor.sources.length})
+                    </summary>
+                    <ol className="sources-list">
+                        {anchor.sources.map((source, index) => (
+                            <li key={index} className="source-item">
+                                <a
+                                    href={source.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="source-link"
+                                >
+                                    {source.title}
+                                </a>
+                                <span className="source-claim">{source.claim}</span>
+                            </li>
+                        ))}
+                    </ol>
+                </details>
+            )}
 
             {/* Key concepts box */}
             {anchor.keyConcepts && anchor.keyConcepts.length > 0 && (
