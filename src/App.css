@@ -927,6 +927,19 @@
   color: #666;
 }
 
+/* Citation links (fact-check sources) — subdued so sub-anchor chips stand out */
+.narrative-text a:not(.sub-anchor-link) {
+  color: #888;
+  text-decoration: none;
+  border-bottom: 1px dotted #aaa;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.narrative-text a:not(.sub-anchor-link):hover {
+  color: #555;
+  border-bottom-color: #555;
+}
+
 /* Sub-anchor links (child anchors in narrative text) */
 .sub-anchor-link {
   font-weight: 700;
