@@ -11,10 +11,13 @@ function escapeRegex(str) {
  * Replace <strong>ChildTitle</strong> with a styled link to that child's narrative.
  * @param {string} html - The narrative HTML string
  * @param {Array<{id: string, title: string}>} children - Child anchor objects
+ * @param {string} breadth - The breadth of the current narrative ('A', 'B', etc.)
  * @returns {string} HTML with child anchor titles converted to links
  */
-function linkChildAnchors(html, children) {
+function linkChildAnchors(html, children, breadth) {
     if (!html || !children || children.length === 0) return html;
+
+    const breadthClass = breadth === 'B' ? 'sub-anchor-link-temporal' : 'sub-anchor-link-analytical';
 
     let result = html;
     for (const child of children) {
@@ -22,7 +25,7 @@ function linkChildAnchors(html, children) {
             `<strong>${escapeRegex(child.title)}</strong>`,
             'g'
         );
-        const link = `<a href="/narrative/${child.id}?breadth=A" class="sub-anchor-link">${child.title}</a>`;
+        const link = `<a href="/narrative/${child.id}?breadth=A" class="sub-anchor-link ${breadthClass}">${child.title}</a>`;
         result = result.replace(pattern, link);
     }
     return result;

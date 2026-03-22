@@ -169,9 +169,9 @@ export default async function handler(req, res) {
 
         // Post-process: convert child anchor <strong> tags to navigational links
         const childLinks = childAnchors.map(c => ({ id: c.id, title: c.title }));
-        const linkedNarrative = linkChildAnchors(narrativeData.narrative, childLinks);
+        const linkedNarrative = linkChildAnchors(narrativeData.narrative, childLinks, breadth);
         const linkedFactChecked = narrativeData.fact_checked_narrative
-            ? linkChildAnchors(narrativeData.fact_checked_narrative, childLinks)
+            ? linkChildAnchors(narrativeData.fact_checked_narrative, childLinks, breadth)
             : null;
 
         return res.status(200).json({

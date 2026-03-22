@@ -929,19 +929,36 @@
 
 /* Sub-anchor links (child anchors in narrative text) */
 .sub-anchor-link {
-  color: #5a3e28;
   font-weight: 700;
   text-decoration: none;
-  background: #f5ead6;
   padding: 2px 7px;
   border-radius: 4px;
-  border: 1px solid #e0cdb3;
+  border: 1px solid;
   transition: background 0.15s, border-color 0.15s;
 }
 
-.sub-anchor-link:hover {
-  background: #eddcc0;
-  border-color: #c9b48e;
+/* Analytical anchors (A-breadth children) — blue */
+.sub-anchor-link-analytical {
+  color: #2a5a8c;
+  background: #e8f0fa;
+  border-color: #c4d7ed;
+}
+
+.sub-anchor-link-analytical:hover {
+  background: #d6e5f5;
+  border-color: #a8c4de;
+}
+
+/* Temporal anchors (B-breadth children) — green */
+.sub-anchor-link-temporal {
+  color: #2d6a4f;
+  background: #e4f5ec;
+  border-color: #b7dfc8;
+}
+
+.sub-anchor-link-temporal:hover {
+  background: #d0eddb;
+  border-color: #96cead;
 }
 
 /* Key concepts box */

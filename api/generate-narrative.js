@@ -413,7 +413,7 @@ export default async function handler(req, res) {
 
         // Post-process: convert child anchor <strong> tags to navigational links
         const childLinks = children.map(c => ({ id: c.id, title: c.title }));
-        narrativeData.narrative = linkChildAnchors(narrativeData.narrative, childLinks);
+        narrativeData.narrative = linkChildAnchors(narrativeData.narrative, childLinks, breadth);
 
         // Step 7: Store in database
         const storedNarrative = await storeNarrative(anchorId, breadth, narrativeData);
@@ -430,7 +430,7 @@ export default async function handler(req, res) {
                 );
 
                 if (factCheckResult) {
-                    factCheckedNarrative = linkChildAnchors(factCheckResult.narrative, childLinks);
+                    factCheckedNarrative = linkChildAnchors(factCheckResult.narrative, childLinks, breadth);
                     sources = factCheckResult.sources;
 
                     await getSql()`
