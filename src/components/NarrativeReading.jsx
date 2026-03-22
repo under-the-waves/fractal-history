@@ -161,15 +161,6 @@ function NarrativeBody({ html }) {
                 className="narrative-text"
                 dangerouslySetInnerHTML={{ __html: processedHtml }}
             />
-            {footnotes.length > 0 && (
-                <ol className="footnotes-list">
-                    {footnotes.map(f => (
-                        <li key={f.number} id={`fn-${f.number}`}>
-                            <a href={f.url} target="_blank" rel="noopener">{f.text}</a>
-                        </li>
-                    ))}
-                </ol>
-            )}
         </>
     );
 }
