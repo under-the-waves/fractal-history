@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { Show, SignInButton, UserButton } from '@clerk/react'
 import { useClerkEnabled } from './hooks/useClerkAuth'
 import LandingPage from './components/LandingPage'
@@ -11,6 +11,7 @@ import './App.css'
 
 function AppContent() {
   const navigate = useNavigate()
+  const location = useLocation()
   const clerkEnabled = useClerkEnabled()
 
   const handleSelectAnchor = (anchor) => {
@@ -21,15 +22,15 @@ function AppContent() {
     <div className="app">
       {/* Navigation */}
       <nav className="app-nav">
-        <button onClick={() => navigate('/')}>Home</button>
-        <button onClick={() => navigate('/tree')}>Tree View</button>
-        <button onClick={() => navigate('/anchors')}>30 Essentials</button>
+        <button className={location.pathname === '/' ? 'active' : ''} onClick={() => navigate('/')}>Home</button>
+        <button className={location.pathname === '/tree' || location.pathname.startsWith('/narrative/') ? 'active' : ''} onClick={() => navigate('/tree')}>Tree View</button>
+        <button className={location.pathname === '/anchors' ? 'active' : ''} onClick={() => navigate('/anchors')}>30 Essentials</button>
         {clerkEnabled && (
           <Show when="signed-in">
-            <button onClick={() => navigate('/flashcards')}>Flashcards</button>
+            <button className={location.pathname === '/flashcards' ? 'active' : ''} onClick={() => navigate('/flashcards')}>Flashcards</button>
           </Show>
         )}
-        <button onClick={() => navigate('/about')}>About</button>
+        <button className={location.pathname === '/about' ? 'active' : ''} onClick={() => navigate('/about')}>About</button>
         {clerkEnabled && (
           <div className="nav-auth">
             <Show when="signed-in">

@@ -541,7 +541,7 @@ function TreeVisualization() {
                 style={{
                     height: 'calc(100vh - 140px)',
                     overflowY: 'auto',
-                    overflowX: 'hidden'
+                    overflowX: 'auto'
                 }}
             >
                 <svg width={svgWidth} height={svgHeight} style={{ overflow: 'visible' }}>
@@ -558,6 +558,7 @@ function TreeVisualization() {
                         return (
                             <g
                                 key={node.id}
+                                data-testid={`tree-node-${node.anchor.id}`}
                                 style={{
                                     transform: `translate(${pos.x}px, ${pos.y}px)`,
                                     transition: 'transform 0.4s cubic-bezier(0.4, 0.0, 0.2, 1), opacity 0.2s ease',
