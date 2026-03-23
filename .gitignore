@@ -25,5 +25,9 @@ dist-ssr
 
 .vercel
 
+# Playwright
+test-results/
+playwright-report/
+
 # Claude Code settings
 .claude/
