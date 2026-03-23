@@ -237,7 +237,8 @@ Return ONLY valid JSON with this exact structure:
 Each question tests whether the reader absorbed one key fact from one A-anchor.
 
 - **One question per A-anchor, plus one about the opening hook** (exactly 6)
-- **Simple factual recall**: "What..." or "Roughly when..." or "Where..."
+- **Simple factual recall**: "What..." or "How..." or "Why..."
+- **Questions must test the reader's understanding of the key concepts (A-anchors) and their significance.** Do NOT ask about dates, time periods, or chronological sequences -- that is the B-breadth's job.
 - **Single focus**: Never ask two things in one question
 - **Answerable from narrative**: The answer must appear in your text
 - **Not circular**: Don't embed the answer in the question

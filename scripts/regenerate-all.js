@@ -17,6 +17,7 @@ dotenv.config({ path: '.env.local' });
 const sql = neon(process.env.DATABASE_URL);
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const dryRun = process.argv.includes('--dry-run');
+const breadthFilter = process.argv.find(a => a.startsWith('--breadth='))?.split('=')[1]?.toUpperCase() || null;
 
 function loadPromptTemplate(breadth) {
     const files = { 'A': 'narrative-a-prompt.md', 'B': 'narrative-b-prompt.md' };
@@ -152,14 +153,22 @@ async function regenerateNarrative(anchorId, breadth) {
 }
 
 async function main() {
-    console.log(dryRun ? '=== DRY RUN ===' : '=== REGENERATING ALL NARRATIVES ===');
+    console.log(dryRun ? '=== DRY RUN ===' : '=== REGENERATING NARRATIVES ===');
+    if (breadthFilter) console.log(`Filtering to breadth ${breadthFilter} only`);
 
     // Get all existing narratives
-    const narratives = await sql`
-        SELECT n.anchor_id, a.title, n.breadth
-        FROM narratives n JOIN anchors a ON n.anchor_id = a.id
-        ORDER BY n.anchor_id, n.breadth
-    `;
+    const narratives = breadthFilter
+        ? await sql`
+            SELECT n.anchor_id, a.title, n.breadth
+            FROM narratives n JOIN anchors a ON n.anchor_id = a.id
+            WHERE n.breadth = ${breadthFilter}
+            ORDER BY n.anchor_id, n.breadth
+        `
+        : await sql`
+            SELECT n.anchor_id, a.title, n.breadth
+            FROM narratives n JOIN anchors a ON n.anchor_id = a.id
+            ORDER BY n.anchor_id, n.breadth
+        `;
 
     console.log(`\nFound ${narratives.length} existing narratives to regenerate:\n`);
 
