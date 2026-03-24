@@ -46,29 +46,73 @@ Answer: "What additional depth does X offer for specialists or highly interested
 
 ## Flashcard Design Principles
 
-### **Research-Based Foundations**
+### Research-Based Foundations
+
+These principles draw on Piotr Wozniak's SuperMemo "20 Rules of Formulating Knowledge", Andy Matuschak's writing on spaced repetition system design, and Michael Nielsen's "Augmenting Long-term Memory".
+
+**Core findings:**
 - **Active recall** is more effective than recognition or re-reading
 - **Spaced repetition** multiplies learning effectiveness (80% vs 60% retention)
 - **Metacognition** (confidence rating) deepens memory formation
 - **Q&A format preferred** over cloze deletion (less ambiguous, more reliable)
 
-### **Content Constraints**
-- **Information must be present** in the underlying 1000-word narrative
+### The Minimum Information Principle
+
+This is the single most important rule for flashcard design. From Wozniak: "Simple items are easier to remember." Each card should test exactly one atomic fact. The answer should be a single sentence or short phrase -- if it takes more than 20 words, the card is testing too much.
+
+**Why this matters:**
+- Complex answers create partial recall ("I know some of this but not all of it"), which makes self-grading unreliable
+- Multiple facts in one answer means the card's interval is set by whichever fact is weakest, dragging the known facts down with it
+- Short, specific answers produce crisp "I know it / I don't" signals, which is what the SRS algorithm needs
+
+**How to decompose:**
+- If an answer contains "and" joining two separate facts, make two cards
+- If an answer requires a list, make one card per list item (or use a single card that asks for the count/category, not the full list)
+- If an answer requires explanation of a mechanism, narrow the question to one step of that mechanism
+
+### Content Constraints
+- **Information must be present** in the underlying ~1000-word narrative
 - **Cannot test on content** users haven't learned
 - **Each complexity level** requires appropriate narrative depth
 
-### **Question Structure Guidelines**
+### Question Design
 
-#### **Complexity 1: Simple Anchor Recall**
+#### Making questions concrete
+
+Vague questions produce vague answers. Anchor every question to a specific person, place, date, or event mentioned in the narrative.
+
+**BAD:** "What was important about the printing press?"
+**GOOD:** "What did Gutenberg's printing press make possible for the first time?"
+
+**BAD:** "What happened during the Classical period?"
+**GOOD:** "Roughly when did Athenian democracy emerge?"
+
+The key test: could two different people, both of whom read the narrative, give the same answer? If the question is vague enough that reasonable people might answer different (correct) things, it needs narrowing.
+
+#### Avoiding "explain everything" questions
+
+Questions starting with "What was the significance of..." or "Why was X important?" invite essay-length answers. Instead, ask about one specific consequence, mechanism, or fact.
+
+**BAD:** "What was the significance of the Columbian Exchange?"
+**GOOD:** "What disease, brought by Spanish forces, devastated the Aztec population in 1520?"
+
+#### One direction per card
+
+Each card should have exactly one correct answer path. If the question could be answered by discussing cause OR effect OR timeline, it's too open.
+
+### Question Structure by Complexity Level
+
+#### Complexity 1: Simple Anchor Recall
 **Purpose:** Ensure students remember the 5 main points from the narrative they just read.
 
 **Key Features:**
 - **One question per child anchor** (exactly 5 questions per narrative)
 - **Clear right/wrong answers**
 - **Simple recall, not analysis**
+- **Answer in under 20 words**
 - **Foundation for higher complexity levels**
 
-#### **Complexity 2: Causal Mechanisms**
+#### Complexity 2: Causal Mechanisms
 **Purpose:** Understand why and how historical processes worked.
 
 **Format:** "How did X lead to Y?" or "Why did X happen when/where it did?"
@@ -78,10 +122,11 @@ Answer: "What additional depth does X offer for specialists or highly interested
 
 **Key Features:**
 - **Specific mechanisms** rather than general explanations
-- **Cause-and-effect reasoning**
+- **Cause-and-effect reasoning** -- but ask about ONE link in the chain, not the whole chain
 - **Historical process understanding**
+- **Answer still under 20 words** -- narrow the question until this is achievable
 
-#### **Complexity 3: Analytical/Historiographical**
+#### Complexity 3: Analytical/Historiographical
 **Purpose:** Develop historical thinking and source evaluation skills.
 
 **Format:** "What do historians debate about X?" or "How do we know Y?"
@@ -94,23 +139,32 @@ Answer: "What additional depth does X offer for specialists or highly interested
 - **Source evaluation skills**
 - **Multiple perspectives understanding**
 
-### **Quality Control Standards**
+### Quality Control Standards
 
-#### **The "30-Second Rule"**
+#### The "30-Second Rule"
 Good flashcard answers should be:
-1. **Retrievable in 30 seconds or less**
+1. **Retrievable in a few seconds** -- if you need to think for 30 seconds, the card tests too much
 2. **Clearly right or wrong** when compared to target answer
 3. **Meaningful for historical understanding** (not just trivia)
 
-#### **The "So What?" Test**
+#### The "So What?" Test
 Every flashcard should pass: "If a student learns this answer, will they better understand how the world works?"
 
-**Fails:** "Rome fell in 476 CE" (arbitrary date)
+**Fails:** "Rome fell in 476 CE" (arbitrary date, no transferable insight)
 **Passes:** "Internal political division made Rome vulnerable to external pressures" (transferable pattern)
 
-#### **Anchor Alignment**
+#### The "Two People" Test
+If two people who both read the narrative might reasonably give different correct answers to your question, the question is too vague. Narrow it.
+
+#### Anchor Alignment
 - **Complexity 1:** Must correspond directly to the 5 child anchors
 - **Higher complexities:** Can synthesize across anchors or explore deeper implications
 - **All levels:** Must draw content from the narrative users actually read
 
-This framework ensures students build genuine historical literacy through memorable, engaging learning experiences that progress from concrete facts to transferable historical thinking patterns.
+### Common Mistakes to Avoid
+
+1. **Stuffing multiple facts into one answer.** The most common failure. Always check: does the answer contain "and" or a comma-separated list? Split it.
+2. **Open-ended "significance" questions.** These invite rambling. Ask about one specific consequence instead.
+3. **Testing definitions instead of understanding.** "What is feudalism?" is a dictionary question. "What obligation did a vassal owe their lord in exchange for land?" tests understanding.
+4. **Embedding the answer in the question.** "What revolution in agriculture enabled settled civilisation?" gives away the answer (Agricultural Revolution).
+5. **Testing trivia over patterns.** Isolated dates and names are low-value unless they anchor a causal relationship or turning point.

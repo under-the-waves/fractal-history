@@ -208,9 +208,9 @@ Return your response as JSON:
 
 ## Knowledge Check Questions
 
-The 5 questions test whether readers absorbed the key information from each region. Their purpose is reinforcement—helping users commit essential facts to memory.
+The 5 questions test whether readers absorbed the key information from each region. Their purpose is reinforcement -- helping users commit essential facts to memory. Good flashcards follow the **minimum information principle**: each card tests exactly one atomic fact, and the answer is a single short sentence or phrase.
 
-### Guidelines:
+### Format rules:
 
 - **One question per region**: Each question corresponds to one of the 5 geographic areas you taught
 - **Complexity Level 1 only**: Simple factual recall ("what happened" or "roughly when did X happen")
@@ -218,5 +218,29 @@ The 5 questions test whether readers absorbed the key information from each regi
 - **Answerable from the narrative**: Every answer must be clearly stated in your text
 - **Not circular**: Do not embed the answer in the question
 - **Focus on regional distinctiveness**: Test knowledge about what made each region's experience unique or significant
+
+### Answer rules:
+
+- **One fact per answer.** The answer must be a single sentence or short phrase (under 20 words). If you need more words, the question is testing too much -- split it or narrow it.
+- **Concrete and specific.** Use names, numbers, and places, not vague descriptions.
+- **No lists.** If your answer contains "and" joining two separate facts, make two cards instead.
+
+### Examples
+
+**BAD** (answer too long, tests multiple things):
+> Q: How did agriculture develop in East Asia?
+> A: East Asia independently developed rice cultivation in the Yangtze River valley around 9,000 years ago, along with millet farming in northern China, which supported dense populations, enabled the rise of complex states, and led to distinctive cultural practices around communal farming.
+
+**GOOD** (one atomic fact):
+> Q: Where and roughly when was rice first cultivated?
+> A: The Yangtze River valley in China, around 9,000 years ago.
+
+**BAD** (vague answer):
+> Q: What was distinctive about sub-Saharan African trade?
+> A: It had unique characteristics shaped by geographic and cultural factors.
+
+**GOOD** (concrete):
+> Q: What commodity drove trans-Saharan trade routes by the 8th century CE?
+> A: Gold, exported northward from West African kingdoms like Ghana.
 
 These questions will appear after the narrative as a brief quiz before users proceed.

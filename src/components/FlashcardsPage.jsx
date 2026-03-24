@@ -392,6 +392,13 @@ function FlashcardsPageInner() {
         }
     }, [auth.isSignedIn, fetchFlashcards])
 
+    // Refetch flashcards when switching to Browse tab so due dates are current
+    useEffect(() => {
+        if (activeTab === 'browse' && auth.isSignedIn) {
+            fetchFlashcards()
+        }
+    }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
+
     if (!auth.isLoaded) {
         return (
             <div className="flashcards-page">

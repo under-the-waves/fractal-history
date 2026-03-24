@@ -22,8 +22,23 @@ You are writing the **B-breadth narrative** for this anchor. This means organizi
 
 These are the chronological periods that divide this topic. Your narrative MUST:
 - Move through each period in order
-- **Bold each period title** when you transition into it
+- **Reference each period using natural prose**, not the raw anchor title. The anchor titles (e.g. "Early Modern: 1500 - 1900 CE") are identifiers, not sentences. Your narrative should read like normal writing. Use `<strong data-title="EXACT ANCHOR TITLE">your natural phrasing</strong>` so the system can link them. See examples below.
 - Help readers understand what changed between periods and why
+
+### How to Reference Periods in Prose
+
+The anchor title is a label. Your job is to weave it into a sentence that reads naturally while preserving the link.
+
+**BAD (raw title dumped into prose):**
+> <strong>Early Modern: 1500 - 1900 CE</strong> marked an era of unprecedented global integration.
+
+**GOOD (natural prose with data-title for linking):**
+> <strong data-title="Early Modern: 1500 - 1900 CE">The early modern period (1500 - 1900 CE)</strong> marked an era of unprecedented global integration.
+
+**ALSO GOOD:**
+> By roughly 1500 CE, the world was entering <strong data-title="Early Modern: 1500 - 1900 CE">an era of unprecedented global integration</strong>.
+
+The text inside the `<strong>` tags should read as part of the sentence. The `data-title` attribute must contain the exact anchor title so the system can create the correct link.
 
 {{childAnchors}}
 
@@ -165,7 +180,7 @@ NEVER use these:
 Return your response as JSON:
 
 {
-  "narrative": "<p>Your ~1000-word narrative here, with HTML paragraph tags. Bold the period titles using <strong> tags.</p>",
+  "narrative": "<p>Your ~1000-word narrative here, with HTML paragraph tags. Reference periods using <strong data-title=\"Exact Anchor Title\">natural prose text</strong> tags.</p>",
   "keyConcepts": [
     "Key takeaway about period 1",
     "Key takeaway about period 2",
@@ -206,9 +221,9 @@ Return your response as JSON:
 
 ## Knowledge Check Questions
 
-The 5 questions test whether readers absorbed the key information from each period. Their purpose is reinforcement—helping users commit essential facts to memory.
+The 5 questions test whether readers absorbed the key information from each period. Their purpose is reinforcement -- helping users commit essential facts to memory. Good flashcards follow the **minimum information principle**: each card tests exactly one atomic fact, and the answer is a single short sentence or phrase.
 
-### Guidelines:
+### Format rules:
 
 - **One question per period, plus one about the precursor history or aftermath**: 6 questions total
 - **Questions must test the reader's knowledge of the chronological periods and their key events/dates.** Do NOT ask about analytical concepts or thematic ideas from the A-breadth perspective.
@@ -217,5 +232,32 @@ The 5 questions test whether readers absorbed the key information from each peri
 - **Answerable from the narrative**: Every answer must be clearly stated in your text
 - **Not circular**: Do not embed the answer in the question
 - **Focus on turning points**: Test knowledge about key developments or transitions within each period
+
+### Answer rules:
+
+- **One fact per answer.** The answer must be a single sentence or short phrase (under 20 words). If you need more words, the question is testing too much -- split it or narrow it.
+- **Concrete and specific.** Use names, numbers, and places, not vague descriptions.
+- **No lists.** If your answer contains "and" joining two separate facts, make two cards instead.
+
+### Examples
+
+**BAD** (answer too long, tests multiple things):
+> Q: What happened during the Classical period?
+> A: The Classical period saw the rise of Greek democracy, the conquests of Alexander the Great, the growth of the Roman Republic, major advances in philosophy and science, and the spread of Hellenistic culture across the Mediterranean.
+
+**GOOD** (one atomic fact each):
+> Q: Roughly when did Athenian democracy emerge?
+> A: Around 508 BCE, under Cleisthenes' reforms.
+>
+> Q: What did Alexander the Great's conquests spread across the eastern Mediterranean?
+> A: Greek language and Hellenistic culture.
+
+**BAD** (vague answer):
+> Q: What was significant about this period?
+> A: It marked a major turning point with significant changes across many areas of society.
+
+**GOOD** (concrete):
+> Q: What political system did Rome transition to around 27 BCE?
+> A: A centralised empire under Augustus, ending the Republic.
 
 These questions will appear after the narrative as a brief quiz before users proceed.

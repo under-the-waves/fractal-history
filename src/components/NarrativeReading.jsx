@@ -196,9 +196,24 @@ function NarrativeReading() {
         setError(null)
 
         try {
+            // Helper: parse JSON response, throwing a clear error if the
+            // server returned non-JSON (e.g. a Vercel timeout page).
+            const safeJson = async (response, context) => {
+                const text = await response.text()
+                try {
+                    return JSON.parse(text)
+                } catch {
+                    throw new Error(
+                        response.status === 504 || text.startsWith('An error')
+                            ? `${context} timed out. Try again — the server may need a moment.`
+                            : `${context} returned an unexpected response.`
+                    )
+                }
+            }
+
             // First, check if narrative exists
             const checkResponse = await fetch(`/api/get-narrative?id=${id}&breadth=${breadth}`)
-            const checkData = await checkResponse.json()
+            const checkData = await safeJson(checkResponse, 'Checking narrative')
 
             if (!checkResponse.ok) {
                 throw new Error(checkData.error || 'Failed to check narrative')
@@ -237,7 +252,7 @@ function NarrativeReading() {
                     })
                 })
                 if (!anchorsResponse.ok) {
-                    const errData = await anchorsResponse.json()
+                    const errData = await safeJson(anchorsResponse, 'Generating child anchors')
                     throw new Error(errData.error || 'Failed to generate child anchors')
                 }
             }
@@ -245,7 +260,7 @@ function NarrativeReading() {
             // Now generate the narrative (children guaranteed to exist)
             setLoadingStage('generating_narrative')
             const generateResponse = await fetch(`/api/generate-narrative?id=${id}&breadth=${breadth}`)
-            const generateData = await generateResponse.json()
+            const generateData = await safeJson(generateResponse, 'Generating narrative')
 
             if (!generateResponse.ok || !generateData.success) {
                 throw new Error(generateData.error || 'Failed to generate narrative')
