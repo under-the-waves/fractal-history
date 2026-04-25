@@ -201,76 +201,8 @@ Return ONLY valid JSON with this exact structure:
     "Fourth key takeaway (one sentence, corresponding to A-anchor 4)",
     "Fifth key takeaway (one sentence, corresponding to A-anchor 5)"
   ],
-  "questions": [
-    {
-      "question": "Question about the opening anecdote/hook",
-      "answer": "Clear, specific answer findable in the narrative"
-    },
-    {
-      "question": "Simple factual question about A-anchor 1",
-      "answer": "Clear, specific answer findable in the narrative"
-    },
-    {
-      "question": "Simple factual question about A-anchor 2",
-      "answer": "Clear, specific answer findable in the narrative"
-    },
-    {
-      "question": "Simple factual question about A-anchor 3",
-      "answer": "Clear, specific answer findable in the narrative"
-    },
-    {
-      "question": "Simple factual question about A-anchor 4",
-      "answer": "Clear, specific answer findable in the narrative"
-    },
-    {
-      "question": "Simple factual question about A-anchor 5",
-      "answer": "Clear, specific answer findable in the narrative"
-    }
-  ],
   "estimatedReadTime": 5
 }
-
----
-
-## Knowledge Check Questions
-
-Each question tests whether the reader absorbed one key fact from one A-anchor. Good flashcards follow the **minimum information principle**: each card tests exactly one atomic fact, and the answer is a single short sentence or phrase.
-
-### Format rules:
-
-- **One question per A-anchor, plus one about the opening hook** (exactly 6)
-- **Simple factual recall**: "What..." or "How..." or "Why..."
-- **Questions must test the reader's understanding of the key concepts (A-anchors) and their significance.** Do NOT ask about dates, time periods, or chronological sequences -- that is the B-breadth's job.
-- **Single focus**: Never ask two things in one question
-- **Answerable from narrative**: The answer must appear in your text
-- **Not circular**: Don't embed the answer in the question
-
-### Answer rules:
-
-- **One fact per answer.** The answer must be a single sentence or short phrase (under 20 words). If you need more words, the question is testing too much -- split it or narrow it.
-- **Concrete and specific.** Use names, numbers, and places, not vague descriptions.
-- **No lists.** If your answer contains "and" joining two separate facts, make two cards instead.
-
-### Examples
-
-**BAD** (answer too long, tests multiple things):
-> Q: What was the significance of the printing press?
-> A: The printing press, invented by Gutenberg around 1440, revolutionised the spread of knowledge by making books affordable, enabled the Protestant Reformation by allowing mass distribution of pamphlets, and undermined the Church's monopoly on information.
-
-**GOOD** (one atomic fact each):
-> Q: What did Gutenberg's printing press make possible for the first time?
-> A: Mass production of books at affordable prices.
->
-> Q: How did the printing press help the Protestant Reformation spread?
-> A: It enabled mass distribution of pamphlets and translated Bibles.
-
-**BAD** (vague answer):
-> Q: Why was Roman road-building important?
-> A: It had significant implications for trade, military movement, and cultural exchange across the empire.
-
-**GOOD** (concrete):
-> Q: Why was the Roman road network militarily valuable?
-> A: Legions could march roughly 25 miles per day on paved roads, enabling rapid deployment across the empire.
 
 ---
 

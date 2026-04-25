@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
@@ -22,10 +22,40 @@ const BREADTH_LABELS = {
 }
 
 // Separate component that safely uses Clerk hooks (only rendered inside ClerkProvider)
-function FlashcardSaveSection({ anchorId, breadth, questions }) {
+function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }) {
     const auth = useAuth()
+    const [questions, setQuestions] = useState(initialQuestions)
+    const [generating, setGenerating] = useState(false)
+    const [generateError, setGenerateError] = useState(null)
     const [savedCards, setSavedCards] = useState(new Set())
     const [savingAll, setSavingAll] = useState(false)
+
+    // Sync if parent passes updated questions
+    useEffect(() => {
+        if (initialQuestions && initialQuestions.length > 0) {
+            setQuestions(initialQuestions)
+        }
+    }, [initialQuestions])
+
+    // Generate flashcards on demand
+    const generateFlashcards = async () => {
+        setGenerating(true)
+        setGenerateError(null)
+        try {
+            const response = await fetch(`/api/generate-flashcards?id=${anchorId}&breadth=${breadth}`)
+            const data = await response.json()
+            if (data.success && data.questions) {
+                setQuestions(data.questions)
+            } else {
+                setGenerateError(data.error || 'Failed to generate flashcards')
+            }
+        } catch (err) {
+            console.error('Failed to generate flashcards:', err)
+            setGenerateError('Failed to generate flashcards. Please try again.')
+        } finally {
+            setGenerating(false)
+        }
+    }
 
     // Load already-saved flashcards on mount
     useEffect(() => {
@@ -108,6 +138,22 @@ function FlashcardSaveSection({ anchorId, breadth, questions }) {
                         <button className="sign-in-prompt-button">Sign in to save flashcards</button>
                     </SignInButton>
                 </div>
+            </section>
+        )
+    }
+
+    if (!questions || questions.length === 0) {
+        return (
+            <section className="flashcard-save-section">
+                <h2 className="flashcard-save-heading">Flashcards</h2>
+                {generateError && <p className="flashcard-error">{generateError}</p>}
+                <button
+                    className="save-all-button"
+                    onClick={generateFlashcards}
+                    disabled={generating}
+                >
+                    {generating ? 'Generating flashcards...' : 'Generate flashcards'}
+                </button>
             </section>
         )
     }
@@ -280,10 +326,14 @@ function NarrativeReading() {
         }
     }, [id, breadth])
 
-    // Fetch on mount and when id/breadth changes
+    // Fetch on mount and when id/breadth changes (guard against double-fire)
+    const fetchInFlight = useRef(null)
     useEffect(() => {
-        fetchNarrative()
-    }, [fetchNarrative])
+        const key = `${id}-${breadth}`
+        if (fetchInFlight.current === key) return
+        fetchInFlight.current = key
+        fetchNarrative().finally(() => { fetchInFlight.current = null })
+    }, [fetchNarrative, id, breadth])
 
     // Calculate read time from word count or use estimated
     const getReadTime = () => {
@@ -454,11 +504,11 @@ function NarrativeReading() {
             )}
 
             {/* Flashcard save section */}
-            {anchor.questions && anchor.questions.length > 0 && clerkEnabled && (
+            {clerkEnabled && (
                 <FlashcardSaveSection
                     anchorId={id}
                     breadth={breadth}
-                    questions={anchor.questions}
+                    questions={anchor.questions || []}
                 />
             )}
 

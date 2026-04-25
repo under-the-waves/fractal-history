@@ -1,17 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { neon } from '@neondatabase/serverless';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import { factCheckNarrative } from './utils/factCheck.js';
 import { linkChildAnchors } from './utils/linkChildAnchors.js';
+import { query, getAncestorPath } from './utils/db.js';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
 
-// Initialize clients lazily to ensure env vars are available
 let anthropic = null;
-let sql = null;
 
 function getAnthropicClient() {
     if (!anthropic) {
@@ -20,13 +18,6 @@ function getAnthropicClient() {
         });
     }
     return anthropic;
-}
-
-function getSql() {
-    if (!sql) {
-        sql = neon(process.env.DATABASE_URL);
-    }
-    return sql;
 }
 
 // Load prompt template from file
@@ -53,106 +44,36 @@ function loadPromptTemplate(breadth) {
     }
 }
 
-// Recursively fetch all ancestors of a given anchor
-async function getAncestorPath(anchorId) {
-    const ancestors = [];
-    let currentId = anchorId;
-
-    while (currentId && currentId !== '0-ROOT') {
-        const result = await getSql()`
-            SELECT
-                a.id,
-                a.title,
-                a.scope,
-                tp.level,
-                tp.breadth,
-                tp.parent_position_id
-            FROM anchors a
-            JOIN tree_positions tp ON a.id = tp.anchor_id
-            WHERE a.id = ${currentId}
-            LIMIT 1
-        `;
-
-        if (result.length === 0) break;
-
-        const anchor = result[0];
-        ancestors.unshift({
-            id: anchor.id,
-            title: anchor.title,
-            scope: anchor.scope || 'No scope defined',
-            level: anchor.level,
-            breadth: anchor.breadth
-        });
-
-        if (anchor.parent_position_id) {
-            const parentResult = await getSql()`
-                SELECT anchor_id
-                FROM tree_positions
-                WHERE position_id = ${anchor.parent_position_id}
-                LIMIT 1
-            `;
-
-            if (parentResult.length > 0) {
-                currentId = parentResult[0].anchor_id;
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-
-    // Add ROOT at the beginning
-    ancestors.unshift({
-        id: '0-ROOT',
-        title: 'The Story of Everything',
-        scope: 'All of history',
-        level: 0,
-        breadth: null
-    });
-
-    return ancestors;
-}
-
 // Get child anchors for a given parent and breadth
 async function getChildAnchors(parentId, breadth) {
-    const children = await getSql()`
-        SELECT a.id, a.title, a.scope, tp.position
-        FROM anchors a
-        JOIN tree_positions tp ON a.id = tp.anchor_id
-        WHERE tp.parent_position_id = (
-            SELECT position_id
-            FROM tree_positions
-            WHERE anchor_id = ${parentId}
-            LIMIT 1
-        )
-        AND tp.breadth = ${breadth}
-        ORDER BY tp.position ASC
-    `;
-
-    return children;
+    return await query(
+        `SELECT a.id, a.title, a.scope, tp.position
+         FROM anchors a
+         JOIN tree_positions tp ON a.id = tp.anchor_id
+         WHERE tp.parent_position_id = (
+             SELECT position_id FROM tree_positions WHERE anchor_id = $1 LIMIT 1
+         )
+         AND tp.breadth = $2
+         ORDER BY tp.position ASC`,
+        [parentId, breadth]
+    );
 }
 
 // Check if narrative already exists
 async function getNarrative(anchorId, breadth) {
-    const result = await getSql()`
-        SELECT * FROM narratives
-        WHERE anchor_id = ${anchorId} AND breadth = ${breadth}
-        LIMIT 1
-    `;
-
+    const result = await query(
+        'SELECT * FROM narratives WHERE anchor_id = $1 AND breadth = $2 LIMIT 1',
+        [anchorId, breadth]
+    );
     return result.length > 0 ? result[0] : null;
 }
 
 // Get anchor details
 async function getAnchorDetails(anchorId) {
-    const result = await getSql()`
-        SELECT a.id, a.title, a.scope
-        FROM anchors a
-        WHERE a.id = ${anchorId}
-        LIMIT 1
-    `;
-
+    const result = await query(
+        'SELECT id, title, scope FROM anchors WHERE id = $1 LIMIT 1',
+        [anchorId]
+    );
     return result.length > 0 ? result[0] : null;
 }
 
@@ -208,14 +129,11 @@ function parseNarrativeResponse(response) {
         if (!Array.isArray(data.keyConcepts)) {
             throw new Error('Response missing keyConcepts array');
         }
-        if (!Array.isArray(data.questions)) {
-            throw new Error('Response missing questions array');
-        }
 
         return {
             narrative: data.narrative,
             keyConcepts: data.keyConcepts,
-            questions: data.questions,
+            questions: data.questions || [],
             estimatedReadTime: data.estimatedReadTime || 5
         };
     } catch (error) {
@@ -227,25 +145,21 @@ function parseNarrativeResponse(response) {
 
 // Store narrative in database
 async function storeNarrative(anchorId, breadth, narrativeData) {
-    const result = await getSql()`
-        INSERT INTO narratives (anchor_id, breadth, narrative, key_concepts, questions, estimated_read_time)
-        VALUES (
-            ${anchorId},
-            ${breadth},
-            ${narrativeData.narrative},
-            ${JSON.stringify(narrativeData.keyConcepts)},
-            ${JSON.stringify(narrativeData.questions)},
-            ${narrativeData.estimatedReadTime}
-        )
-        ON CONFLICT (anchor_id, breadth)
-        DO UPDATE SET
-            narrative = ${narrativeData.narrative},
-            key_concepts = ${JSON.stringify(narrativeData.keyConcepts)},
-            questions = ${JSON.stringify(narrativeData.questions)},
-            estimated_read_time = ${narrativeData.estimatedReadTime}
-        RETURNING *
-    `;
-
+    const result = await query(
+        `INSERT INTO narratives (anchor_id, breadth, narrative, key_concepts, questions, estimated_read_time)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (anchor_id, breadth)
+         DO UPDATE SET
+             narrative = $3,
+             key_concepts = $4,
+             questions = $5,
+             estimated_read_time = $6
+         RETURNING *`,
+        [anchorId, breadth, narrativeData.narrative,
+         JSON.stringify(narrativeData.keyConcepts),
+         JSON.stringify(narrativeData.questions),
+         narrativeData.estimatedReadTime]
+    );
     return result[0];
 }
 
@@ -300,16 +214,18 @@ export default async function handler(req, res) {
             }
         }
 
-        // Get anchor details
-        const anchor = await getAnchorDetails(anchorId);
+        // Fetch anchor details, children, and ancestors in parallel
+        const [anchor, children, ancestors] = await Promise.all([
+            getAnchorDetails(anchorId),
+            getChildAnchors(anchorId, breadth),
+            getAncestorPath(anchorId)
+        ]);
+
         if (!anchor) {
             return res.status(404).json({ error: 'Anchor not found' });
         }
 
         console.log(`Generating narrative for ${anchorId} (${anchor.title}) breadth ${breadth}`);
-
-        // Step 2: Check for child anchors
-        let children = await getChildAnchors(anchorId, breadth);
         console.log(`Found ${children.length} existing ${breadth}-children for ${anchorId}`);
 
         // Children must exist before narrative generation (frontend generates them separately)
@@ -321,12 +237,8 @@ export default async function handler(req, res) {
             });
         }
 
-        // Step 4: Load and populate prompt template
-        console.log('Loading prompt template...');
+        // Load and populate prompt template
         const promptTemplate = loadPromptTemplate(breadth);
-
-        // Get ancestor path
-        const ancestors = await getAncestorPath(anchorId);
 
         // Populate template
         const prompt = populatePromptTemplate(promptTemplate, {
@@ -341,8 +253,8 @@ export default async function handler(req, res) {
         // Step 5: Call LLM API
         console.log('Calling Anthropic API for narrative generation...');
         const completion = await getAnthropicClient().messages.create({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 4096,
+            model: 'claude-sonnet-4-6',
+            max_tokens: 2500,
             system: 'You are an expert historian and educational writer. You write engaging, accurate historical narratives in the style of Dan Carlin\'s Hardcore History podcast. Always respond with valid JSON as specified in the prompt.',
             messages: [
                 {

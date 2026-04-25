@@ -1,88 +1,19 @@
-import { neon } from '@neondatabase/serverless';
 import { linkChildAnchors } from './utils/linkChildAnchors.js';
-
-const sql = neon(process.env.DATABASE_URL);
-
-// Recursively fetch all ancestors of a given anchor
-async function getAncestorPath(anchorId) {
-    const ancestors = [];
-    let currentId = anchorId;
-
-    while (currentId && currentId !== '0-ROOT') {
-        // Get current anchor details and its parent
-        const result = await sql`
-            SELECT
-                a.id,
-                a.title,
-                tp.parent_position_id
-            FROM anchors a
-            JOIN tree_positions tp ON a.id = tp.anchor_id
-            WHERE a.id = ${currentId}
-            LIMIT 1
-        `;
-
-        if (result.length === 0) break;
-
-        const anchor = result[0];
-
-        // Get parent anchor ID from parent_position_id
-        if (anchor.parent_position_id) {
-            const parentResult = await sql`
-                SELECT anchor_id
-                FROM tree_positions
-                WHERE position_id = ${anchor.parent_position_id}
-                LIMIT 1
-            `;
-
-            if (parentResult.length > 0) {
-                currentId = parentResult[0].anchor_id;
-
-                // Add parent to ancestors (we'll build the path in reverse)
-                const parentDetails = await sql`
-                    SELECT id, title FROM anchors WHERE id = ${currentId} LIMIT 1
-                `;
-                if (parentDetails.length > 0) {
-                    ancestors.unshift({
-                        id: parentDetails[0].id,
-                        title: parentDetails[0].title
-                    });
-                }
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-
-    // Add ROOT at the beginning if not already there
-    if (ancestors.length === 0 || ancestors[0].id !== '0-ROOT') {
-        ancestors.unshift({
-            id: '0-ROOT',
-            title: 'The Story of Everything'
-        });
-    }
-
-    return ancestors;
-}
+import { query, getAncestorPath } from './utils/db.js';
 
 // Get child anchors for a specific breadth
 async function getChildAnchors(parentId, breadth) {
-    const children = await sql`
-        SELECT a.id, a.title
-        FROM anchors a
-        JOIN tree_positions tp ON a.id = tp.anchor_id
-        WHERE tp.parent_position_id = (
-            SELECT position_id
-            FROM tree_positions
-            WHERE anchor_id = ${parentId}
-            LIMIT 1
-        )
-        AND tp.breadth = ${breadth}
-        ORDER BY tp.position ASC
-    `;
-
-    return children;
+    return await query(
+        `SELECT a.id, a.title
+         FROM anchors a
+         JOIN tree_positions tp ON a.id = tp.anchor_id
+         WHERE tp.parent_position_id = (
+             SELECT position_id FROM tree_positions WHERE anchor_id = $1 LIMIT 1
+         )
+         AND tp.breadth = $2
+         ORDER BY tp.position ASC`,
+        [parentId, breadth]
+    );
 }
 
 export default async function handler(req, res) {
@@ -101,17 +32,21 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Fetch anchor data
-        const anchorResult = await sql`
-            SELECT
-                a.id,
-                a.title,
-                a.scope,
-                a.generation_status
-            FROM anchors a
-            WHERE a.id = ${id}
-            LIMIT 1
-        `;
+        // Fetch anchor, narrative, children, and ancestors in parallel
+        const [anchorResult, narrativeResult, childAnchors, ancestors] = await Promise.all([
+            query(
+                'SELECT id, title, scope, generation_status FROM anchors WHERE id = $1 LIMIT 1',
+                [id]
+            ),
+            query(
+                `SELECT narrative, key_concepts, questions, estimated_read_time,
+                        fact_checked_narrative, sources, fact_checked_at
+                 FROM narratives WHERE anchor_id = $1 AND breadth = $2 LIMIT 1`,
+                [id, breadth]
+            ),
+            getChildAnchors(id, breadth),
+            getAncestorPath(id)
+        ]);
 
         if (anchorResult.length === 0) {
             return res.status(404).json({
@@ -121,27 +56,6 @@ export default async function handler(req, res) {
         }
 
         const anchor = anchorResult[0];
-
-        // Check if narrative exists in the narratives table for this breadth
-        const narrativeResult = await sql`
-            SELECT
-                narrative,
-                key_concepts,
-                questions,
-                estimated_read_time,
-                fact_checked_narrative,
-                sources,
-                fact_checked_at
-            FROM narratives
-            WHERE anchor_id = ${id} AND breadth = ${breadth}
-            LIMIT 1
-        `;
-
-        // Check if child anchors exist for this breadth
-        const childAnchors = await getChildAnchors(id, breadth);
-
-        // Fetch ancestors
-        const ancestors = await getAncestorPath(id);
 
         // If no narrative exists
         if (narrativeResult.length === 0) {

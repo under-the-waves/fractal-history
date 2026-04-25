@@ -1,14 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { neon } from '@neondatabase/serverless';
 import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles } from './utils/promptLoader.js';
+import { query, getAncestorPath } from './utils/db.js';
 import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
 
-// Initialize clients lazily to ensure env vars are available
 let anthropic = null;
-let sql = null;
 
 function getAnthropicClient() {
     if (!anthropic) {
@@ -17,13 +15,6 @@ function getAnthropicClient() {
         });
     }
     return anthropic;
-}
-
-function getSql() {
-    if (!sql) {
-        sql = neon(process.env.DATABASE_URL);
-    }
-    return sql;
 }
 
 // Generate anchor ID in format like "2A-X7Y3Z"
@@ -51,77 +42,21 @@ function generateAnchorId(parentId, position) {
     return `${childLevel}A-${hash}`;
 }
 
-// NEW: Recursively fetch all ancestors of a given anchor
-async function getAncestorPath(anchorId) {
-    const ancestors = [];
-    let currentId = anchorId;
-
-    while (currentId && currentId !== '0-ROOT') {
-        // Get current anchor details and its parent
-        const result = await getSql()`
-            SELECT 
-                a.id,
-                a.title,
-                a.scope,
-                tp.level,
-                tp.breadth,
-                tp.parent_position_id
-            FROM anchors a
-            JOIN tree_positions tp ON a.id = tp.anchor_id
-            WHERE a.id = ${currentId}
-            LIMIT 1
-        `;
-
-        if (result.length === 0) break;
-
-        const anchor = result[0];
-        ancestors.unshift({
-            id: anchor.id,
-            title: anchor.title,
-            scope: anchor.scope || 'No scope defined',
-            level: anchor.level,
-            breadth: anchor.breadth
-        });
-
-        // Get parent anchor ID from parent_position_id
-        if (anchor.parent_position_id) {
-            const parentResult = await getSql()`
-                SELECT anchor_id 
-                FROM tree_positions 
-                WHERE position_id = ${anchor.parent_position_id}
-                LIMIT 1
-            `;
-
-            if (parentResult.length > 0) {
-                currentId = parentResult[0].anchor_id;
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-
-    return ancestors;
-}
-
-// NEW: Get existing sibling anchors at the same level
+// Get existing sibling anchors at the same level
 async function getSiblingAnchors(parentId, breadth) {
-    const siblings = await getSql()`
+    return await query(`
         SELECT a.id, a.title, a.scope
         FROM anchors a
         JOIN tree_positions tp ON a.id = tp.anchor_id
         WHERE tp.parent_position_id = (
-            SELECT position_id 
-            FROM tree_positions 
-            WHERE anchor_id = ${parentId}
+            SELECT position_id
+            FROM tree_positions
+            WHERE anchor_id = $1
             LIMIT 1
         )
-        AND tp.breadth = ${breadth}
+        AND tp.breadth = $2
         ORDER BY tp.position ASC
-    `;
-
-    return siblings;
+    `, [parentId, breadth]);
 }
 
 export default async function handler(req, res) {
@@ -146,12 +81,42 @@ export default async function handler(req, res) {
 
         console.log(`Generating anchors for parent: ${parentId} - ${parentTitle}`);
 
-        // UPDATED: Fetch ancestor path and sibling context
-        const ancestorPath = await getAncestorPath(parentId);
-        const existingSiblings = await getSiblingAnchors(parentId, breadth);
+        // Idempotency: if children already exist for this parent+breadth, return them
+        const parentPos = await query(
+            'SELECT position_id FROM tree_positions WHERE anchor_id = $1 LIMIT 1',
+            [parentId]
+        );
+        if (parentPos.length > 0) {
+            const existingChildren = await query(`
+                SELECT a.id, a.title, a.scope, a.generation_status,
+                       tp.level, tp.breadth, tp.position
+                FROM anchors a
+                JOIN tree_positions tp ON a.id = tp.anchor_id
+                WHERE tp.parent_position_id = $1
+                  AND tp.breadth = $2
+                ORDER BY tp.position ASC
+            `, [parentPos[0].position_id, breadth]);
+            if (existingChildren.length > 0) {
+                console.log(`Children already exist for ${parentId} breadth ${breadth} (${existingChildren.length} found), skipping generation`);
+                return res.status(200).json({
+                    success: true,
+                    parentId,
+                    parentTitle,
+                    breadth,
+                    anchorsGenerated: existingChildren.length,
+                    anchors: existingChildren,
+                    skipped: true
+                });
+            }
+        }
+
+        // Fetch ancestor path and sibling context in parallel
+        const [ancestorPath, existingSiblings] = await Promise.all([
+            getAncestorPath(parentId),
+            getSiblingAnchors(parentId, breadth)
+        ]);
 
         console.log(`Found ${ancestorPath.length} ancestors and ${existingSiblings.length} existing siblings`);
-
         // Build the appropriate prompt based on breadth type
         const systemPrompt = breadth === 'A'
             ? buildBreadthAPrompt(
@@ -169,12 +134,13 @@ export default async function handler(req, res) {
                 existingSiblings
             );
 
+        const apiStart = Date.now();
         console.log('Calling Anthropic API...');
 
         const completion = await getAnthropicClient().messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 8000,
-            system: 'You are an expert historian using the Fractal History methodology to select the most essential anchors for historical topics.',
+            system: 'You are an expert historian selecting essential anchors for a fractal history education platform. Respond with valid JSON only. No markdown, no explanation outside the JSON. Keep anchor titles to 5 words maximum.',
             messages: [
                 {
                     role: 'user',
@@ -184,35 +150,81 @@ export default async function handler(req, res) {
         });
 
         const response = completion.content[0].text;
-        console.log('Anthropic response received');
+        const apiMs = Date.now() - apiStart;
+        console.log(`Anthropic response received in ${apiMs}ms (${(apiMs/1000).toFixed(1)}s)`);
+        console.log(`Usage: ${completion.usage?.input_tokens} input, ${completion.usage?.output_tokens} output tokens`);
         console.log('\n=== FULL LLM RESPONSE ===');
         console.log(response);
         console.log('=== END RESPONSE ===\n');
 
         // Parse the LLM response based on breadth type
-        const anchors = breadth === 'A'
-            ? parseAnchorResponse(response, parentId)
-            : parseTemporalAnchorResponse(response, parentId);
-
-        // Parse candidates and reasoning for "Why these Anchors?" feature
-        let candidates = [];
-        let selectionReasoning = '';
+        let anchors, candidates, selectionReasoning;
 
         if (breadth === 'A') {
-            candidates = parseCandidatesFromResponse(response);
-            selectionReasoning = parseSelectionReasoning(response);
+            // Parse JSON candidates from LLM
+            let cleaned = response.trim().replace(/```json\n?/g, '').replace(/```\n?/g, '');
+            const data = JSON.parse(cleaned);
 
-            // Mark which candidates were selected
-            const selectedTitles = anchors.map(a => a.title.toLowerCase());
-            candidates = candidates.map(c => ({
-                ...c,
-                selected: selectedTitles.includes(c.title.toLowerCase())
+            if (!data.candidates || !Array.isArray(data.candidates) || data.candidates.length === 0) {
+                throw new Error('Response missing candidates array');
+            }
+
+            // Deterministic selection: sort by finalScore descending, pick top 3-5
+            const sorted = [...data.candidates]
+                .filter(c => c.finalScore >= 6.0)
+                .sort((a, b) => b.finalScore - a.finalScore);
+
+            // Use score gap heuristic: cut where there's a >1.0 drop (min 3, max 5)
+            let count = Math.min(sorted.length, 5);
+            for (let i = 3; i < Math.min(sorted.length, 5); i++) {
+                if (sorted[i - 1].finalScore - sorted[i].finalScore > 1.0) {
+                    count = i;
+                    break;
+                }
+            }
+            count = Math.max(3, Math.min(count, sorted.length));
+
+            const selected = sorted.slice(0, count);
+            console.log(`Deterministic selection: ${count} anchors (gap heuristic)`);
+            selected.forEach((a, i) => console.log(`  ${i + 1}. ${a.title} (score: ${a.finalScore})`));
+
+            // Map to expected format, sort chronologically
+            anchors = selected.map(a => ({
+                title: a.title,
+                scope: a.scope,
+                timePeriod: a.timePeriod,
+                sortValue: parseTimePeriodToSortValue(a.timePeriod),
+                position: 0,
+                causalSignificance: a.causalSignificance,
+                humanImpact: a.humanImpact,
+                finalScore: a.finalScore
             }));
+            anchors.sort((a, b) => b.sortValue - a.sortValue);
+            anchors.forEach((a, i) => { a.position = i + 1; });
+
+            console.log('Final order (chronological):');
+            anchors.forEach(a => console.log(`  Position ${a.position}: ${a.title} (${a.timePeriod})`));
+
+            // Map all candidates for "Why these anchors?" display
+            const selectedTitles = new Set(selected.map(a => a.title.toLowerCase()));
+            candidates = data.candidates.map(c => ({
+                title: c.title,
+                type: c.type || 'Unknown',
+                scope: c.scope || '',
+                causalSignificance: c.causalSignificance || 0,
+                causalJustification: c.causalJustification || '',
+                humanImpact: c.humanImpact || 0,
+                humanJustification: c.humanJustification || '',
+                finalScore: c.finalScore || 0,
+                selected: selectedTitles.has(c.title.toLowerCase())
+            }));
+
+            selectionReasoning = `Top ${count} candidates selected by score (gap heuristic: cut at >1.0 point drop).`;
         } else {
-            // For Breadth B, parse the candidate subdivision schemes
+            // Breadth B: existing parsing
+            anchors = parseTemporalAnchorResponse(response, parentId);
             candidates = parseTemporalCandidates(response);
 
-            // Extract selection reasoning from the parsed data
             try {
                 let cleaned = response.trim().replace(/```json\n?/g, '').replace(/```\n?/g, '');
                 const data = JSON.parse(cleaned);
@@ -233,85 +245,77 @@ export default async function handler(req, res) {
                 finalScore: a.finalScore
             }));
 
-            const [metadataRow] = await getSql()`
+            const metadataResult = await query(`
                 INSERT INTO anchor_generation_metadata
                 (parent_anchor_id, breadth, candidates, final_selection, selection_reasoning, raw_response)
-                VALUES (
-                    ${parentId},
-                    ${breadth},
-                    ${JSON.stringify(candidates)},
-                    ${JSON.stringify(finalSelection)},
-                    ${selectionReasoning},
-                    ${response}
-                )
+                VALUES ($1, $2, $3, $4, $5, $6)
                 ON CONFLICT (parent_anchor_id, breadth)
                 DO UPDATE SET
-                    candidates = ${JSON.stringify(candidates)},
-                    final_selection = ${JSON.stringify(finalSelection)},
-                    selection_reasoning = ${selectionReasoning},
-                    raw_response = ${response},
+                    candidates = $3,
+                    final_selection = $4,
+                    selection_reasoning = $5,
+                    raw_response = $6,
                     generated_at = NOW()
                 RETURNING id
-            `;
-            metadataId = metadataRow.id;
+            `, [parentId, breadth, JSON.stringify(candidates), JSON.stringify(finalSelection), selectionReasoning, response]);
+            metadataId = metadataResult[0].id;
             console.log(`Stored generation metadata with ID: ${metadataId}`);
         } catch (metaError) {
             console.error('Error storing generation metadata:', metaError);
             // Don't fail the whole request if metadata storage fails
         }
 
-        // Insert anchors into database
-        const insertedAnchors = [];
-        for (const anchor of anchors) {
+        // Fetch parent level and position once (not per anchor)
+        const parentPosResult = await query(
+            'SELECT position_id, level FROM tree_positions WHERE anchor_id = $1 LIMIT 1',
+            [parentId]
+        );
+        const parentPosId = parentPosResult.length > 0 ? parentPosResult[0].position_id : null;
+        const childLevel = parentPosResult.length > 0 ? parentPosResult[0].level + 1 : 1;
+
+        // Prepare anchor data with generated IDs
+        const anchorRows = anchors.map(anchor => {
             const anchorId = generateAnchorId(parentId, anchor.position);
-
-            const [insertedAnchor] = await getSql()`
-                INSERT INTO anchors (id, title, scope, generation_status)
-                VALUES (${anchorId}, ${anchor.title}, ${anchor.scope}, 'pending')
-                RETURNING id, title, scope, generation_status
-            `;
-
-            const parentPositions = await getSql()`
-                SELECT level FROM tree_positions 
-                WHERE anchor_id = ${parentId}
-                LIMIT 1
-            `;
-
-            const childLevel = parentPositions.length > 0 ? parentPositions[0].level + 1 : 1;
-
-            const parentPosIds = await getSql()`
-                SELECT position_id FROM tree_positions 
-                WHERE anchor_id = ${parentId}
-                LIMIT 1
-            `;
-
-            const parentPosId = parentPosIds.length > 0 ? parentPosIds[0].position_id : null;
-
-            // Generate position_id in format like "2A-X7Y3Z"
             const positionId = `${childLevel}${breadth}-${anchorId.split('-')[1]}`;
+            return { anchorId, positionId, anchor };
+        });
 
-            await getSql()`
-                INSERT INTO tree_positions (position_id, anchor_id, parent_position_id, level, breadth, position)
-                VALUES (
-                    ${positionId},
-                    ${anchorId},
-                    ${parentPosId},
-                    ${childLevel},
-                    ${breadth},
-                    ${anchor.position}
-                )
-            `;
+        // Batch insert anchors (single query)
+        const anchorValues = anchorRows.map((r, i) => {
+            const off = i * 4;
+            return `($${off + 1}, $${off + 2}, $${off + 3}, $${off + 4})`;
+        }).join(', ');
+        const anchorParams = anchorRows.flatMap(r => [
+            r.anchorId, r.anchor.title, r.anchor.scope, 'pending'
+        ]);
+        const insertedRows = await query(
+            `INSERT INTO anchors (id, title, scope, generation_status) VALUES ${anchorValues} RETURNING id, title, scope, generation_status`,
+            anchorParams
+        );
 
-            insertedAnchors.push({
-                ...insertedAnchor,
-                level: childLevel,
-                breadth,
-                position: anchor.position,
-                causalSignificance: anchor.causalSignificance,
-                humanImpact: anchor.humanImpact,
-                finalScore: anchor.finalScore,
-            });
-        }
+        // Batch insert tree positions (single query)
+        const posValues = anchorRows.map((r, i) => {
+            const off = i * 6;
+            return `($${off + 1}, $${off + 2}, $${off + 3}, $${off + 4}, $${off + 5}, $${off + 6})`;
+        }).join(', ');
+        const posParams = anchorRows.flatMap(r => [
+            r.positionId, r.anchorId, parentPosId, childLevel, breadth, r.anchor.position
+        ]);
+        await query(
+            `INSERT INTO tree_positions (position_id, anchor_id, parent_position_id, level, breadth, position) VALUES ${posValues}`,
+            posParams
+        );
+
+        // Build response
+        const insertedAnchors = insertedRows.map((row, i) => ({
+            ...row,
+            level: childLevel,
+            breadth,
+            position: anchorRows[i].anchor.position,
+            causalSignificance: anchorRows[i].anchor.causalSignificance,
+            humanImpact: anchorRows[i].anchor.humanImpact,
+            finalScore: anchorRows[i].anchor.finalScore,
+        }));
 
         return res.status(200).json({
             success: true,
@@ -810,15 +814,15 @@ function parseAnchorResponse(response, parentId) {
             }
         }
 
-        // Split by numbered anchors (1. **Title**, 2. **Title**, etc.)
-        const anchorSections = step3Content.split(/\n\s*\d+\.\s*\*\*/);
+        // Split by numbered anchors - handles both "1. **Title**" and "1. Title"
+        const anchorSections = step3Content.split(/\n\s*\d+\.\s*(?=\*\*|[A-Z])/);
 
         // Skip first element (it's the text before the first anchor)
         for (let i = 1; i < anchorSections.length; i++) {
-            const section = '**' + anchorSections[i]; // Add back the ** we split on
+            const section = anchorSections[i];
 
-            // Extract title (between ** and **)
-            const titleMatch = section.match(/\*\*([^*]+)\*\*/);
+            // Extract title - handles both **Title** and plain Title (up to newline)
+            const titleMatch = section.match(/^\*\*([^*]+)\*\*/) || section.match(/^([^\n]+)/);
             if (!titleMatch) continue;
             const title = titleMatch[1].trim();
 
@@ -1004,16 +1008,18 @@ function parseCandidatesFromResponse(response) {
             const causalMatch = section.match(/Causal Significance:\s*(\d+(?:\.\d+)?)\s*(?:\/\s*10)?/i);
             const causalSignificance = causalMatch ? parseFloat(causalMatch[1]) : 0;
 
-            // Extract causal justification (follows the score on next line)
-            const causalJustMatch = section.match(/Causal Significance:\s*\d+(?:\.\d+)?\s*(?:\/\s*10)?\s*\n\s*Justification:\s*([^\n]+)/i);
+            // Extract causal justification - handles both "Justification: ..." on next line and "9/10 - ..." inline
+            const causalJustMatch = section.match(/Causal Significance:\s*\d+(?:\.\d+)?\s*(?:\/\s*10)?\s*\n\s*Justification:\s*([^\n]+)/i)
+                || section.match(/Causal Significance:\s*\d+(?:\.\d+)?\s*(?:\/\s*10)?\s*[-–]\s*([^\n]+)/i);
             const causalJustification = causalJustMatch ? causalJustMatch[1].trim() : '';
 
             // Extract human impact
             const humanMatch = section.match(/Human Impact:\s*(\d+(?:\.\d+)?)\s*(?:\/\s*10)?/i);
             const humanImpact = humanMatch ? parseFloat(humanMatch[1]) : 0;
 
-            // Extract human justification (follows the score on next line)
-            const humanJustMatch = section.match(/Human Impact:\s*\d+(?:\.\d+)?\s*(?:\/\s*10)?\s*\n\s*Justification:\s*([^\n]+)/i);
+            // Extract human justification - handles both formats
+            const humanJustMatch = section.match(/Human Impact:\s*\d+(?:\.\d+)?\s*(?:\/\s*10)?\s*\n\s*Justification:\s*([^\n]+)/i)
+                || section.match(/Human Impact:\s*\d+(?:\.\d+)?\s*(?:\/\s*10)?\s*[-–]\s*([^\n]+)/i);
             const humanJustification = humanJustMatch ? humanJustMatch[1].trim() : '';
 
             // Extract final score
