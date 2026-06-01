@@ -31,3 +31,7 @@ playwright-report/
 
 # Claude Code settings
 .claude/
+
+# Local dev helpers (Vercel CLI auth workaround — not for production)
+dev-api-server.mjs
+vite.dev-local.config.js

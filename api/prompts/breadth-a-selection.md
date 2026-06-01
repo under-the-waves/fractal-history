@@ -35,7 +35,7 @@ Resist Western/European-centric defaults. Consider non-Western developments fair
 ## Rules
 
 1. **No double-barrelled anchors.** Each anchor = one atomic concept. "World War One and Two" is wrong; "World War One" is right.
-2. **Titles must be short** — 5 words maximum. Use the simplest standard name for the concept.
+2. **Titles must be short noun phrases — 5 words maximum.** Use the simplest standard *name* for the concept, not a headline that describes an event. A title names a thing you could put "the" in front of and point at; it is never a subject-verb sentence. Write "The Marshall Plan" not "Marshall Plan Launched"; "Division of Germany" not "German Division Hardened"; "People's Republic of China" not "Communist China Established"; "NATO" not "NATO Alliance Formed". ("Soviet Atomic Bomb" is already a good noun-phrase title.)
 3. **Include difficult topics.** Wars, genocides, slavery, colonial violence — if causally significant, include them.
 4. **Score honestly.** Causal Significance (1-10): how directly this reshaped subsequent history. Human Impact (1-10): how many people were affected and how severely. Final Score = (Causal x 0.6) + (Impact x 0.4).
 5. **Generic titles for broad processes** (e.g. "Urbanization"), **specific titles for bounded events** (e.g. "Siege of Leningrad").

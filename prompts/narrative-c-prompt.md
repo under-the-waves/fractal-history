@@ -22,8 +22,20 @@ You are writing the **C-breadth narrative** for this anchor. This means organizi
 
 These are the regions or civilizations that provide complete geographic coverage of this topic. Your narrative MUST:
 - Address each region substantively
-- **Bold each region title** when you introduce it
+- **Link each region** using the `data-title` pattern described below, with visible words that read naturally in your sentence
 - Help readers understand both what was similar and what was different across regions
+
+### How to Reference Regions in Prose
+
+Anchor titles are identifiers, not sentence fragments. Do NOT drop the raw title into a sentence. Write the sentence naturally about the region, then wrap the relevant phrase — whatever words actually carry that meaning, even if they differ from the title — with `<strong data-title='EXACT ANCHOR TITLE'>your natural phrasing</strong>`. Use **single quotes** around the attribute so it needs no escaping inside the JSON narrative string. The `data-title` attribute must contain the exact anchor title so the system can create the link; the visible text is yours to phrase well.
+
+**BAD (raw title forced into prose):**
+> <strong>Sub-Saharan African Kingdoms</strong> traded gold across the desert.
+
+**GOOD (natural prose, link preserved via data-title):**
+> Far to the south, <strong data-title='Sub-Saharan African Kingdoms'>the kingdoms below the Sahara</strong> grew rich funnelling gold across the desert.
+
+The text inside the `<strong>` tags should read as part of the sentence. Only the `data-title` attribute must match the title exactly.
 
 {{childAnchors}}
 
@@ -44,6 +56,8 @@ Your writing should emulate the storytelling style of Dan Carlin's Hardcore Hist
 **Connecting to larger patterns**: Help readers see how specific events reflect broader historical forces, without overstating significance.
 
 **Conversational authority**: Write as someone who has deeply studied this topic and is sharing it with genuine enthusiasm—not as a textbook or encyclopedia.
+
+{{sharedVoice}}
 
 ---
 
@@ -121,10 +135,10 @@ This catastrophe was one consequence of a collision between two worlds that had 
 
 ### Structure for Geographic Narratives
 
-Your narrative should help readers understand this topic across space:
+Carry one through-line across the regions rather than writing five disconnected regional summaries: a single thread (a shared force, a comparison, a movement) the reader follows from region to region. Your narrative should help readers understand this topic across space:
 
 - **Establish the global context**: What was the overall pattern or phenomenon?
-- **Move through regions**: Address each region substantively, bolding titles as you introduce them
+- **Move through regions**: Address each region substantively, linking each via the `data-title` pattern (see "How to Reference Regions in Prose") as you introduce it
 - **Compare and contrast**: What was similar across regions? What was different and why?
 - **Avoid mere listing**: Do not just describe each region in isolation—show connections, parallels, and divergences
 
@@ -148,7 +162,7 @@ You may organize geographically (region by region) OR thematically (examining ho
 
 ## Closing (100-150 words)
 
-End by synthesizing the geographic picture: what does examining this topic across regions reveal that focusing on one place would miss? Point forward or offer a final insight about global patterns.
+End on a concrete landing: a specific detail, region, or consequence that crystallises the geographic picture, rather than a floating thesis about "global patterns". You may leave the reader with a genuine insight, but let it rest on something specific. Do not end on a rhetorical question or a restated summary.
 
 ---
 
@@ -161,6 +175,7 @@ NEVER use these:
 - Fabricated reactions, emotions, or perspectives from historical figures
 - "What happened next will shock you" or similar clickbait
 - Rhetorical questions when a direct statement works better
+{{sharedBans}}
 - Treating one region as central and others as peripheral
 - Listing regions as bullet points—they must be woven into flowing prose
 
@@ -171,7 +186,7 @@ NEVER use these:
 Return your response as JSON:
 
 {
-  "narrative": "<p>Your ~1000-word narrative here, with HTML paragraph tags. Bold the region titles using <strong> tags.</p>",
+  "narrative": "<p>Your ~1000-word narrative here, with HTML paragraph tags. Link regions using <strong data-title='Exact Anchor Title'>natural prose text</strong> tags (single quotes, no escaping needed).</p>",
   "keyConcepts": [
     "Key takeaway about region 1",
     "Key takeaway about region 2",

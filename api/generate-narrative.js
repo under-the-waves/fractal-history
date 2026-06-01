@@ -44,6 +44,20 @@ function loadPromptTemplate(breadth) {
     }
 }
 
+// Load shared voice/style guidance used across all breadths.
+// Single source of truth: prompts/_shared-voice.md, split into a VOICE section
+// and a BANS section by sentinel comments. Read fresh each call so edits apply live.
+function loadSharedVoice() {
+    const sharedPath = path.join(process.cwd(), 'prompts', '_shared-voice.md');
+    const raw = fs.readFileSync(sharedPath, 'utf-8');
+    const m = raw.match(/<!-- VOICE -->([\s\S]*?)<!-- BANS -->([\s\S]*)/);
+    if (!m) {
+        // Fallback: treat the whole file as voice guidance, no separate bans
+        return { voice: raw.trim(), bans: '' };
+    }
+    return { voice: m[1].trim(), bans: m[2].trim() };
+}
+
 // Get child anchors for a given parent and breadth
 async function getChildAnchors(parentId, breadth) {
     return await query(
@@ -110,7 +124,9 @@ function populatePromptTemplate(template, data) {
         .replace(/\{\{anchorScope\}\}/g, data.anchorScope)
         .replace(/\{\{ancestorPath\}\}/g, data.ancestorPath)
         .replace(/\{\{prerequisites\}\}/g, data.prerequisites)
-        .replace(/\{\{childAnchors\}\}/g, data.childAnchors);
+        .replace(/\{\{childAnchors\}\}/g, data.childAnchors)
+        .replace(/\{\{sharedVoice\}\}/g, () => data.sharedVoice)
+        .replace(/\{\{sharedBans\}\}/g, () => data.sharedBans);
 }
 
 // Parse the LLM response JSON
@@ -241,13 +257,16 @@ export default async function handler(req, res) {
         const promptTemplate = loadPromptTemplate(breadth);
 
         // Populate template
+        const shared = loadSharedVoice();
         const prompt = populatePromptTemplate(promptTemplate, {
             anchorId: anchorId,
             anchorTitle: anchor.title,
             anchorScope: anchor.scope || 'No scope defined',
             ancestorPath: formatAncestorPath(ancestors),
             prerequisites: 'None', // Can be expanded later to track user progress
-            childAnchors: formatChildAnchors(children, breadth)
+            childAnchors: formatChildAnchors(children, breadth),
+            sharedVoice: shared.voice,
+            sharedBans: shared.bans
         });
 
         // Step 5: Call LLM API

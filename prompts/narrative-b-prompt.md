@@ -22,7 +22,7 @@ You are writing the **B-breadth narrative** for this anchor. This means organizi
 
 These are the chronological periods that divide this topic. Your narrative MUST:
 - Move through each period in order
-- **Reference each period using natural prose**, not the raw anchor title. The anchor titles (e.g. "Early Modern: 1500 - 1900 CE") are identifiers, not sentences. Your narrative should read like normal writing. Use `<strong data-title="EXACT ANCHOR TITLE">your natural phrasing</strong>` so the system can link them. See examples below.
+- **Reference each period using natural prose**, not the raw anchor title. The anchor titles (e.g. "Early Modern: 1500 - 1900 CE") are identifiers, not sentences. Your narrative should read like normal writing. Use `<strong data-title='EXACT ANCHOR TITLE'>your natural phrasing</strong>` (single quotes around the attribute, so it needs no escaping inside the JSON) so the system can link them. See examples below.
 - Help readers understand what changed between periods and why
 
 ### How to Reference Periods in Prose
@@ -33,10 +33,10 @@ The anchor title is a label. Your job is to weave it into a sentence that reads 
 > <strong>Early Modern: 1500 - 1900 CE</strong> marked an era of unprecedented global integration.
 
 **GOOD (natural prose with data-title for linking):**
-> <strong data-title="Early Modern: 1500 - 1900 CE">The early modern period (1500 - 1900 CE)</strong> marked an era of unprecedented global integration.
+> <strong data-title='Early Modern: 1500 - 1900 CE'>The early modern period (1500 - 1900 CE)</strong> marked an era of unprecedented global integration.
 
 **ALSO GOOD:**
-> By roughly 1500 CE, the world was entering <strong data-title="Early Modern: 1500 - 1900 CE">an era of unprecedented global integration</strong>.
+> By roughly 1500 CE, the world was entering <strong data-title='Early Modern: 1500 - 1900 CE'>an era of unprecedented global integration</strong>.
 
 The text inside the `<strong>` tags should read as part of the sentence. The `data-title` attribute must contain the exact anchor title so the system can create the correct link.
 
@@ -59,6 +59,8 @@ Your writing should emulate the storytelling style of Dan Carlin's Hardcore Hist
 **Connecting to larger patterns**: Help readers see how specific events reflect broader historical forces, without overstating significance.
 
 **Conversational authority**: Write as someone who has deeply studied this topic and is sharing it with genuine enthusiasm—not as a textbook or encyclopedia.
+
+{{sharedVoice}}
 
 ---
 
@@ -129,7 +131,7 @@ Begin by setting the stage: what was the world like **before** the first tempora
 
 ### Structure for Temporal Narratives
 
-Your narrative should move **sequentially through the periods**, helping readers feel the passage of time:
+The chronology is your through-line: move **sequentially through the periods** as one continuous story, not five separate mini-essays. Each period is a station the single narrative passes through. Your narrative should help readers feel the passage of time:
 
 - **Establish the starting point**: What did things look like at the beginning of the first period?
 - **Show transitions**: What caused each shift from one period to the next?
@@ -171,6 +173,7 @@ NEVER use these:
 - Fabricated reactions, emotions, or perspectives from historical figures
 - "What happened next will shock you" or similar clickbait
 - Rhetorical questions when a direct statement works better
+{{sharedBans}}
 - Listing the periods as bullet points—they must flow as continuous narrative
 
 ---
@@ -180,7 +183,7 @@ NEVER use these:
 Return your response as JSON:
 
 {
-  "narrative": "<p>Your ~1000-word narrative here, with HTML paragraph tags. Reference periods using <strong data-title=\"Exact Anchor Title\">natural prose text</strong> tags.</p>",
+  "narrative": "<p>Your ~1000-word narrative here, with HTML paragraph tags. Reference periods using <strong data-title='Exact Anchor Title'>natural prose text</strong> tags (single quotes, no escaping needed).</p>",
   "keyConcepts": [
     "Key takeaway about period 1",
     "Key takeaway about period 2",

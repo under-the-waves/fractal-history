@@ -44,8 +44,25 @@ You are writing the **A-breadth narrative** for this anchor—organized around t
 
 Your narrative MUST:
 - Introduce and explain each of these concepts
-- **Bold each A-anchor title** (using `<strong>` tags) when it first appears meaningfully
+- **Link each A-anchor** using the `data-title` pattern described below, with visible words that read naturally in your sentence
 - Ensure a reader understands why each matters
+
+### How to Reference A-Anchors in Prose
+
+Anchor titles are **identifiers, not sentence fragments**. Many are written as headline-style labels (e.g. "Communist China Established", "Marshall Plan Launched") that do not belong verbatim in flowing prose. Do NOT drop the raw title into a sentence.
+
+Instead, write the sentence naturally about the concept, then wrap the relevant phrase — whatever words actually carry that meaning, even if they differ from the title — with `<strong data-title='EXACT ANCHOR TITLE'>your natural phrasing</strong>`. Use **single quotes** around the attribute so it needs no escaping inside the JSON narrative string. The `data-title` attribute must contain the exact anchor title so the system can create the link; the visible text is yours to phrase well.
+
+**BAD (raw title forced into prose):**
+> <strong>Communist China Established</strong> after a civil war the Communists had won over the US-backed Nationalists.
+
+**GOOD (natural prose, link preserved via data-title):**
+> When the Communists finally <strong data-title='Communist China Established'>won the Chinese Civil War in 1949</strong>, Mao proclaimed the People's Republic from atop Tiananmen.
+
+**ALSO GOOD:**
+> Washington watched in alarm as <strong data-title='Soviet Atomic Bomb'>the Soviets detonated their first nuclear device</strong>, years ahead of US predictions.
+
+The text inside the `<strong>` tags should read as part of the sentence. Only the `data-title` attribute must match the title exactly.
 
 {{childAnchors}}
 
@@ -102,6 +119,8 @@ Your writing must have **voice**—the sense of a real person who finds this mat
 
 **Conversational authority**: Write as someone sharing knowledge, not reciting it. Occasional asides, moments of emphasis, genuine reactions to the material.
 
+{{sharedVoice}}
+
 ### Patterns to AVOID
 
 These are telltale signs of generic AI writing. DO NOT USE:
@@ -115,6 +134,7 @@ These are telltale signs of generic AI writing. DO NOT USE:
 - "The seeds were planted for..."
 - "...forever changing the course of history"
 - "...which would have profound implications"
+{{sharedBans}}
 - Any phrase that sounds like a documentary voiceover cliché
 
 If you catch yourself writing something that sounds like every other piece of educational content, stop and rewrite it.
@@ -155,13 +175,15 @@ The goal is understanding, not comfort. But also not gratuitous shock value.
 
 ## Main Narrative Structure (600-700 words)
 
+Carry one clear through-line from the hook to the close: a single narrative spine the reader can follow. The five A-anchors are not five separate mini-essays to tick off; they are stations along that spine. Thread them into the one story so each emerges where it belongs, and resist the urge to cover everything around them.
+
 After your hook and pivot:
 
 1. **Establish context**: What does the reader need to understand before the story begins?
 
 2. **Move chronologically**: Present events in time order, not by thematic category
 
-3. **Weave in the A-anchors**: Each of the 5 child anchors should emerge naturally within your narrative. Bold the title when you introduce it substantively. Don't list them—integrate them.
+3. **Weave in the A-anchors**: Each of the 5 child anchors should emerge naturally within your narrative. Link it using the `data-title` pattern (see "How to Reference A-Anchors in Prose") when you introduce it substantively. Never dump the raw title into a sentence. Don't list them—integrate them.
 
 4. **Explain causation**: When something happens, help readers understand why. Connect events to underlying forces.
 
@@ -173,18 +195,18 @@ After your hook and pivot:
 
 ## Closing (100-150 words)
 
-End with genuine insight, not summary. Options:
+End on a concrete landing: a fact, an image, a consequence, the scene the through-line was driving toward. Not a restated thesis. You may leave the reader with a genuine insight, but let it rest on something specific rather than float free as commentary. Options:
 
-- Connect to what comes next historically
-- Offer a perspective that rewards the reader for finishing
-- Return to your opening anecdote with new understanding
-- Pose a genuine question the material raises
+- Connect forward to what comes next historically, through a concrete detail
+- Return to your opening anecdote, now read differently
+- Land on the consequence the whole story was driving toward
 
 DO NOT end with:
 - A recap of what you just said
 - Generic statements about "appreciating" or "understanding" history
 - Preachy conclusions about lessons learned
 - "As we look to the future..."
+- A rhetorical question standing in for a real ending
 
 ---
 
@@ -193,7 +215,7 @@ DO NOT end with:
 Return ONLY valid JSON with this exact structure:
 
 {
-  "narrative": "<p>Your ~1000-word narrative here with HTML paragraph tags. Bold A-anchor titles using <strong> tags.</p>",
+  "narrative": "<p>Your ~1000-word narrative here with HTML paragraph tags. Link A-anchors using <strong data-title='Exact Anchor Title'>natural prose text</strong> tags (single quotes, no escaping needed).</p>",
   "keyConcepts": [
     "First key takeaway (one sentence, corresponding to A-anchor 1)",
     "Second key takeaway (one sentence, corresponding to A-anchor 2)",
@@ -213,9 +235,10 @@ Ask yourself:
 1. Does my opening hook tell a specific story, or does it explain the topic directly? (Must be a story)
 2. Would someone actually want to read this, or does it feel like homework? (Must be genuinely engaging)
 3. Have I used any em-dashes? (Must not)
-4. Have I used any cliché phrases like "pivotal moment" or "forever changed"? (Must not)
-5. Are my A-anchors woven into the narrative naturally, or do they feel like a checklist? (Must be natural)
+4. Have I used any cliché phrases ("pivotal moment", "forever changed", "but here's the thing", "the impact was real", "this is what most people miss")? (Must not)
+5. Are my A-anchors woven in as natural prose using `<strong data-title='...'>` links (single quotes), never raw titles dumped into sentences? (Must be natural)
 6. Did I explain WHY things happened, not just WHAT happened? (Must explain causation)
-7. Does my closing offer genuine insight, or is it a summary? (Must be insight)
+7. Does my closing land on something concrete, or does it drift into thesis-restatement? (Must land concrete)
+8. Does every sentence drive the story, and do my paragraphs vary in shape, or do they march in uniform blocks? (Must vary; no inert sentences)
 
 If any answer is wrong, revise before submitting.
