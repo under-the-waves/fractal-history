@@ -73,9 +73,9 @@ export default async function handler(req, res) {
             });
         }
 
-        if (breadth !== 'A' && breadth !== 'B') {
+        if (breadth !== 'A' && breadth !== 'B' && breadth !== 'C') {
             return res.status(400).json({
-                error: 'Only Breadth A and B anchor generation is currently supported'
+                error: 'Only Breadth A, B, and C anchor generation is supported'
             });
         }
 
@@ -118,21 +118,18 @@ export default async function handler(req, res) {
 
         console.log(`Found ${ancestorPath.length} ancestors and ${existingSiblings.length} existing siblings`);
         // Build the appropriate prompt based on breadth type
-        const systemPrompt = breadth === 'A'
-            ? buildBreadthAPrompt(
-                parentId,
-                parentTitle,
-                parentScope || 'No scope provided',
-                ancestorPath,
-                existingSiblings
-            )
-            : buildBreadthBPrompt(
-                parentId,
-                parentTitle,
-                parentScope || 'No scope provided',
-                ancestorPath,
-                existingSiblings
-            );
+        const promptBuilder = breadth === 'A'
+            ? buildBreadthAPrompt
+            : breadth === 'C'
+                ? buildBreadthCPrompt
+                : buildBreadthBPrompt;
+        const systemPrompt = promptBuilder(
+            parentId,
+            parentTitle,
+            parentScope || 'No scope provided',
+            ancestorPath,
+            existingSiblings
+        );
 
         const apiStart = Date.now();
         console.log('Calling Anthropic API...');
@@ -369,6 +366,147 @@ function buildBreadthAPrompt(parentId, parentTitle, parentScope, ancestorPath, e
 }
 
 // Build prompt for Breadth-B (Temporal) anchor generation
+function buildBreadthCPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings) {
+    // Format ancestor path, flagging any inherited geographic constraint
+    const ancestorContext = ancestorPath.length > 0
+        ? ancestorPath.map((a) => {
+            let constraintType = '';
+            if (a.breadth === 'A') constraintType = '(Analytical/Thematic constraint)';
+            else if (a.breadth === 'B') constraintType = '(Temporal constraint)';
+            else if (a.breadth === 'C') constraintType = '(Geographic constraint)';
+            return `Level ${a.level}: **${a.title}** ${constraintType}\n   Scope: ${a.scope}`;
+        }).join('\n\n')
+        : 'No ancestor path (this is a top-level anchor)';
+
+    const siblingContext = existingSiblings.length > 0
+        ? existingSiblings.map((s, i) => `${i + 1}. ${s.title}\n   Scope: ${s.scope || 'No scope'}`).join('\n\n')
+        : 'None yet - you are generating the first geographic divisions';
+
+    // Inherited constraints (especially any geographic bound from ancestors)
+    const constraints = { topic: [], geographic: [], temporal: [], analytical: [] };
+    ancestorPath.forEach(a => {
+        if (a.breadth === 'A') constraints.analytical.push(a.title);
+        else if (a.breadth === 'B') constraints.temporal.push(a.title);
+        else if (a.breadth === 'C') constraints.geographic.push(a.title);
+        else constraints.topic.push(a.title);
+    });
+
+    const constraintSummary = `
+**Inherited Scope Constraints:**
+${constraints.topic.length > 0 ? `- Topic: ${constraints.topic.join(' → ')}` : ''}
+${constraints.geographic.length > 0 ? `- Geography: Already limited to ${constraints.geographic[constraints.geographic.length - 1]} - subdivide WITHIN this only` : '- Geography: the whole world is available'}
+${constraints.temporal.length > 0 ? `- Time: Inherited from ${constraints.temporal[constraints.temporal.length - 1]} - each region covers ONLY this period` : "- Time: each region is scoped to the parent topic's own timespan"}
+${constraints.analytical.length > 0 ? `- Thematic focus: ${constraints.analytical.join(', ')}` : ''}
+
+Every region you create must respect ALL of these constraints.
+    `.trim();
+
+    return `# Breadth-C Geographic Anchor Selection Task
+
+## Your Task
+
+You are selecting **Breadth-C anchors** (geographic - regional divisions) for the parent anchor:
+
+**Parent ID:** ${parentId}
+**Parent Title:** ${parentTitle}
+**Parent Scope:** ${parentScope}
+
+Your goal is to find the BEST way to divide this topic geographically by:
+1. Considering 3 different ways to carve the topic into regions
+2. Rating each scheme on 3 criteria
+3. Selecting the highest-scoring scheme
+4. Generating the final region anchors PLUS a mandatory "Rest of the World" anchor
+
+---
+
+## CRITICAL CONTEXT: Learning Path That Led Here
+
+**Full ancestor path (how we reached this anchor):**
+
+${ancestorContext}
+
+${constraintSummary}
+
+---
+
+## Sibling Context: What Already Exists at This Level
+
+${existingSiblings.length > 0 ? '**Existing C-anchors already generated:**\n\n' + siblingContext : siblingContext}
+${existingSiblings.length > 0 ? '\n**Important:** Do not duplicate these existing regions.\n' : ''}
+
+---
+
+## What are C-Anchors (Geographic)?
+
+C-anchors divide a topic by PLACE. They answer: "Where did this topic happen, and how did it differ by region?"
+
+**Core principles:**
+1. **Bounded to THIS topic.** Each region covers everything about *this specific topic* in that place - and nothing else. Under "World War II", the region "The Americas" means the Americas' role in WWII, NOT a general history of the Americas.
+2. **Topic-relevant regions.** Choose the regions that genuinely matter for THIS topic. They differ from topic to topic. You want the real places where the topic played out, not a generic world map stamped onto every subject.
+3. **A mandatory "Rest of the World" catch-all.** In ADDITION to your chosen regions, the final list ALWAYS ends with one "Rest of the World" anchor covering everywhere the topic had a lesser presence. This guarantees nothing is excluded and every place stays reachable by drilling deeper. Do NOT count it among your scheme's regions - it is added on top.
+4. **Modern names, no archaic geography.** Use modern, recognisable region names (e.g. "Mesoamerica", "East Asia"). Explain historical geographic differences inside narratives later, never as separate anchors.
+5. **Inherited time scope.** Each region is scoped to the parent topic's timespan only (see constraints above).
+
+---
+
+## Hard limits
+
+- Each scheme proposes **2 to 4 named regions** (NOT counting "Rest of the World").
+- The FINAL anchor list = the selected scheme's regions **+ exactly one "Rest of the World" anchor**, for a MAXIMUM of **5 anchors total**. Never produce more than 5. Prefer fewer, well-chosen regions.
+
+---
+
+## Selection Process: Three Candidate Schemes
+
+Consider **exactly 3 different ways** to carve this topic geographically. All 3 must be GEOGRAPHIC (regional) schemes - not temporal or thematic. There are often genuinely different valid carvings (by continent, by civilisation, by theatre of action, by ecological zone); propose three a historian would recognise.
+
+Rate each scheme 1-3 on three criteria:
+- **naturalBreakpoints** (Natural Boundaries): do the regions reflect real geographic, cultural, or political divisions that matter for THIS topic?
+- **comparableDepth**: is the learning load reasonably balanced across regions (no single region swallowing everything)?
+- **historicalConvention**: does this carving match how historians actually regionalise this topic?
+
+Prefer the scheme whose regions, together with "Rest of the World", leave no significant part of the topic's geography unreachable.
+
+Mark exactly one scheme \`"selected": true\`. Generate the final \`anchors\` for that scheme only, then append the "Rest of the World" anchor as the last entry.
+
+---
+
+## Output Format
+
+Return ONLY valid JSON in exactly this shape:
+
+\`\`\`json
+{
+  "geographicScopeInferred": { "extent": "the geographic extent this topic actually covers", "rationale": "one sentence" },
+  "candidateSchemes": [
+    {
+      "name": "Scheme name",
+      "anchors": ["Region One", "Region Two", "Region Three"],
+      "ratings": {
+        "naturalBreakpoints": { "score": 3, "justification": "..." },
+        "comparableDepth": { "score": 2, "justification": "..." },
+        "historicalConvention": { "score": 3, "justification": "..." }
+      },
+      "totalScore": 8,
+      "selected": true
+    }
+  ],
+  "selectedScheme": "Scheme name",
+  "anchors": [
+    { "position": 1, "title": "Region One", "scope": "2-3 sentences on this region's role in THIS topic, bounded to the parent's time and topic.", "regionExtent": "the modern areas/countries this covers" },
+    { "position": 2, "title": "Rest of the World", "scope": "2-3 sentences on the topic's lesser presence everywhere else, kept reachable for deeper drilling.", "regionExtent": "everywhere not covered above" }
+  ],
+  "coverageJustification": "Why the selected carving best covers this topic's geography, and how Rest of the World keeps every place reachable."
+}
+\`\`\`
+
+**CRITICAL:**
+- \`candidateSchemes\` must contain EXACTLY 3 entries, with exactly one \`"selected": true\`.
+- \`anchors\` must be the selected scheme's 2-4 regions PLUS a final "Rest of the World" anchor - MAXIMUM 5 total.
+- Titles must be clean region noun-phrases, 5 words maximum.
+- Output ONLY the JSON object, no markdown, no commentary.`;
+}
+
 function buildBreadthBPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings) {
     // Format ancestor path with emphasis on temporal and scope constraints
     const ancestorContext = ancestorPath.length > 0
