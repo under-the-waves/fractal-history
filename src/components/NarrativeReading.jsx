@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
 import { citationsToFootnotes } from '../utils/citationsToFootnotes'
+import { getRandomFact } from '../data/historyFacts'
 
 // Loading stages for generation process
 const LOADING_STAGES = {
@@ -29,6 +30,7 @@ function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }
     const [generateError, setGenerateError] = useState(null)
     const [savedCards, setSavedCards] = useState(new Set())
     const [savingAll, setSavingAll] = useState(false)
+    const [revealed, setRevealed] = useState(new Set())
 
     // Sync if parent passes updated questions
     useEffect(() => {
@@ -46,6 +48,7 @@ function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }
             const data = await response.json()
             if (data.success && data.questions) {
                 setQuestions(data.questions)
+                setRevealed(new Set())
             } else {
                 setGenerateError(data.error || 'Failed to generate flashcards')
             }
@@ -179,7 +182,17 @@ function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }
                     <div key={index} className="flashcard-save-item">
                         <div className="flashcard-save-content">
                             <p className="flashcard-save-question"><strong>Q:</strong> {q.question}</p>
-                            <p className="flashcard-save-answer"><strong>A:</strong> {q.answer}</p>
+                            {revealed.has(index) ? (
+                                <p className="flashcard-save-answer"><strong>A:</strong> {q.answer}</p>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="flashcard-reveal-button"
+                                    onClick={() => setRevealed(prev => new Set([...prev, index]))}
+                                >
+                                    Show answer
+                                </button>
+                            )}
                         </div>
                         <button
                             className={`flashcard-save-button ${savedCards.has(q.question) ? 'saved' : ''}`}
@@ -347,6 +360,9 @@ function NarrativeReading() {
         return '5 min read'
     }
 
+    // Pick one history fact to show on the loading screen (stable per mount)
+    const loadingFact = useMemo(() => getRandomFact(), [])
+
     // Loading state during generation
     if (loading || isGenerating) {
         return (
@@ -389,6 +405,11 @@ function NarrativeReading() {
                                 ? 'First-time generation may take 20-30 seconds'
                                 : 'Loading narrative...'}
                         </p>
+
+                        <div className="loading-fact">
+                            <span className="loading-fact-label">Did you know?</span>
+                            <p className="loading-fact-text">{loadingFact}</p>
+                        </div>
                     </div>
                 </div>
             </div>

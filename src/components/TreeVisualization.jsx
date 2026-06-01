@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     getBreadthColor,
@@ -7,6 +7,7 @@ import {
     getAnchorById as getStaticAnchorById
 } from '../data/treeStructure';
 import WhyTheseAnchors from './WhyTheseAnchors';
+import { getRandomFact } from '../data/historyFacts';
 
 function TreeVisualization() {
     const navigate = useNavigate();
@@ -419,6 +420,9 @@ function TreeVisualization() {
         return lines;
     };
 
+    // A history fact for the loading/generating overlays (new one per wait)
+    const overlayFact = useMemo(() => getRandomFact(), [generating, loadingBreadth]);
+
     if (loading) {
         return (
             <div className="tree-visualization">
@@ -454,6 +458,19 @@ function TreeVisualization() {
                     marginTop: '20px',
                     fontSize: '24px'
                 }}>⏳</div>
+                <div style={{
+                    marginTop: '20px',
+                    maxWidth: '380px',
+                    fontSize: '14px',
+                    color: '#555',
+                    lineHeight: 1.5,
+                    textAlign: 'left',
+                    borderLeft: '3px solid #2c3e50',
+                    paddingLeft: '12px'
+                }}>
+                    <strong style={{ display: 'block', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#2c3e50', marginBottom: '4px' }}>Did you know?</strong>
+                    {overlayFact}
+                </div>
             </div>
         </div>
     ) : null;
@@ -489,6 +506,19 @@ function TreeVisualization() {
                     fontSize: '14px',
                     color: '#666'
                 }}>Please wait 5-10 seconds</div>
+                <div style={{
+                    marginTop: '16px',
+                    maxWidth: '360px',
+                    fontSize: '13px',
+                    color: '#555',
+                    lineHeight: 1.5,
+                    textAlign: 'left',
+                    borderLeft: '3px solid #2c3e50',
+                    paddingLeft: '12px'
+                }}>
+                    <strong style={{ display: 'block', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#2c3e50', marginBottom: '4px' }}>Did you know?</strong>
+                    {overlayFact}
+                </div>
             </div>
         </div>
     ) : null;
@@ -544,7 +574,12 @@ function TreeVisualization() {
                     overflowX: 'auto'
                 }}
             >
-                <svg width={svgWidth} height={svgHeight} style={{ overflow: 'visible' }}>
+                <svg
+                    viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+                    width="100%"
+                    preserveAspectRatio="xMidYMin meet"
+                    style={{ overflow: 'visible', maxWidth: svgWidth, height: 'auto', display: 'block' }}
+                >
 
                     {visibleNodes.map((node) => {
                         const pos = calculatePosition(node);

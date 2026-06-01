@@ -68,6 +68,12 @@ export default async function handler(req, res) {
 
         const breadthLabel = { A: 'analytical', B: 'temporal', C: 'geographic' }[breadth] || 'analytical';
 
+        const breadthGuidance = {
+            A: "These are ANALYTICAL (concept) cards. Test understanding of the key ideas and WHY they mattered. Do NOT ask about specific dates, years, or chronological order -- that is the temporal breadth's job.",
+            B: "These are TEMPORAL cards. Test what happened in each period and how things changed over time. Asking roughly when something happened is fine here, but prefer 'what changed' over pure date memorisation.",
+            C: "These are GEOGRAPHIC cards. Test regional variation -- what happened in which region, and how different regions differed. Anchor each question to a place."
+        }[breadth] || "These are ANALYTICAL (concept) cards. Test understanding of the key ideas and why they mattered; avoid date questions.";
+
         console.log(`Generating flashcards for ${anchorId} breadth ${breadth}`);
 
         const completion = await getAnthropicClient().messages.create({
@@ -86,14 +92,19 @@ ${childTitles}
 **Narrative text:**
 ${narrative}
 
+${breadthGuidance}
+
 Create exactly ${children.length + 1} questions: one about the opening hook/anecdote, plus one per sub-topic.
 
-Rules:
-- Simple factual recall only ("What...", "How...", "Why...")
-- Each question tests exactly one atomic fact
-- Answers must be a single sentence or short phrase (under 20 words)
-- Answers must be findable in the narrative text
-- No lists in answers; if an answer needs "and", split into two questions
+Follow these flashcard learning principles strictly:
+- ATOMIC: each card tests exactly ONE fact. Never join two facts with "and", "where", or a comma.
+- MINIMAL ANSWER: the answer is the single shortest unique thing the question asks for -- a name, term, place, or number. Usually 1-5 words; never a full descriptive sentence (hard cap ~10 words).
+- CORRECT ORIENTATION: put the descriptive context in the QUESTION; put the hard-to-recall item in the ANSWER.
+  BAD  -> Q: "What did Churchill do in 1946?"  A: "A speech in Fulton, Missouri, where he said an 'iron curtain' had descended across Europe."
+  GOOD -> Q: "In which US town did Churchill give his 'iron curtain' speech?"  A: "Fulton, Missouri"
+  GOOD -> Q: "What phrase did Churchill use for the divide across Europe?"  A: "The Iron Curtain"
+- The answer must be findable in, or directly derivable from, the narrative text.
+- Plain wording. Never use the construction "not X; it was Y" or "not just X, it's Y".
 
 Return JSON:
 {
