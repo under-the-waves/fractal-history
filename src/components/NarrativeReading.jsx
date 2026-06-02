@@ -480,7 +480,7 @@ function NarrativeReading() {
 
                 {/* Breadth selector tabs */}
                 <div className="breadth-tabs">
-                    {['A', 'B'].map((b) => (
+                    {['A', 'B', 'C'].map((b) => (
                         <button
                             key={b}
                             className={`breadth-tab ${breadth === b ? 'active' : ''}`}
@@ -489,13 +489,6 @@ function NarrativeReading() {
                             {BREADTH_LABELS[b]}
                         </button>
                     ))}
-                    <button
-                        className="breadth-tab disabled"
-                        disabled
-                        title="Coming soon"
-                    >
-                        {BREADTH_LABELS['C']}
-                    </button>
                 </div>
             </header>
 

@@ -667,7 +667,7 @@ function TreeVisualization() {
                                                 </text>
 
                                                 {/* Breadth buttons */}
-                                                {['A', 'B'].map((breadth, index) => {
+                                                {['A', 'B', 'C'].map((breadth, index) => {
                                                     const activeBreadth = getActiveBreadth(node.id);
                                                     const isActive = breadth === activeBreadth;
                                                     // Check both local treeData and static data
@@ -719,8 +719,8 @@ function TreeVisualization() {
                                                                 setLoadingBreadth({ nodeId: node.id, breadth });
 
                                                                 try {
-                                                                    // Check database for children (A or B breadths only for now)
-                                                                    if (breadth === 'A' || breadth === 'B') {
+                                                                    // Check database for children (A, B, and C breadths)
+                                                                    if (breadth === 'A' || breadth === 'B' || breadth === 'C') {
                                                                         const checkResponse = await fetch(`/api/get-tree?parentId=${node.id}&breadth=${breadth}`);
                                                                         const checkData = await checkResponse.json();
 
