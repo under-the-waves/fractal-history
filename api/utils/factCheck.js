@@ -54,11 +54,11 @@ async function extractClaims(client, narrativeHtml, title, scope) {
 async function verifyClaim(client, claimObj) {
     const system = `You verify ONE historical factual claim against web search results. Output ONLY JSON.
 
-Source authority: prefer encyclopaedias (Wikipedia, Britannica), academic and .edu, museums, government and .gov, official archives, and major reference works. NEVER base a correction on, or cite, low-authority sources: YouTube, Facebook, Reddit, Quora, Pinterest, personal blogs, forums, or AI-generated pages.
+Source authority: your CITED source must be an original, authoritative one - ideally the kind of source Wikipedia itself cites: official archives and government (.gov), academic and university (.edu), museums, primary documents, established reference works, and news of record. Wikipedia and other wikis are fine to READ for orientation but must NEVER be your cited URL. If your best result is a Wikipedia page, run ANOTHER search (for the specific fact, document, institution, or date) to find the underlying primary/authoritative source and cite THAT. Also never cite or rely on low-authority sources: YouTube, Facebook, Reddit, Quora, Pinterest, personal blogs, forums, or AI-generated pages. If no acceptable non-wiki source can be found, finalise with an empty url rather than citing a wiki.
 
 Be CONSERVATIVE. Only mark a claim "adjust" or "wrong" when authoritative sources CLEARLY and consistently support the change. If the evidence is weak, comes only from low-authority sources, or sources conflict, mark it "ok" and leave the claim unchanged - it is better to keep a defensible claim than to "correct" it to an uncertain value. Do NOT flag minor rounding or phrasing differences ("about two million" vs "more than two million"; "$13 billion" vs "$13.3 billion") - those are "ok". DO catch genuine errors: wrong dates, wrong names, wrong sequence, materially wrong numbers.
 
-Each step, either finalise with a verdict or (if evidence is insufficient) request one more search. When finalising, choose the SINGLE most authoritative source URL present in the results. Never invent a URL.`;
+Each step, either finalise with a verdict or (if evidence is insufficient, or your only source so far is a wiki) request one more search. When finalising, choose the SINGLE most authoritative NON-WIKI source URL present in the results. Never invent a URL.`;
     const gathered = [];
     let query = claimObj.query || claimObj.claim;
 
@@ -142,7 +142,7 @@ export async function factCheckNarrative(narrativeHtml, anchorTitle, anchorScope
 
     const seen = new Set();
     const sources = verdicts
-        .filter(v => v.url && /^https?:\/\//.test(v.url))
+        .filter(v => v.url && /^https?:\/\//.test(v.url) && !/wikipedia\.org|wikimedia\.org/i.test(v.url))
         .filter(v => (seen.has(v.url) ? false : (seen.add(v.url), true)))
         .map(v => ({ claim: ((v.status === 'adjust' || v.status === 'wrong') && v.fix) ? v.fix : v.claim, url: v.url }));
 
