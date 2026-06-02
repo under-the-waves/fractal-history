@@ -18,9 +18,9 @@ You are writing the **C-breadth narrative** for this anchor. This means organizi
 
 **Prerequisites the user has completed:** {{prerequisites}}
 
-## The 5 C-Anchors (Geographic Regions) You Must Teach
+## The C-Anchors (Geographic Regions) You Must Teach
 
-These are the regions or civilizations that provide complete geographic coverage of this topic. Your narrative MUST:
+These are the 3-5 regions (listed below) that provide complete geographic coverage of this topic, with a final catch-all region covering the rest of the world. Your narrative MUST:
 - Address each region substantively
 - **Link each region** using the `data-title` pattern described below, with visible words that read naturally in your sentence
 - Help readers understand both what was similar and what was different across regions
@@ -188,11 +188,7 @@ Return your response as JSON:
 {
   "narrative": "<p>Your ~1000-word narrative here, with HTML paragraph tags. Link regions using <strong data-title='Exact Anchor Title'>natural prose text</strong> tags (single quotes, no escaping needed).</p>",
   "keyConcepts": [
-    "Key takeaway about region 1",
-    "Key takeaway about region 2",
-    "Key takeaway about region 3",
-    "Key takeaway about region 4",
-    "Key takeaway about region 5"
+    "One key takeaway per region listed above - produce exactly as many as there are regions (typically 3-5), in the same order"
   ],
   "estimatedReadTime": 5
 }

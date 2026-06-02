@@ -65,7 +65,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { parentId, parentTitle, parentScope, breadth = 'A' } = req.body;
+        const { parentId, parentTitle, parentScope, breadth = 'A', regenerate = false } = req.body;
 
         if (!parentId || !parentTitle) {
             return res.status(400).json({
@@ -86,7 +86,30 @@ export default async function handler(req, res) {
             'SELECT position_id FROM tree_positions WHERE anchor_id = $1 LIMIT 1',
             [parentId]
         );
-        if (parentPos.length > 0) {
+        if (parentPos.length > 0 && regenerate) {
+            // Clear existing children for this parent+breadth so we can regenerate cleanly
+            const kids = await query(
+                'SELECT anchor_id FROM tree_positions WHERE parent_position_id = $1 AND breadth = $2',
+                [parentPos[0].position_id, breadth]
+            );
+            await query(
+                'DELETE FROM tree_positions WHERE parent_position_id = $1 AND breadth = $2',
+                [parentPos[0].position_id, breadth]
+            );
+            for (const k of kids) {
+                // Delete the anchor only if no other tree_position still references it
+                const del = await query(
+                    `DELETE FROM anchors WHERE id = $1
+                     AND NOT EXISTS (SELECT 1 FROM tree_positions WHERE anchor_id = $1)
+                     RETURNING id`,
+                    [k.anchor_id]
+                );
+                if (del.length > 0) {
+                    await query('DELETE FROM narratives WHERE anchor_id = $1', [k.anchor_id]);
+                }
+            }
+            console.log(`Regenerate: cleared ${kids.length} existing ${breadth}-children of ${parentId}`);
+        } else if (parentPos.length > 0) {
             const existingChildren = await query(`
                 SELECT a.id, a.title, a.scope, a.generation_status,
                        tp.level, tp.breadth, tp.position
@@ -443,7 +466,7 @@ C-anchors divide a topic by PLACE. They answer: "Where did this topic happen, an
 **Core principles:**
 1. **Bounded to THIS topic.** Each region covers everything about *this specific topic* in that place - and nothing else. Under "World War II", the region "The Americas" means the Americas' role in WWII, NOT a general history of the Americas.
 2. **Topic-relevant regions.** Choose the regions that genuinely matter for THIS topic. They differ from topic to topic. You want the real places where the topic played out, not a generic world map stamped onto every subject.
-3. **A mandatory "Rest of the World" catch-all.** In ADDITION to your chosen regions, the final list ALWAYS ends with one "Rest of the World" anchor covering everywhere the topic had a lesser presence. This guarantees nothing is excluded and every place stays reachable by drilling deeper. Do NOT count it among your scheme's regions - it is added on top.
+3. **A mandatory catch-all anchor (always last).** In ADDITION to your chosen regions, the final list ALWAYS ends with one catch-all anchor covering everywhere the topic had a lesser presence, so nothing is excluded and every place stays reachable by drilling deeper. **Naming:** if ONE leftover region clearly stands out among what it absorbs, name it after that region - e.g. "The Andes and the Rest of the World"; if several leftovers are co-equal, name it plainly "Rest of the World". Its scope must ALWAYS name the main regions it absorbs. Do NOT count it among your scheme's regions - it is added on top.
 4. **Modern names, no archaic geography.** Use modern, recognisable region names (e.g. "Mesoamerica", "East Asia"). Explain historical geographic differences inside narratives later, never as separate anchors.
 5. **Inherited time scope.** Each region is scoped to the parent topic's timespan only (see constraints above).
 
@@ -494,7 +517,7 @@ Return ONLY valid JSON in exactly this shape:
   "selectedScheme": "Scheme name",
   "anchors": [
     { "position": 1, "title": "Region One", "scope": "2-3 sentences on this region's role in THIS topic, bounded to the parent's time and topic.", "regionExtent": "the modern areas/countries this covers" },
-    { "position": 2, "title": "Rest of the World", "scope": "2-3 sentences on the topic's lesser presence everywhere else, kept reachable for deeper drilling.", "regionExtent": "everywhere not covered above" }
+    { "position": 2, "title": "The Andes and the Rest of the World", "scope": "2-3 sentences that NAME the main absorbed regions (e.g. the Andes, the African Sahel, New Guinea) and the topic's lesser presence elsewhere, kept reachable for deeper drilling.", "regionExtent": "everywhere not covered above" }
   ],
   "coverageJustification": "Why the selected carving best covers this topic's geography, and how Rest of the World keeps every place reachable."
 }
@@ -502,7 +525,7 @@ Return ONLY valid JSON in exactly this shape:
 
 **CRITICAL:**
 - \`candidateSchemes\` must contain EXACTLY 3 entries, with exactly one \`"selected": true\`.
-- \`anchors\` must be the selected scheme's 2-4 regions PLUS a final "Rest of the World" anchor - MAXIMUM 5 total.
+- \`anchors\` must be the selected scheme's 2-4 regions PLUS a final catch-all anchor (named per principle 3) - MAXIMUM 5 total.
 - Titles must be clean region noun-phrases, 5 words maximum.
 - Output ONLY the JSON object, no markdown, no commentary.`;
 }
