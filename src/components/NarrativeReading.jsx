@@ -208,6 +208,10 @@ function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }
     )
 }
 
+function sourceLabel(url) {
+    try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url }
+}
+
 function NarrativeBody({ html }) {
     const { html: processedHtml, footnotes } = useMemo(
         () => citationsToFootnotes(html),
@@ -238,6 +242,7 @@ function NarrativeReading() {
     const [loadingStage, setLoadingStage] = useState('checking')
     const [error, setError] = useState(null)
     const [isGenerating, setIsGenerating] = useState(false)
+    const [factCheckStatus, setFactCheckStatus] = useState('idle') // idle | checking | done | error
 
     // Change breadth
     const changeBreadth = useCallback((newBreadth) => {
@@ -246,6 +251,7 @@ function NarrativeReading() {
         setLoading(true)
         setLoadingStage('checking')
         setError(null)
+        setFactCheckStatus('idle')
     }, [setSearchParams])
 
     // Fetch or generate narrative
@@ -347,6 +353,37 @@ function NarrativeReading() {
         fetchInFlight.current = key
         fetchNarrative().finally(() => { fetchInFlight.current = null })
     }, [fetchNarrative, id, breadth])
+
+    // Background fact-check (progressive enhancement): once a narrative is shown and
+    // not already fact-checked, verify it and swap in the sourced version when ready.
+    const factCheckInFlight = useRef(null)
+    useEffect(() => {
+        if (loading || error || !anchor || !anchor.id) return
+        if (anchor.factCheckedNarrative) { setFactCheckStatus('done'); return }
+        const key = `${anchor.id}-${breadth}`
+        if (factCheckInFlight.current === key) return
+        factCheckInFlight.current = key
+        setFactCheckStatus('checking')
+        fetch('/api/fact-check-narrative', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ anchorId: anchor.id, breadth })
+        })
+            .then(r => (r.ok ? r.json() : Promise.reject(new Error('fact-check failed'))))
+            .then(data => {
+                if (!data.success) { setFactCheckStatus('error'); return }
+                // Re-fetch so the fact-checked narrative gets the same child-anchor link processing
+                return fetch(`/api/get-narrative?id=${anchor.id}&breadth=${breadth}`)
+                    .then(r => r.json())
+                    .then(fresh => {
+                        if (fresh.success && fresh.anchor) {
+                            setAnchor(prev => (prev && prev.id === anchor.id ? fresh.anchor : prev))
+                        }
+                        setFactCheckStatus('done')
+                    })
+            })
+            .catch(() => setFactCheckStatus('error'))
+    }, [anchor, loading, error, breadth])
 
     // Calculate read time from word count or use estimated
     const getReadTime = () => {
@@ -496,6 +533,26 @@ function NarrativeReading() {
             <article className="narrative-content">
                 <NarrativeBody html={anchor.factCheckedNarrative || anchor.narrative} />
             </article>
+
+            {factCheckStatus === 'checking' && (
+                <div className="factcheck-status">Verifying facts and adding sources…</div>
+            )}
+
+            {anchor.sources && anchor.sources.length > 0 && (
+                <section className="sources-section">
+                    <h2 className="sources-heading">Sources</h2>
+                    <ol className="sources-list">
+                        {anchor.sources.map((s, i) => (
+                            <li key={i} className="source-item">
+                                <a className="source-link" href={s.url} target="_blank" rel="noopener noreferrer">
+                                    {sourceLabel(s.url)}
+                                </a>
+                                {s.claim && <span className="source-claim">{s.claim}</span>}
+                            </li>
+                        ))}
+                    </ol>
+                </section>
+            )}
 
             {/* Child anchors (if available) */}
             {anchor.childAnchors && anchor.childAnchors.length > 0 && (
