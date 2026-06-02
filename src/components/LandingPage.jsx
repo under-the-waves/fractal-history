@@ -9,7 +9,7 @@ function LandingPage({ onStart, onAbout }) {
 
             <div className="landing-buttons">
                 <button className="primary-button" onClick={onStart}>
-                    View the 30 Essential Anchors
+                    Start Exploring
                 </button>
                 <button className="primary-button" onClick={onAbout}>
                     Learn How This Works

@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from
 import { Show, SignInButton, UserButton } from '@clerk/react'
 import { useClerkEnabled } from './hooks/useClerkAuth'
 import LandingPage from './components/LandingPage'
-import AnchorList from './components/AnchorList'
 import NarrativeReading from './components/NarrativeReading'
 import TreeVisualization from './components/TreeVisualization.jsx'
 import AboutPage from './components/AboutPage'
@@ -14,17 +13,12 @@ function AppContent() {
   const location = useLocation()
   const clerkEnabled = useClerkEnabled()
 
-  const handleSelectAnchor = (anchor) => {
-    navigate(`/narrative/${anchor.id}`)
-  }
-
   return (
     <div className="app">
       {/* Navigation */}
       <nav className="app-nav">
         <button className={location.pathname === '/' ? 'active' : ''} onClick={() => navigate('/')}>Home</button>
         <button className={location.pathname === '/tree' || location.pathname.startsWith('/narrative/') ? 'active' : ''} onClick={() => navigate('/tree')}>Tree View</button>
-        <button className={location.pathname === '/anchors' ? 'active' : ''} onClick={() => navigate('/anchors')}>30 Essentials</button>
         {clerkEnabled && (
           <Show when="signed-in">
             <button className={location.pathname === '/flashcards' ? 'active' : ''} onClick={() => navigate('/flashcards')}>Flashcards</button>
@@ -56,7 +50,6 @@ function AppContent() {
           }
         />
         <Route path="/tree" element={<TreeVisualization />} />
-        <Route path="/anchors" element={<AnchorList onSelectAnchor={handleSelectAnchor} />} />
         <Route path="/narrative/:id" element={<NarrativeReading />} />
         <Route path="/flashcards" element={<FlashcardsPage />} />
         <Route path="/about" element={<AboutPage onBack={() => navigate('/')} />} />

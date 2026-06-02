@@ -3,63 +3,92 @@ function AboutPage({ onBack }) {
         <div className="about-page">
             <button className="back-button" onClick={onBack}>← Back</button>
 
-            <h1>About Fractal History</h1>
+            <header className="about-hero">
+                <h1>About Fractal History</h1>
+                <p className="about-tagline">
+                    A first-principles map of world history — from the Big Bang to the present —
+                    that you explore by zooming from broad topics into ever-finer detail.
+                </p>
+            </header>
 
             <section className="about-section">
                 <h2>What is Fractal History?</h2>
                 <p>
-                    Fractal History is a learning system designed to help you build coherent
-                    understanding of world history through hierarchical "anchors" - topics that
-                    branch into progressively more detailed subtopics.
+                    Fractal History is a learning system that helps you build a coherent understanding
+                    of world history through hierarchical <em>anchors</em> — topics that branch into
+                    progressively more detailed subtopics. Instead of a flat timeline or a single
+                    fixed narrative, it lets you choose your own depth and path through the past.
                 </p>
             </section>
 
             <section className="about-section">
                 <h2>How It Works</h2>
-
-                <h3>Anchors</h3>
-                <p>
-                    An anchor is a historical topic with a unique ID (like "1A-G7H2K: Agricultural Revolution").
-                    Each anchor contains 3-5 key concepts that represent the most important aspects of that topic.
-                    These concepts can themselves become anchors for deeper exploration.
-                </p>
-
-                <h3>Narratives</h3>
-                <p>
-                    Each anchor has an accompanying narrative - a ~1000-word historical account written in
-                    an engaging style. These narratives explain what happened, when, and why it matters.
-                </p>
-
-                <h3>The Fractal Structure</h3>
-                <p>
-                    Like a fractal in mathematics, each level of the system mirrors the structure of the whole.
-                    You can start with broad overviews and progressively zoom into specific topics, events,
-                    or themes that interest you. Every topic has context above it and detail below it.
-                </p>
+                <div className="about-cards">
+                    <div className="about-card">
+                        <h3>Anchors</h3>
+                        <p>
+                            An anchor is a historical topic with a unique ID, such as{' '}
+                            <code>1A-G7H2K: Agricultural Revolution</code>. Each one captures a single
+                            significant subject and can branch into deeper anchors.
+                        </p>
+                    </div>
+                    <div className="about-card">
+                        <h3>Narratives</h3>
+                        <p>
+                            Every anchor has an accompanying narrative — a concise, readable historical
+                            account that explains what happened, when, and why it matters.
+                        </p>
+                    </div>
+                    <div className="about-card">
+                        <h3>The Fractal Structure</h3>
+                        <p>
+                            Like a fractal, each level mirrors the structure of the whole. Zoom out for
+                            the big picture or in for the specifics; every topic has context above it and
+                            detail below it.
+                        </p>
+                    </div>
+                </div>
             </section>
 
             <section className="about-section">
-                <h2>The 30 Essential Anchors</h2>
+                <h2>Three Ways to Branch</h2>
                 <p>
-                    This site presents 30 carefully selected anchors that provide foundational knowledge
-                    of world history from the Big Bang to the present. These anchors follow a recommended
-                    sequence designed to build understanding progressively, with each topic providing
-                    context for those that follow.
+                    Any topic can be broken down along three dimensions, so you can study it from
+                    whichever angle fits your question.
                 </p>
-                <p>
-                    You can work through them in order, or explore topics that interest you. Prerequisites
-                    are noted when one anchor assumes knowledge from another.
-                </p>
+                <div className="about-breadths">
+                    <div className="about-breadth" style={{ '--breadth-color': '#3498db' }}>
+                        <span className="about-breadth-tag">A</span>
+                        <div>
+                            <h4>Analytical</h4>
+                            <p>The most essential aspects and themes of a topic.</p>
+                        </div>
+                    </div>
+                    <div className="about-breadth" style={{ '--breadth-color': '#27ae60' }}>
+                        <span className="about-breadth-tag">B</span>
+                        <div>
+                            <h4>Temporal</h4>
+                            <p>Chronological periods that give complete time coverage.</p>
+                        </div>
+                    </div>
+                    <div className="about-breadth" style={{ '--breadth-color': '#e67e22' }}>
+                        <span className="about-breadth-tag">C</span>
+                        <div>
+                            <h4>Geographic</h4>
+                            <p>Regions and places that give complete spatial coverage.</p>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <section className="about-section">
                 <h2>How to Use This Site</h2>
-                <ol>
-                    <li>Browse the list of 30 anchors</li>
-                    <li>Select an anchor to read its narrative</li>
-                    <li>Review the 3-5 key concepts</li>
-                    <li>Take the knowledge check to reinforce what you learned</li>
-                    <li>Continue to the next anchor</li>
+                <ol className="about-steps">
+                    <li>Open the <strong>Tree View</strong> to see history as a branching map.</li>
+                    <li>Select any anchor to read its narrative.</li>
+                    <li>Drill deeper — each anchor branches into more detailed sub-anchors.</li>
+                    <li>Switch between the Analytical, Temporal, and Geographic views of a topic.</li>
+                    <li>Save key questions as flashcards to review later.</li>
                 </ol>
             </section>
         </div>
