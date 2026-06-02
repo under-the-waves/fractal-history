@@ -1147,6 +1147,14 @@
   margin-top: 2px;
 }
 
+.source-quote {
+  display: block;
+  color: #555;
+  font-size: 13px;
+  font-style: italic;
+  margin-top: 4px;
+}
+
 .key-concepts-box {
   max-width: 680px;
   margin: 0 auto 48px;

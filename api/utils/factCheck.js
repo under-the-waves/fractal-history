@@ -123,6 +123,62 @@ Return ONLY the corrected narrative HTML, nothing else.`;
     return resp.content[0].text.trim().replace(/```html\n?/g, '').replace(/```\n?/g, '');
 }
 
+// Fetch the chosen source page and confirm it actually supports the claim.
+// Returns { confirm: 'supported' | 'unsupported' | 'unreadable', quote }.
+async function confirmSource(client, claimText, url) {
+    let html;
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 6000);
+        const resp = await fetch(url, {
+            signal: controller.signal,
+            redirect: 'follow',
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FractalHistoryFactCheck/1.0)' },
+        });
+        clearTimeout(timer);
+        const ctype = resp.headers.get('content-type') || '';
+        if (!resp.ok || !/text\/html|xhtml|text\/plain/i.test(ctype)) {
+            return { confirm: 'unreadable', quote: '' };
+        }
+        html = await resp.text();
+    } catch {
+        return { confirm: 'unreadable', quote: '' };
+    }
+
+    const text = html
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&[a-z]+;/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 8000);
+    if (text.length < 200) return { confirm: 'unreadable', quote: '' };
+
+    try {
+        const resp = await client.messages.create({
+            model: HAIKU,
+            max_tokens: 300,
+            system: 'You check whether a source page actually supports a specific historical claim. Output ONLY JSON.',
+            messages: [{
+                role: 'user',
+                content: `Claim: "${claimText}"
+
+Source page text (may be truncated):
+${text}
+
+Does this page's own text support the claim? Answer "yes" only if the page clearly states or directly evidences it. Return ONLY JSON:
+{"supported": "yes" | "no" | "unclear", "quote": "a verbatim quote (<=25 words) from the page that supports the claim, or empty"}`,
+            }],
+        });
+        const d = parseJson(resp.content[0].text);
+        const map = { yes: 'supported', no: 'unsupported', unclear: 'unreadable' };
+        return { confirm: map[d.supported] || 'unreadable', quote: (d.quote || '').slice(0, 300) };
+    } catch {
+        return { confirm: 'unreadable', quote: '' };
+    }
+}
+
 /**
  * Fact-check a narrative. Returns { narrative, sources, corrections }.
  * Always returns an object (never null); sources are real URLs from search results.
@@ -137,14 +193,30 @@ export async function factCheckNarrative(narrativeHtml, anchorTitle, anchorScope
 
     const verdicts = await Promise.all(claims.map(c => verifyClaim(client, c)));
 
-    const fixes = verdicts.filter(v => (v.status === 'adjust' || v.status === 'wrong') && v.fix);
+    // Read each cited page and confirm it actually supports the claim (with a quote)
+    const confirmed = await Promise.all(verdicts.map(async (v) => {
+        if (!v.url || !/^https?:\/\//.test(v.url) || /wikipedia\.org|wikimedia\.org/i.test(v.url)) {
+            return { ...v, confirm: 'unreadable', quote: '' };
+        }
+        const claimText = ((v.status === 'adjust' || v.status === 'wrong') && v.fix) ? v.fix : v.claim;
+        const c = await confirmSource(client, claimText, v.url);
+        return { ...v, confirm: c.confirm, quote: c.quote };
+    }));
+
+    // Apply only corrections the source page did NOT contradict
+    const fixes = confirmed.filter(v => (v.status === 'adjust' || v.status === 'wrong') && v.fix && v.confirm !== 'unsupported');
     const correctedNarrative = await incorporate(client, narrativeHtml, fixes);
 
+    // Sources: only pages we fetched and confirmed support the claim, with a verbatim quote
     const seen = new Set();
-    const sources = verdicts
-        .filter(v => v.url && /^https?:\/\//.test(v.url) && !/wikipedia\.org|wikimedia\.org/i.test(v.url))
+    const sources = confirmed
+        .filter(v => v.confirm === 'supported' && v.url && /^https?:\/\//.test(v.url))
         .filter(v => (seen.has(v.url) ? false : (seen.add(v.url), true)))
-        .map(v => ({ claim: ((v.status === 'adjust' || v.status === 'wrong') && v.fix) ? v.fix : v.claim, url: v.url }));
+        .map(v => ({
+            claim: ((v.status === 'adjust' || v.status === 'wrong') && v.fix) ? v.fix : v.claim,
+            url: v.url,
+            quote: v.quote || '',
+        }));
 
     const corrections = fixes.map(f => ({ original: f.claim, corrected: f.fix, reason: f.note || f.status }));
 

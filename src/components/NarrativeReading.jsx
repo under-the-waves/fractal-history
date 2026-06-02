@@ -548,6 +548,7 @@ function NarrativeReading() {
                                     {sourceLabel(s.url)}
                                 </a>
                                 {s.claim && <span className="source-claim">{s.claim}</span>}
+                                {s.quote && <span className="source-quote">“{s.quote}”</span>}
                             </li>
                         ))}
                     </ol>
