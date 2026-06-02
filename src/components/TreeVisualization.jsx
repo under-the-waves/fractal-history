@@ -540,7 +540,7 @@ function TreeVisualization() {
             {/* Frozen header */}
             <div className="tree-header">
                 <h1>Fractal History Tree</h1>
-                <span className="tree-subtitle">Click to expand. Toggle A/B for different perspectives.</span>
+                <span className="tree-subtitle">Click to expand. Toggle A/B/C for different perspectives.</span>
 
                 {/* Collapsible legend */}
                 <div className="breadth-legend">
@@ -548,7 +548,7 @@ function TreeVisualization() {
                         className="legend-toggle"
                         onClick={() => setLegendExpanded(!legendExpanded)}
                     >
-                        Breadth: <span style={{ color: '#3498db' }}>A</span>=Analytical <span style={{ color: '#27ae60' }}>B</span>=Temporal {legendExpanded ? '▲' : '▼'}
+                        Breadth: <span style={{ color: '#3498db' }}>A</span>=Analytical <span style={{ color: '#27ae60' }}>B</span>=Temporal <span style={{ color: '#e67e22' }}>C</span>=Geographic {legendExpanded ? '▲' : '▼'}
                     </button>
                     {legendExpanded && (
                         <div className="legend-expanded">
@@ -559,6 +559,10 @@ function TreeVisualization() {
                             <div className="legend-item">
                                 <span className="legend-color" style={{ backgroundColor: '#27ae60' }}></span>
                                 <span><strong>Breadth B:</strong> Temporal anchors - complete time coverage</span>
+                            </div>
+                            <div className="legend-item">
+                                <span className="legend-color" style={{ backgroundColor: '#e67e22' }}></span>
+                                <span><strong>Breadth C:</strong> Geographic anchors - regional coverage</span>
                             </div>
                         </div>
                     )}
