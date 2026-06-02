@@ -9,7 +9,22 @@ import {
 import WhyTheseAnchors from './WhyTheseAnchors';
 import { getRandomFact } from '../data/historyFacts';
 
+function useIsMobile(breakpoint = 768) {
+    const [isMobile, setIsMobile] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return window.matchMedia(`(max-width: ${breakpoint}px)`).matches;
+    });
+    useEffect(() => {
+        const mql = window.matchMedia(`(max-width: ${breakpoint}px)`);
+        const handler = (e) => setIsMobile(e.matches);
+        mql.addEventListener('change', handler);
+        return () => mql.removeEventListener('change', handler);
+    }, [breakpoint]);
+    return isMobile;
+}
+
 function TreeVisualization() {
+    const isMobile = useIsMobile();
     const navigate = useNavigate();
     const [activePath, setActivePath] = useState([]);
     const [breadthSelections, setBreadthSelections] = useState({});
@@ -277,6 +292,115 @@ function TreeVisualization() {
         return breadthSelections[nodeId] || 'A';
     };
 
+    // Select a breadth on an anchor: instant update if children exist locally,
+    // otherwise fetch from DB or generate via API. Used by both desktop SVG
+    // breadth buttons and the mobile card layout.
+    const handleBreadthSelect = async (anchor, breadth) => {
+        const nodeId = anchor.id;
+        const anchorTitle = anchor.title;
+        const anchorScope = anchor.scope || '';
+
+        const hasChildrenAtBreadth = getChildren(nodeId, breadth).length > 0 ||
+            getStaticChildren(nodeId, breadth).length > 0;
+
+        const applyMetadata = (metadataData) => {
+            if (metadataData?.success && metadataData.found) {
+                const metadata = metadataData.metadata;
+                setSidebarData({
+                    parentId: nodeId,
+                    parentTitle: metadataData.parentInfo?.title || anchorTitle || nodeId,
+                    breadth: metadata.breadth,
+                    candidates: metadata.candidates,
+                    selectionReasoning: metadata.selection_reasoning,
+                    generatedAt: metadata.generated_at
+                });
+            } else {
+                setSidebarData(null);
+            }
+        };
+
+        if (hasChildrenAtBreadth) {
+            setBreadthSelections(prev => ({ ...prev, [nodeId]: breadth }));
+            const nodeIndexInPath = activePath.indexOf(nodeId);
+            if (nodeIndexInPath !== -1) {
+                setActivePath(activePath.slice(0, nodeIndexInPath + 1));
+            } else {
+                setActivePath([...activePath, nodeId]);
+            }
+            fetchMetadataData(nodeId, breadth).then(applyMetadata).catch(() => setSidebarData(null));
+            return;
+        }
+
+        setLoadingBreadth({ nodeId, breadth });
+        try {
+            const checkResponse = await fetch(`/api/get-tree?parentId=${nodeId}&breadth=${breadth}`);
+            const checkData = await checkResponse.json();
+
+            if (checkData.success && checkData.count > 0) {
+                await fetchBreadthData(nodeId, anchorTitle, breadth);
+                return;
+            }
+
+            setLoadingBreadth(null);
+            setGenerating(true);
+            try {
+                const generateResponse = await fetch('/api/generate-anchors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        parentId: nodeId,
+                        parentTitle: anchorTitle,
+                        parentScope: anchorScope,
+                        breadth: breadth
+                    })
+                });
+
+                const generateData = await generateResponse.json();
+
+                if (generateData.success) {
+                    await fetchBreadthData(nodeId, anchorTitle, breadth);
+                } else {
+                    console.error(`Failed to generate ${breadth}-anchors:`, generateData.error);
+                    setErrorMessage(`Failed to generate ${breadth}-anchors: ${generateData.error}`);
+                    setTimeout(() => setErrorMessage(null), 5000);
+                }
+            } catch (error) {
+                console.error(`Error generating ${breadth}-anchors:`, error);
+                setErrorMessage(`Error generating ${breadth}-anchors. Please try again.`);
+                setTimeout(() => setErrorMessage(null), 5000);
+            } finally {
+                setGenerating(false);
+            }
+        } finally {
+            setLoadingBreadth(null);
+        }
+    };
+
+    // Navigate the mobile breadcrumb: make the tapped ancestor the currently
+    // expanded node (slice keeps that ancestor in the path).
+    const navigateToAncestor = (anchorId) => {
+        const indexInPath = activePath.indexOf(anchorId);
+        if (indexInPath === -1) return;
+        setActivePath(activePath.slice(0, indexInPath + 1));
+        const breadth = getActiveBreadth(anchorId);
+        fetchMetadataData(anchorId, breadth).then(metadataData => {
+            if (metadataData?.success && metadataData.found) {
+                const metadata = metadataData.metadata;
+                const anchor = getAnchorById(anchorId);
+                setSidebarData({
+                    parentId: anchorId,
+                    parentTitle: metadataData.parentInfo?.title || anchor?.title || anchorId,
+                    breadth: metadata.breadth,
+                    candidates: metadata.candidates,
+                    selectionReasoning: metadata.selection_reasoning,
+                    generatedAt: metadata.generated_at
+                });
+            } else {
+                setSidebarData(null);
+            }
+        }).catch(() => setSidebarData(null));
+    };
+
     // Determine which nodes should be rendered
     const getVisibleNodes = () => {
         const nodes = [];
@@ -525,6 +649,196 @@ function TreeVisualization() {
 
     const visibleNodes = getVisibleNodes();
 
+    if (isMobile) {
+        const expandedNode = visibleNodes.find(n => n.type === 'expanded') || visibleNodes.find(n => n.type === 'root');
+        const expandedAnchor = expandedNode?.anchor;
+        const ancestors = visibleNodes.filter(n => n.type === 'ancestor');
+        const childNodes = visibleNodes.filter(n => n.type === 'child');
+        const activeBreadth = expandedAnchor ? getActiveBreadth(expandedAnchor.id) : 'A';
+        const accentColor = expandedAnchor && expandedAnchor.id !== '0-ROOT' && expandedAnchor.parentId
+            ? getBreadthColor(getActiveBreadth(expandedAnchor.parentId))
+            : getBreadthColor(activeBreadth);
+        const childrenAccent = getBreadthColor(activeBreadth);
+        const showStart = activePath.length === 0;
+
+        return (
+            <div className="tree-visualization mobile-tree-wrapper">
+                {generatingOverlay}
+                {loadingOverlay}
+
+                {errorMessage && (
+                    <div className="tree-error-banner" onClick={() => setErrorMessage(null)}>
+                        {errorMessage}
+                    </div>
+                )}
+
+                <div className="mobile-tree">
+                    <header className="mobile-tree-header">
+                        <h1>Fractal History</h1>
+                        <button
+                            className="mobile-legend-toggle"
+                            onClick={() => setLegendExpanded(!legendExpanded)}
+                            aria-expanded={legendExpanded}
+                        >
+                            <span style={{ color: '#3498db' }}>A</span>
+                            <span style={{ color: '#27ae60' }}>B</span>
+                            <span style={{ color: '#e67e22' }}>C</span>
+                            <span className="mobile-legend-caret">{legendExpanded ? '▲' : '▼'}</span>
+                        </button>
+                    </header>
+
+                    {legendExpanded && (
+                        <div className="mobile-legend-panel">
+                            <div className="legend-item">
+                                <span className="legend-color" style={{ backgroundColor: '#3498db' }}></span>
+                                <span><strong>A — Analytical:</strong> most essential aspects/themes</span>
+                            </div>
+                            <div className="legend-item">
+                                <span className="legend-color" style={{ backgroundColor: '#27ae60' }}></span>
+                                <span><strong>B — Temporal:</strong> complete time coverage</span>
+                            </div>
+                            <div className="legend-item">
+                                <span className="legend-color" style={{ backgroundColor: '#e67e22' }}></span>
+                                <span><strong>C — Geographic:</strong> regional coverage</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {activePath.length > 0 && (
+                        <nav className="mobile-tree-breadcrumbs" aria-label="Path">
+                            <button
+                                className="mobile-breadcrumb-btn mobile-breadcrumb-home"
+                                onClick={() => {
+                                    setActivePath([]);
+                                    setSidebarData(null);
+                                }}
+                            >
+                                ← Top
+                            </button>
+                            {ancestors.map(ancestor => (
+                                <span key={ancestor.id} className="mobile-breadcrumb-segment">
+                                    <span className="mobile-breadcrumb-sep">›</span>
+                                    <button
+                                        className="mobile-breadcrumb-btn"
+                                        onClick={() => navigateToAncestor(ancestor.id)}
+                                    >
+                                        {ancestor.anchor.title}
+                                    </button>
+                                </span>
+                            ))}
+                        </nav>
+                    )}
+
+                    {expandedAnchor && (
+                        <section
+                            className={showStart ? 'mobile-tree-current mobile-tree-current-root' : 'mobile-tree-current'}
+                            style={{ borderTopColor: accentColor }}
+                        >
+                            <h2 className="mobile-tree-title">{expandedAnchor.title}</h2>
+                            {expandedAnchor.scope && (
+                                <p className="mobile-tree-scope">{expandedAnchor.scope}</p>
+                            )}
+
+                            {showStart ? (
+                                <button
+                                    className="mobile-primary-btn"
+                                    onClick={() => handleExplore(expandedAnchor.id)}
+                                >
+                                    Start exploring →
+                                </button>
+                            ) : (
+                                <>
+                                    <div className="mobile-breadth-row" role="group" aria-label="Choose breadth">
+                                        <span className="mobile-breadth-label">Breadth</span>
+                                        <div className="mobile-breadth-btns">
+                                            {['A', 'B', 'C'].map(b => {
+                                                const isActive = b === activeBreadth;
+                                                const color = getBreadthColor(b);
+                                                return (
+                                                    <button
+                                                        key={b}
+                                                        className={`mobile-breadth-btn${isActive ? ' active' : ''}`}
+                                                        onClick={() => handleBreadthSelect(expandedAnchor, b)}
+                                                        style={isActive ? { background: color, borderColor: color, color: 'white' } : undefined}
+                                                        aria-pressed={isActive}
+                                                    >
+                                                        {b}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        className="mobile-primary-btn"
+                                        onClick={() => navigate(`/narrative/${expandedAnchor.id}?breadth=${activeBreadth}`)}
+                                    >
+                                        Read this article →
+                                    </button>
+
+                                    {sidebarData && (
+                                        <button
+                                            className="mobile-why-btn"
+                                            onClick={() => setSidebarOpen(true)}
+                                            style={{ color: getBreadthColor(sidebarData.breadth) }}
+                                        >
+                                            Why these sub-topics? →
+                                        </button>
+                                    )}
+                                </>
+                            )}
+                        </section>
+                    )}
+
+                    {!showStart && childNodes.length > 0 && (
+                        <>
+                            <h3 className="mobile-children-label">Sub-topics</h3>
+                            <ul className="mobile-children">
+                                {childNodes.map(child => (
+                                    <li key={child.id} className="mobile-child-card">
+                                        <button
+                                            className="mobile-child-main"
+                                            onClick={() => handleExplore(child.anchor.id)}
+                                        >
+                                            <span
+                                                className="mobile-child-accent"
+                                                style={{ background: childrenAccent }}
+                                                aria-hidden="true"
+                                            ></span>
+                                            <span className="mobile-child-body">
+                                                <span className="mobile-child-title">{child.anchor.title}</span>
+                                                {child.anchor.scope && (
+                                                    <span className="mobile-child-scope">{child.anchor.scope}</span>
+                                                )}
+                                            </span>
+                                            <span className="mobile-child-chevron" aria-hidden="true">›</span>
+                                        </button>
+                                        <button
+                                            className="mobile-child-read"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/narrative/${child.anchor.id}?breadth=${getActiveBreadth(child.anchor.id)}`);
+                                            }}
+                                            aria-label={`Read ${child.anchor.title}`}
+                                        >
+                                            Read →
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </>
+                    )}
+                </div>
+
+                <WhyTheseAnchors
+                    data={sidebarData}
+                    isOpen={sidebarOpen}
+                    onToggle={setSidebarOpen}
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="tree-visualization">
             {generatingOverlay}
@@ -674,9 +988,6 @@ function TreeVisualization() {
                                                 {['A', 'B', 'C'].map((breadth, index) => {
                                                     const activeBreadth = getActiveBreadth(node.id);
                                                     const isActive = breadth === activeBreadth;
-                                                    // Check both local treeData and static data
-                                                    const hasChildrenAtBreadth = getChildren(node.id, breadth).length > 0 ||
-                                                        getStaticChildren(node.id, breadth).length > 0;
                                                     const buttonWidth = (nodeWidth / 2 - 15) / 3 - 2;
                                                     const buttonX = 10 + index * (buttonWidth + 2);
                                                     const breadthColor = getBreadthColor(breadth);
@@ -687,92 +998,9 @@ function TreeVisualization() {
                                                     return (
                                                         <g
                                                             key={breadth}
-                                                            onClick={async (e) => {
+                                                            onClick={(e) => {
                                                                 e.stopPropagation();
-
-                                                                // If we already have children locally, update UI immediately (no loading needed)
-                                                                if (hasChildrenAtBreadth) {
-                                                                    // Update UI state immediately - no waiting
-                                                                    setBreadthSelections(prev => ({ ...prev, [node.id]: breadth }));
-                                                                    const nodeIndexInPath = activePath.indexOf(node.id);
-                                                                    if (nodeIndexInPath !== -1) {
-                                                                        setActivePath(activePath.slice(0, nodeIndexInPath + 1));
-                                                                    } else {
-                                                                        setActivePath([...activePath, node.id]);
-                                                                    }
-                                                                    // Fetch metadata in background (don't await, don't show loading)
-                                                                    fetchMetadataData(node.id, breadth).then(metadataData => {
-                                                                        if (metadataData.success && metadataData.found) {
-                                                                            const metadata = metadataData.metadata;
-                                                                            setSidebarData({
-                                                                                parentId: node.id,
-                                                                                parentTitle: metadataData.parentInfo?.title || node.anchor.title || node.id,
-                                                                                breadth: metadata.breadth,
-                                                                                candidates: metadata.candidates,
-                                                                                selectionReasoning: metadata.selection_reasoning,
-                                                                                generatedAt: metadata.generated_at
-                                                                            });
-                                                                        } else {
-                                                                            setSidebarData(null);
-                                                                        }
-                                                                    }).catch(() => setSidebarData(null));
-                                                                    return;
-                                                                }
-
-                                                                // Show loading only when we need to fetch/generate
-                                                                setLoadingBreadth({ nodeId: node.id, breadth });
-
-                                                                try {
-                                                                    // Check database for children (A, B, and C breadths)
-                                                                    if (breadth === 'A' || breadth === 'B' || breadth === 'C') {
-                                                                        const checkResponse = await fetch(`/api/get-tree?parentId=${node.id}&breadth=${breadth}`);
-                                                                        const checkData = await checkResponse.json();
-
-                                                                        if (checkData.success && checkData.count > 0) {
-                                                                            // Data exists in DB - use coordinated fetch
-                                                                            await fetchBreadthData(node.id, node.anchor.title, breadth);
-                                                                            return;
-                                                                        }
-
-                                                                        // No data - need to generate (switch to generating overlay)
-                                                                        setLoadingBreadth(null);
-                                                                        setGenerating(true);
-                                                                        try {
-                                                                            const generateResponse = await fetch('/api/generate-anchors', {
-                                                                                method: 'POST',
-                                                                                headers: { 'Content-Type': 'application/json' },
-                                                                                body: JSON.stringify({
-                                                                                    parentId: node.id,
-                                                                                    parentTitle: node.anchor.title,
-                                                                                    parentScope: node.anchor.scope || '',
-                                                                                    breadth: breadth
-                                                                                })
-                                                                            });
-
-                                                                            const generateData = await generateResponse.json();
-
-                                                                            if (generateData.success) {
-                                                                                await fetchBreadthData(node.id, node.anchor.title, breadth);
-                                                                            } else {
-                                                                                console.error(`Failed to generate ${breadth}-anchors:`, generateData.error);
-                                                                                setErrorMessage(`Failed to generate ${breadth}-anchors: ${generateData.error}`);
-                                                                                setTimeout(() => setErrorMessage(null), 5000);
-                                                                            }
-                                                                        } catch (error) {
-                                                                            console.error(`Error generating ${breadth}-anchors:`, error);
-                                                                                setErrorMessage(`Error generating ${breadth}-anchors. Please try again.`);
-                                                                                setTimeout(() => setErrorMessage(null), 5000);
-                                                                        } finally {
-                                                                            setGenerating(false);
-                                                                        }
-                                                                        return;
-                                                                    }
-
-                                                                    // Fallback for any breadth without generation support
-                                                                    await fetchBreadthData(node.id, node.anchor.title, breadth);
-                                                                } finally {
-                                                                    setLoadingBreadth(null);
-                                                                }
+                                                                handleBreadthSelect(node.anchor, breadth);
                                                             }}
                                                         >
                                                             <rect
