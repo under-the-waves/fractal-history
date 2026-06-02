@@ -144,7 +144,7 @@ export async function factCheckNarrative(narrativeHtml, anchorTitle, anchorScope
     const sources = verdicts
         .filter(v => v.url && /^https?:\/\//.test(v.url))
         .filter(v => (seen.has(v.url) ? false : (seen.add(v.url), true)))
-        .map(v => ({ claim: v.claim, url: v.url }));
+        .map(v => ({ claim: ((v.status === 'adjust' || v.status === 'wrong') && v.fix) ? v.fix : v.claim, url: v.url }));
 
     const corrections = fixes.map(f => ({ original: f.claim, corrected: f.fix, reason: f.note || f.status }));
 
