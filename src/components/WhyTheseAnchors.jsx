@@ -59,12 +59,12 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
 
     const breadthColor = getBreadthColor(breadth);
 
-    // Check if this is B-anchor format (has subdivision schemes with ratings)
-    const isBreadthB = breadth === 'B' && candidates?.[0]?.ratings;
+    // B and C anchors use the subdivision-scheme format (named schemes with ratings)
+    const isSchemeFormat = (breadth === 'B' || breadth === 'C') && candidates?.[0]?.ratings;
 
     // For A-anchors: sort by finalScore
     // For B-anchors: sort by totalScore
-    const sortedCandidates = isBreadthB
+    const sortedCandidates = isSchemeFormat
         ? [...(candidates || [])].sort((a, b) => b.totalScore - a.totalScore)
         : [...(candidates || [])].sort((a, b) => b.finalScore - a.finalScore);
 
@@ -109,12 +109,12 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
                     {/* Breadth-specific explanation */}
                     <div className="why-panel-explanation">
                         {getBreadthDescription(breadth)}
-                        {!isBreadthB && (
+                        {!isSchemeFormat && (
                             <div className="why-formula">
                                 Final Score = (Causal × 0.6) + (Human × 0.4)
                             </div>
                         )}
-                        {isBreadthB && (
+                        {isSchemeFormat && (
                             <div className="why-formula">
                                 Total Score = Natural Breakpoints + Comparable Depth + Historical Convention (max 9)
                             </div>
@@ -122,7 +122,7 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
                     </div>
 
                     {/* Content differs based on breadth type */}
-                    {isBreadthB ? (
+                    {isSchemeFormat ? (
                         // B-anchor: Show subdivision schemes
                         <div className="why-panel-candidates">
                             <div className="why-schemes-intro">
@@ -223,7 +223,7 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
 
                     {/* Footer */}
                     <div className="why-panel-footer">
-                        {isBreadthB ? (
+                        {isSchemeFormat ? (
                             <>
                                 <span style={{ color: breadthColor }}>
                                     {sortedCandidates.find(s => s.selected)?.name || 'Selected scheme'}
