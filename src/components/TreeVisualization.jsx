@@ -45,6 +45,17 @@ function TreeVisualization() {
     // Error state for user-facing messages
     const [errorMessage, setErrorMessage] = useState(null);
 
+    // First-visit welcome overlay (dismissable, persisted in localStorage)
+    const [showIntro, setShowIntro] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        try { return localStorage.getItem('fh-intro-dismissed') !== '1'; }
+        catch { return false; }
+    });
+    const dismissIntro = () => {
+        try { localStorage.setItem('fh-intro-dismissed', '1'); } catch { /* ignore */ }
+        setShowIntro(false);
+    };
+
     // Helper functions to work with treeData
     const getChildren = (parentId, breadth = 'A') => {
         return Object.values(treeData).filter(anchor =>
@@ -647,6 +658,23 @@ function TreeVisualization() {
         </div>
     ) : null;
 
+    const introOverlay = showIntro ? (
+        <div className="intro-overlay" role="dialog" aria-modal="true" aria-label="Welcome">
+            <div className="intro-card">
+                <h2>Welcome to Fractal History</h2>
+                <p className="intro-tagline">
+                    A first-principles map of world history – from the Big Bang to the present.
+                </p>
+                <ul className="intro-steps">
+                    <li><strong>Tap any topic</strong> to see its sub-topics.</li>
+                    <li><strong>A / B / C</strong> switch between analytical, temporal, and geographic views.</li>
+                    <li><strong>Read</strong> opens the narrative for the current topic.</li>
+                </ul>
+                <button className="intro-btn" onClick={dismissIntro} autoFocus>Start exploring →</button>
+            </div>
+        </div>
+    ) : null;
+
     const visibleNodes = getVisibleNodes();
 
     if (isMobile) {
@@ -663,6 +691,7 @@ function TreeVisualization() {
 
         return (
             <div className="tree-visualization mobile-tree-wrapper">
+                {introOverlay}
                 {generatingOverlay}
                 {loadingOverlay}
 
@@ -841,6 +870,7 @@ function TreeVisualization() {
 
     return (
         <div className="tree-visualization">
+            {introOverlay}
             {generatingOverlay}
             {loadingOverlay}
 

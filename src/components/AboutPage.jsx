@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 function AboutPage({ onBack }) {
     return (
         <div className="about-page">
@@ -84,12 +86,16 @@ function AboutPage({ onBack }) {
             <section className="about-section">
                 <h2>How to Use This Site</h2>
                 <ol className="about-steps">
-                    <li>Open the <strong>Tree View</strong> to see history as a branching map.</li>
+                    <li>Open the <strong>tree</strong> to see history as a branching map.</li>
                     <li>Select any anchor to read its narrative.</li>
                     <li>Drill deeper — each anchor branches into more detailed sub-anchors.</li>
                     <li>Switch between the Analytical, Temporal, and Geographic views of a topic.</li>
                     <li>Save key questions as flashcards to review later.</li>
                 </ol>
+            </section>
+
+            <section className="about-cta-section">
+                <Link to="/" className="about-open-tree-btn">Open the tree →</Link>
             </section>
         </div>
     )

@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { Show, SignInButton, UserButton } from '@clerk/react'
 import { useClerkEnabled } from './hooks/useClerkAuth'
-import LandingPage from './components/LandingPage'
 import NarrativeReading from './components/NarrativeReading'
 import TreeVisualization from './components/TreeVisualization.jsx'
 import AboutPage from './components/AboutPage'
@@ -13,12 +12,13 @@ function AppContent() {
   const location = useLocation()
   const clerkEnabled = useClerkEnabled()
 
+  const isTreeRoute = location.pathname === '/' || location.pathname === '/tree' || location.pathname.startsWith('/narrative/')
+
   return (
     <div className="app">
       {/* Navigation */}
       <nav className="app-nav">
-        <button className={location.pathname === '/' ? 'active' : ''} onClick={() => navigate('/')}>Home</button>
-        <button className={location.pathname === '/tree' || location.pathname.startsWith('/narrative/') ? 'active' : ''} onClick={() => navigate('/tree')}>Tree View</button>
+        <button className={isTreeRoute ? 'active' : ''} onClick={() => navigate('/')}>Tree</button>
         {clerkEnabled && (
           <Show when="signed-in">
             <button className={location.pathname === '/flashcards' ? 'active' : ''} onClick={() => navigate('/flashcards')}>Flashcards</button>
@@ -40,15 +40,7 @@ function AppContent() {
       </nav>
 
       <Routes>
-        <Route
-          path="/"
-          element={
-            <LandingPage
-              onStart={() => navigate('/tree')}
-              onAbout={() => navigate('/about')}
-            />
-          }
-        />
+        <Route path="/" element={<TreeVisualization />} />
         <Route path="/tree" element={<TreeVisualization />} />
         <Route path="/narrative/:id" element={<NarrativeReading />} />
         <Route path="/flashcards" element={<FlashcardsPage />} />

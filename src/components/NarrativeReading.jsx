@@ -404,6 +404,9 @@ function NarrativeReading() {
     if (loading || isGenerating) {
         return (
             <div className="narrative-page">
+                <div className="narrative-back-bar">
+                    <Link to="/" className="back-to-tree-pill">← Back to the tree</Link>
+                </div>
                 <div className="narrative-loading">
                     <div className="loading-content">
                         {anchor ? (
@@ -464,7 +467,7 @@ function NarrativeReading() {
                         <button onClick={fetchNarrative} className="retry-button">
                             Try Again
                         </button>
-                        <button onClick={() => navigate('/tree')} className="back-button">
+                        <button onClick={() => navigate('/')} className="back-button">
                             Return to Tree View
                         </button>
                     </div>
@@ -479,7 +482,7 @@ function NarrativeReading() {
                 <div className="narrative-error">
                     <h1>Anchor Not Found</h1>
                     <p>The requested anchor could not be found.</p>
-                    <button onClick={() => navigate('/tree')} className="back-button">
+                    <button onClick={() => navigate('/')} className="back-button">
                         Return to Tree View
                     </button>
                 </div>
@@ -489,9 +492,14 @@ function NarrativeReading() {
 
     return (
         <div className="narrative-page">
+            {/* Back-to-tree pill */}
+            <div className="narrative-back-bar">
+                <Link to="/" className="back-to-tree-pill">← Back to the tree</Link>
+            </div>
+
             {/* Breadcrumb bar */}
             <nav className="narrative-breadcrumbs">
-                {anchor.ancestors?.map((ancestor, index) => (
+                {anchor.ancestors?.map((ancestor) => (
                     <span key={ancestor.id}>
                         <Link
                             to={`/narrative/${ancestor.id}?breadth=${breadth}`}
