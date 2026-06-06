@@ -2153,6 +2153,146 @@
   background: #1d4ed8;
 }
 
+/* --- Candidate pool: header, hint, groups, reverse cards --- */
+
+.flashcard-save-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.flashcard-save-header .flashcard-save-heading {
+  margin: 0;
+}
+
+.flashcard-regenerate {
+  font-family: 'Source Sans Pro', -apple-system, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  background: white;
+  color: #2563eb;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.flashcard-regenerate:hover:not(:disabled) {
+  background: #2563eb;
+  color: white;
+}
+
+.flashcard-regenerate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.flashcard-pool-hint {
+  font-size: 13px;
+  color: #777;
+  line-height: 1.5;
+  margin: 0 0 20px 0;
+}
+
+.flashcard-group {
+  margin-bottom: 24px;
+}
+
+.flashcard-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #ececec;
+}
+
+.flashcard-group-heading {
+  font-family: 'Source Sans Pro', -apple-system, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.flashcard-group-save-all {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  background: none;
+  color: #2563eb;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.flashcard-group-save-all:hover:not(:disabled) {
+  border-color: #2563eb;
+}
+
+.flashcard-group-save-all:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.flashcard-reverse {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #d8d8d8;
+}
+
+.flashcard-reverse-label {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.flashcard-reverse-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.flashcard-save-both {
+  background: #475569;
+}
+
+.flashcard-save-both:hover:not(:disabled) {
+  background: #334155;
+}
+
+.study-remove-card {
+  display: block;
+  margin: 20px auto 0;
+  font-size: 13px;
+  color: #b91c1c;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: 'Source Sans Pro', -apple-system, sans-serif;
+}
+
+.study-remove-card:hover:not(:disabled) {
+  color: #7f1d1d;
+}
+
+.study-remove-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ============================================
    FLASHCARDS PAGE
    ============================================ */

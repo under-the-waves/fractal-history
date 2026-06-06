@@ -58,6 +58,7 @@ function StudyMode({ auth, onSwitchToBrowse }) {
     const [showAnswer, setShowAnswer] = useState(false)
     const [loading, setLoading] = useState(true)
     const [reviewing, setReviewing] = useState(false)
+    const [removing, setRemoving] = useState(false)
     const [sessionStats, setSessionStats] = useState({ total: 0, again: 0, hard: 0, good: 0, easy: 0 })
     const [sessionComplete, setSessionComplete] = useState(false)
     const [stats, setStats] = useState(null)
@@ -148,6 +149,35 @@ function StudyMode({ auth, onSwitchToBrowse }) {
             console.error('Failed to submit review:', err)
         } finally {
             setReviewing(false)
+        }
+    }
+
+    // Remove the current card from the collection mid-session.
+    const handleRemove = async () => {
+        if (removing || reviewing) return
+        if (!window.confirm('Remove this card from your collection? This cannot be undone.')) return
+
+        const card = cards[currentIndex]
+        const wasLast = currentIndex >= cards.length - 1
+        setRemoving(true)
+        try {
+            const token = await auth.getToken()
+            await fetch(`/api/flashcards?id=${card.id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            // Drop it from the queue. currentIndex then points at the next card
+            // (which shifts into this slot), unless we just removed the last one.
+            setCards(prev => prev.filter((_, i) => i !== currentIndex))
+            setShowAnswer(false)
+            if (wasLast) {
+                setSessionComplete(true)
+                fetchStats()
+            }
+        } catch (err) {
+            console.error('Failed to remove card:', err)
+        } finally {
+            setRemoving(false)
         }
     }
 
@@ -272,9 +302,20 @@ function StudyMode({ auth, onSwitchToBrowse }) {
                     </>
                 )}
             </div>
+
+            <button
+                type="button"
+                className="study-remove-card"
+                onClick={handleRemove}
+                disabled={removing || reviewing}
+            >
+                {removing ? 'Removing...' : 'Remove this card'}
+            </button>
         </div>
     )
 }
+
+const BREADTH_LABEL = { A: 'Analytical', B: 'Temporal', C: 'Geographic' }
 
 function BrowseMode({ auth, flashcards, setFlashcards }) {
     const [deletingId, setDeletingId] = useState(null)
@@ -337,7 +378,7 @@ function BrowseMode({ auth, flashcards, setFlashcards }) {
                                     {card.anchor_title}
                                 </Link>
                             </td>
-                            <td>{card.breadth === 'A' ? 'Analytical' : 'Temporal'}</td>
+                            <td>{BREADTH_LABEL[card.breadth] || card.breadth}</td>
                             <td className="flashcard-table-question">{card.question}</td>
                             <td className="flashcard-table-answer">{card.answer}</td>
                             <td className="flashcard-table-due">{formatDue(card)}</td>

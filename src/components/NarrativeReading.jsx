@@ -23,13 +23,37 @@ const BREADTH_LABELS = {
 }
 
 // Separate component that safely uses Clerk hooks (only rendered inside ClerkProvider)
+// Turn the human-facing label for a group key. "sub:Title" -> "Title".
+function flashcardGroupLabel(key) {
+    if (key === 'general') return 'Across the topic'
+    if (key.startsWith('sub:')) return key.slice(4)
+    return key
+}
+
+// Cluster the candidate cards by their group, preserving first-appearance order
+// for sub-topics and pushing the catch-all "general" group to the end.
+function groupFlashcards(cards) {
+    const groups = []
+    const byKey = new Map()
+    cards.forEach((card, index) => {
+        const key = card.group || 'general'
+        if (!byKey.has(key)) {
+            const entry = { key, label: flashcardGroupLabel(key), cards: [] }
+            byKey.set(key, entry)
+            groups.push(entry)
+        }
+        byKey.get(key).cards.push({ ...card, index })
+    })
+    // Stable partition: everything except 'general' keeps its order, 'general' last.
+    return groups.sort((a, b) => (a.key === 'general' ? 1 : 0) - (b.key === 'general' ? 1 : 0))
+}
+
 function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }) {
     const auth = useAuth()
-    const [questions, setQuestions] = useState(initialQuestions)
+    const [questions, setQuestions] = useState(initialQuestions || [])
     const [generating, setGenerating] = useState(false)
     const [generateError, setGenerateError] = useState(null)
     const [savedCards, setSavedCards] = useState(new Set())
-    const [savingAll, setSavingAll] = useState(false)
     const [revealed, setRevealed] = useState(new Set())
 
     // Sync if parent passes updated questions
@@ -39,12 +63,14 @@ function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }
         }
     }, [initialQuestions])
 
-    // Generate flashcards on demand
-    const generateFlashcards = async () => {
+    // Generate (or regenerate) the candidate pool on demand. refresh=true bypasses
+    // the shared server-side cache so old-format pools can be upgraded.
+    const generateFlashcards = async (refresh = false) => {
         setGenerating(true)
         setGenerateError(null)
         try {
-            const response = await fetch(`/api/generate-flashcards?id=${anchorId}&breadth=${breadth}`)
+            const url = `/api/generate-flashcards?id=${anchorId}&breadth=${breadth}${refresh ? '&refresh=1' : ''}`
+            const response = await fetch(url)
             const data = await response.json()
             if (data.success && data.questions) {
                 setQuestions(data.questions)
@@ -84,7 +110,11 @@ function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }
         }
     }, [auth, anchorId, breadth])
 
-    const saveFlashcard = async (question, answer) => {
+    // Save one or more {question, answer} items as independent cards (each gets its
+    // own review schedule). Returns true on success so callers can chain directions.
+    const saveItems = async (items) => {
+        const fresh = items.filter(it => it.question && it.answer && !savedCards.has(it.question))
+        if (fresh.length === 0) return true
         try {
             const token = await auth.getToken()
             const response = await fetch('/api/flashcards', {
@@ -93,43 +123,20 @@ function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ anchorId, breadth, question, answer })
+                body: JSON.stringify({ anchorId, breadth, flashcards: fresh })
             })
             const data = await response.json()
             if (data.success) {
-                setSavedCards(prev => new Set([...prev, question]))
+                setSavedCards(prev => new Set([...prev, ...fresh.map(it => it.question)]))
+                return true
             }
         } catch (err) {
-            console.error('Failed to save flashcard:', err)
+            console.error('Failed to save flashcard(s):', err)
         }
+        return false
     }
 
-    const saveAllFlashcards = async () => {
-        setSavingAll(true)
-        try {
-            const token = await auth.getToken()
-            const response = await fetch('/api/flashcards', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    anchorId,
-                    breadth,
-                    flashcards: questions
-                })
-            })
-            const data = await response.json()
-            if (data.success) {
-                setSavedCards(new Set(questions.map(q => q.question)))
-            }
-        } catch (err) {
-            console.error('Failed to save flashcards:', err)
-        } finally {
-            setSavingAll(false)
-        }
-    }
+    const reveal = (key) => setRevealed(prev => new Set([...prev, key]))
 
     if (!auth.isSignedIn) {
         return (
@@ -152,7 +159,7 @@ function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }
                 {generateError && <p className="flashcard-error">{generateError}</p>}
                 <button
                     className="save-all-button"
-                    onClick={generateFlashcards}
+                    onClick={() => generateFlashcards(false)}
                     disabled={generating}
                 >
                     {generating ? 'Generating flashcards...' : 'Generate flashcards'}
@@ -161,49 +168,116 @@ function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }
         )
     }
 
+    const groups = groupFlashcards(questions)
+
     return (
         <section className="flashcard-save-section">
-            <h2 className="flashcard-save-heading">Save as Flashcards</h2>
-            <div className="flashcard-save-actions">
+            <div className="flashcard-save-header">
+                <h2 className="flashcard-save-heading">Save as Flashcards</h2>
                 <button
-                    className="save-all-button"
-                    onClick={saveAllFlashcards}
-                    disabled={savingAll || savedCards.size === questions.length}
+                    type="button"
+                    className="flashcard-regenerate"
+                    onClick={() => generateFlashcards(true)}
+                    disabled={generating}
+                    title="Generate a fresh set of candidate cards"
                 >
-                    {savedCards.size === questions.length
-                        ? 'All saved'
-                        : savingAll
-                            ? 'Saving...'
-                            : `Save all ${questions.length} as flashcards`}
+                    {generating ? 'Regenerating...' : 'Regenerate'}
                 </button>
             </div>
-            <div className="flashcard-save-list">
-                {questions.map((q, index) => (
-                    <div key={index} className="flashcard-save-item">
-                        <div className="flashcard-save-content">
-                            <p className="flashcard-save-question"><strong>Q:</strong> {q.question}</p>
-                            {revealed.has(index) ? (
-                                <p className="flashcard-save-answer"><strong>A:</strong> {q.answer}</p>
-                            ) : (
-                                <button
-                                    type="button"
-                                    className="flashcard-reveal-button"
-                                    onClick={() => setRevealed(prev => new Set([...prev, index]))}
-                                >
-                                    Show answer
-                                </button>
-                            )}
+            <p className="flashcard-pool-hint">
+                Pick the cards worth remembering -- skip what you already know. Reversible
+                cards can be saved in either direction, or both.
+            </p>
+            {generateError && <p className="flashcard-error">{generateError}</p>}
+
+            {groups.map(group => {
+                const unsavedForward = group.cards.filter(c => !savedCards.has(c.question))
+                return (
+                    <div key={group.key} className="flashcard-group">
+                        <div className="flashcard-group-header">
+                            <h3 className="flashcard-group-heading">{group.label}</h3>
+                            <button
+                                type="button"
+                                className="flashcard-group-save-all"
+                                onClick={() => saveItems(group.cards.map(c => ({ question: c.question, answer: c.answer })))}
+                                disabled={unsavedForward.length === 0}
+                            >
+                                {unsavedForward.length === 0 ? 'All saved' : `Save all ${unsavedForward.length}`}
+                            </button>
                         </div>
-                        <button
-                            className={`flashcard-save-button ${savedCards.has(q.question) ? 'saved' : ''}`}
-                            onClick={() => saveFlashcard(q.question, q.answer)}
-                            disabled={savedCards.has(q.question)}
-                        >
-                            {savedCards.has(q.question) ? 'Saved' : 'Save'}
-                        </button>
+                        <div className="flashcard-save-list">
+                            {group.cards.map(card => {
+                                const fKey = `${card.index}`
+                                const rKey = `${card.index}-r`
+                                const fSaved = savedCards.has(card.question)
+                                const rSaved = card.reverse && savedCards.has(card.reverse.question)
+                                return (
+                                    <div key={card.index} className="flashcard-save-item">
+                                        <div className="flashcard-save-content">
+                                            <p className="flashcard-save-question"><strong>Q:</strong> {card.question}</p>
+                                            {revealed.has(fKey) ? (
+                                                <p className="flashcard-save-answer"><strong>A:</strong> {card.answer}</p>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    className="flashcard-reveal-button"
+                                                    onClick={() => reveal(fKey)}
+                                                >
+                                                    Show answer
+                                                </button>
+                                            )}
+
+                                            {card.reverse && (
+                                                <div className="flashcard-reverse">
+                                                    <span className="flashcard-reverse-label">Reverse</span>
+                                                    <p className="flashcard-save-question"><strong>Q:</strong> {card.reverse.question}</p>
+                                                    {revealed.has(rKey) ? (
+                                                        <p className="flashcard-save-answer"><strong>A:</strong> {card.reverse.answer}</p>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            className="flashcard-reveal-button"
+                                                            onClick={() => reveal(rKey)}
+                                                        >
+                                                            Show answer
+                                                        </button>
+                                                    )}
+                                                    <div className="flashcard-reverse-actions">
+                                                        <button
+                                                            className={`flashcard-save-button ${rSaved ? 'saved' : ''}`}
+                                                            onClick={() => saveItems([{ question: card.reverse.question, answer: card.reverse.answer }])}
+                                                            disabled={rSaved}
+                                                        >
+                                                            {rSaved ? 'Reverse saved' : 'Save reverse'}
+                                                        </button>
+                                                        <button
+                                                            className="flashcard-save-button flashcard-save-both"
+                                                            onClick={() => saveItems([
+                                                                { question: card.question, answer: card.answer },
+                                                                { question: card.reverse.question, answer: card.reverse.answer }
+                                                            ])}
+                                                            disabled={fSaved && rSaved}
+                                                        >
+                                                            {fSaved && rSaved ? 'Both saved' : 'Save both'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button
+                                            className={`flashcard-save-button ${fSaved ? 'saved' : ''}`}
+                                            onClick={() => saveItems([{ question: card.question, answer: card.answer }])}
+                                            disabled={fSaved}
+                                        >
+                                            {fSaved ? 'Saved' : 'Save'}
+                                        </button>
+                                    </div>
+                                )
+                            })}
+                        </div>
                     </div>
-                ))}
-            </div>
+                )
+            })}
         </section>
     )
 }

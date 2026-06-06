@@ -20,6 +20,7 @@ export default async function handler(req, res) {
 
     const anchorId = req.query.id;
     const breadth = req.query.breadth || 'A';
+    const refresh = req.query.refresh === '1';
 
     if (!anchorId) {
         return res.status(400).json({ error: 'Anchor ID is required' });
@@ -32,7 +33,8 @@ export default async function handler(req, res) {
             [anchorId, breadth]
         );
 
-        if (existing.length > 0 && existing[0].questions) {
+        // Skip the cache when the caller explicitly asks to regenerate the pool.
+        if (!refresh && existing.length > 0 && existing[0].questions) {
             const questions = typeof existing[0].questions === 'string'
                 ? JSON.parse(existing[0].questions)
                 : existing[0].questions;
@@ -66,6 +68,15 @@ export default async function handler(req, res) {
 
         const childTitles = children.map((c, i) => `${i + 1}. ${c.title}`).join('\n');
 
+        // Candidate pool: 3 cards per sub-topic plus 5 from the connective/overview
+        // material ("the rest of the text"). With no sub-topics, lean on 8 general cards.
+        const numSubtopics = children.length;
+        const perSubtopic = 3;
+        const generalCount = numSubtopics > 0 ? 5 : 8;
+        const totalTarget = numSubtopics * perSubtopic + generalCount;
+        // Each card may carry a reverse, so budget generously and cap to keep latency sane.
+        const maxTokens = Math.min(8000, totalTarget * 220 + 1000);
+
         const breadthLabel = { A: 'analytical', B: 'temporal', C: 'geographic' }[breadth] || 'analytical';
 
         const breadthGuidance = {
@@ -76,13 +87,20 @@ export default async function handler(req, res) {
 
         console.log(`Generating flashcards for ${anchorId} breadth ${breadth}`);
 
+        const subtopicInstruction = numSubtopics > 0
+            ? `Create a candidate pool the learner will choose from:
+- For EACH of the ${numSubtopics} sub-topics above, write exactly ${perSubtopic} cards, each testing a different aspect of that sub-topic. Tag each with "group": "sub:<exact sub-topic title>".
+- Then write ${generalCount} more cards drawn from the rest of the narrative -- the opening hook, framing, connections between sub-topics, and overall significance -- that are not tied to any single sub-topic. Tag each of these with "group": "general".
+Aim for roughly ${totalTarget} cards total.`
+            : `Create a candidate pool of about ${generalCount} cards drawn from across the whole narrative -- the opening hook, the key facts, and the overall significance. Tag each with "group": "general".`;
+
         const completion = await getAnthropicClient().messages.create({
             model: 'claude-haiku-4-5-20251001',
-            max_tokens: 1500,
+            max_tokens: maxTokens,
             system: 'You are creating flashcard questions for a history education app. Respond with valid JSON only.',
             messages: [{
                 role: 'user',
-                content: `Generate flashcard questions for this historical narrative.
+                content: `Generate a pool of candidate flashcard questions for this historical narrative. The learner will pick the ones they want to study, so offer varied angles rather than a single question per topic.
 
 **Topic:** ${anchor?.title || anchorId}
 **Breadth:** ${breadthLabel}
@@ -94,7 +112,7 @@ ${narrative}
 
 ${breadthGuidance}
 
-Create exactly ${children.length + 1} questions: one about the opening hook/anecdote, plus one per sub-topic.
+${subtopicInstruction}
 
 Follow these flashcard learning principles strictly:
 - ATOMIC: each card tests exactly ONE fact. Never join two facts with "and", "where", or a comma.
@@ -105,11 +123,18 @@ Follow these flashcard learning principles strictly:
   GOOD -> Q: "What phrase did Churchill use for the divide across Europe?"  A: "The Iron Curtain"
 - The answer must be findable in, or directly derivable from, the narrative text.
 - Plain wording. Never use the construction "not X; it was Y" or "not just X, it's Y".
+- VARIED: within a sub-topic's ${perSubtopic} cards, target genuinely different facts, not reworded versions of the same one.
 
-Return JSON:
+REVERSIBLE CARDS: a card is reversible only when its answer is a specific, unique thing that could itself serve as a prompt (a named entity, place, date, or number) AND the question would still have a single clear answer when flipped. For such cards, add a "reverse" object with a naturally reworded question and answer -- never a mechanical swap.
+  Example forward -> Q: "How long ago did the Big Bang occur?"  A: "13.8 billion years"
+  Example reverse -> Q: "What happened about 13.8 billion years ago?"  A: "The Big Bang"
+Omit "reverse" entirely for conceptual "why/how did it matter" cards and any card whose flip would be ambiguous or have many valid answers.
+
+Return JSON. Include "reverse" only where it genuinely applies:
 {
   "questions": [
-    { "question": "...", "answer": "..." }
+    { "group": "sub:Exact Sub-topic Title", "question": "...", "answer": "...", "reverse": { "question": "...", "answer": "..." } },
+    { "group": "general", "question": "...", "answer": "..." }
   ]
 }`
             }],
@@ -122,6 +147,21 @@ Return JSON:
         if (!Array.isArray(data.questions)) {
             throw new Error('Response missing questions array');
         }
+
+        // Normalise: ensure every card has a group, and drop malformed reverse objects.
+        data.questions = data.questions
+            .filter(q => q && q.question && q.answer)
+            .map(q => {
+                const card = {
+                    group: typeof q.group === 'string' && q.group ? q.group : 'general',
+                    question: q.question,
+                    answer: q.answer
+                };
+                if (q.reverse && q.reverse.question && q.reverse.answer) {
+                    card.reverse = { question: q.reverse.question, answer: q.reverse.answer };
+                }
+                return card;
+            });
 
         // Store back into the narratives table
         await query(
