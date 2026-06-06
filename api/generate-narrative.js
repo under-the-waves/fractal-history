@@ -290,9 +290,12 @@ export default async function handler(req, res) {
         const narrativeData = parseNarrativeResponse(response);
         console.log('Narrative parsed successfully');
 
-        // Post-process: convert child anchor <strong> tags to navigational links
+        // Post-process: convert child anchor <strong> tags to tree-navigation links.
+        // pathPrefix is root -> this anchor (ancestors includes self), so each child link
+        // can carry the full path the tree needs to expand to it.
         const childLinks = children.map(c => ({ id: c.id, title: c.title }));
-        narrativeData.narrative = linkChildAnchors(narrativeData.narrative, childLinks, breadth);
+        const pathPrefix = ancestors.map(a => a.id);
+        narrativeData.narrative = linkChildAnchors(narrativeData.narrative, childLinks, breadth, pathPrefix);
 
         // Step 7: Store in database
         const storedNarrative = await storeNarrative(anchorId, breadth, narrativeData);

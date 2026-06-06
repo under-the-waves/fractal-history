@@ -29,7 +29,7 @@ function escapeAttr(str) {
  * @param {string} breadth - The breadth of the current narrative ('A', 'B', etc.)
  * @returns {string} HTML with child anchor titles converted to links
  */
-function linkChildAnchors(html, children, breadth) {
+function linkChildAnchors(html, children, breadth, pathPrefix = []) {
     if (!html || !children || children.length === 0) return html;
 
     const breadthClass = breadth === 'B' ? 'sub-anchor-link-temporal' : 'sub-anchor-link-analytical';
@@ -40,6 +40,11 @@ function linkChildAnchors(html, children, breadth) {
         // a prose phrase actually links to (e.g. "the late republic" -> "Late Republic: ...").
         const attrTitle = escapeAttr(child.title);
 
+        // Sub-anchor links go to the tree visualization, expanded to this anchor, rather
+        // than to its narrative. The path is the ancestor chain (root -> current anchor)
+        // plus this child; ids encode their own breadth so the tree can walk straight to it.
+        const treeHref = `/tree?path=${[...pathPrefix, child.id].join(',')}`;
+
         // Pattern 1: <strong data-title='Exact Title'>display text</strong>
         // Quote char is captured (group 1) and backreferenced (\1) so the opening and
         // closing quotes must match. Accepts both ' and " for backward compatibility.
@@ -48,7 +53,7 @@ function linkChildAnchors(html, children, breadth) {
             'g'
         );
         result = result.replace(dataPattern, (_, _quote, displayText) =>
-            `<a href="/narrative/${child.id}?breadth=A" class="sub-anchor-link ${breadthClass}" title="${attrTitle}">${displayText}</a>`
+            `<a href="${treeHref}" class="sub-anchor-link ${breadthClass}" title="${attrTitle}">${displayText}</a>`
         );
 
         // Pattern 2: <strong>Exact Title</strong> (fallback for A/C or older narratives)
@@ -56,19 +61,19 @@ function linkChildAnchors(html, children, breadth) {
             `<strong>${escapeRegex(child.title)}</strong>`,
             'g'
         );
-        const link = `<a href="/narrative/${child.id}?breadth=A" class="sub-anchor-link ${breadthClass}" title="${attrTitle}">${child.title}</a>`;
-        result = result.replace(plainPattern, link);
+        result = result.replace(plainPattern,
+            `<a href="${treeHref}" class="sub-anchor-link ${breadthClass}" title="${attrTitle}">${child.title}</a>`
+        );
 
-        // Upgrade pass: narratives stored before hover labels existed already contain
-        // <a ... class="sub-anchor-link ..."> for this child but no title attribute. The
-        // negative lookahead skips links that already have a title (e.g. ones just created
-        // above), so this only backfills the missing ones — no regeneration needed.
-        const untitledLinkPattern = new RegExp(
-            `<a href="/narrative/${escapeRegex(child.id)}\\?breadth=A" class="(sub-anchor-link[^"]*)"(?![^>]*\\btitle=)`,
+        // Upgrade pass: narratives stored before this change contain links pointing at
+        // /narrative/<id>. Rewrite their opening tag to the tree href and ensure the title,
+        // so existing narratives get the new behaviour at read time without regeneration.
+        const oldLinkPattern = new RegExp(
+            `<a href="/narrative/${escapeRegex(child.id)}\\?breadth=[ABC]" class="(sub-anchor-link[^"]*)"[^>]*>`,
             'g'
         );
-        result = result.replace(untitledLinkPattern, (_, cls) =>
-            `<a href="/narrative/${child.id}?breadth=A" class="${cls}" title="${attrTitle}"`
+        result = result.replace(oldLinkPattern, (_, cls) =>
+            `<a href="${treeHref}" class="${cls}" title="${attrTitle}">`
         );
     }
     return result;

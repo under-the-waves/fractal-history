@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     getBreadthColor,
     treeStructure,
@@ -8,6 +8,12 @@ import {
 } from '../data/treeStructure';
 import WhyTheseAnchors from './WhyTheseAnchors';
 import { getRandomFact } from '../data/historyFacts';
+
+// Parse the breadth letter (A/B/C) out of an anchor id like "5B-AAA". 0-ROOT has none.
+function breadthFromId(id) {
+    const m = /^\d+([ABC])/.exec(id || '');
+    return m ? m[1] : null;
+}
 
 function useIsMobile(breakpoint = 768) {
     const [isMobile, setIsMobile] = useState(() => {
@@ -26,6 +32,7 @@ function useIsMobile(breakpoint = 768) {
 function TreeVisualization() {
     const isMobile = useIsMobile();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [activePath, setActivePath] = useState([]);
     const [breadthSelections, setBreadthSelections] = useState({});
     const containerRef = useRef(null);
@@ -394,6 +401,68 @@ function TreeVisualization() {
             setLoadingBreadth(null);
         }
     };
+
+    // Expand the tree straight to a node, given the full chain of ids from root to it.
+    // Used by deep links from narratives (breadcrumbs and sub-anchor links). Each id
+    // encodes its own breadth, so we fetch each level's children at the right breadth.
+    const openPath = async (ids) => {
+        if (!ids || ids.length === 0) return;
+        setLoading(true);
+        try {
+            const additions = {};
+            const breadthSel = {};
+
+            const haveChildren = (parent, b) =>
+                getStaticChildren(parent, b).length > 0 ||
+                Object.values(treeData).some(a => a.parentId === parent && a.breadth === b) ||
+                Object.values(additions).some(a => a.parentId === parent && a.breadth === b);
+
+            const loadChildren = async (parent, b) => {
+                if (haveChildren(parent, b)) return;
+                const data = await fetchChildrenData(parent, b);
+                if (data.success && Array.isArray(data.anchors)) {
+                    data.anchors.forEach(a => {
+                        additions[a.id] = {
+                            id: a.id, title: a.title, scope: a.scope, level: a.level,
+                            breadth: a.breadth, position: a.position, parentId: parent
+                        };
+                    });
+                }
+            };
+
+            // Walk each edge, loading the parent's children at the child's breadth.
+            for (let k = 0; k < ids.length - 1; k++) {
+                const b = breadthFromId(ids[k + 1]) || 'A';
+                breadthSel[ids[k]] = b;
+                await loadChildren(ids[k], b);
+            }
+            // Load the target's own (analytical) children so its sub-anchors show on arrival.
+            const target = ids[ids.length - 1];
+            await loadChildren(target, 'A');
+            if (!breadthSel[target]) breadthSel[target] = 'A';
+
+            if (Object.keys(additions).length > 0) {
+                setTreeData(prev => ({ ...prev, ...additions }));
+            }
+            setBreadthSelections(prev => ({ ...prev, ...breadthSel }));
+            setActivePath(ids);
+        } catch (err) {
+            console.error('Failed to open tree path:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Deep-link: when the URL carries ?path=id0,id1,...,target, expand to that node.
+    const openedPathRef = useRef(null);
+    useEffect(() => {
+        const pathParam = searchParams.get('path');
+        if (!pathParam) return;
+        if (openedPathRef.current === pathParam) return;
+        openedPathRef.current = pathParam;
+        const ids = pathParam.split(',').map(s => s.trim()).filter(Boolean);
+        if (ids.length > 0) openPath(ids);
+    }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Navigate the mobile breadcrumb: make the tapped ancestor the currently
     // expanded node (slice keeps that ancestor in the path).

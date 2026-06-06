@@ -81,11 +81,13 @@ export default async function handler(req, res) {
         const textContent = narrativeData.narrative.replace(/<[^>]*>/g, ' ');
         const wordCount = textContent.split(/\s+/).filter(word => word.length > 0).length;
 
-        // Post-process: convert child anchor <strong> tags to navigational links
+        // Post-process: convert child anchor <strong> tags to tree-navigation links (and
+        // rewrite any older /narrative links). pathPrefix is root -> this anchor.
         const childLinks = childAnchors.map(c => ({ id: c.id, title: c.title }));
-        const linkedNarrative = linkChildAnchors(narrativeData.narrative, childLinks, breadth);
+        const pathPrefix = ancestors.map(a => a.id);
+        const linkedNarrative = linkChildAnchors(narrativeData.narrative, childLinks, breadth, pathPrefix);
         const linkedFactChecked = narrativeData.fact_checked_narrative
-            ? linkChildAnchors(narrativeData.fact_checked_narrative, childLinks, breadth)
+            ? linkChildAnchors(narrativeData.fact_checked_narrative, childLinks, breadth, pathPrefix)
             : null;
 
         return res.status(200).json({

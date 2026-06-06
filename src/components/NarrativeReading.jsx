@@ -599,19 +599,24 @@ function NarrativeReading() {
                 <Link to="/" className="back-to-tree-pill">← Back to the tree</Link>
             </div>
 
-            {/* Breadcrumb bar */}
+            {/* Breadcrumb bar. ancestors includes the current anchor as its last entry,
+                so we drop that (shown separately) and link the rest to the tree, expanded
+                to that ancestor. */}
             <nav className="narrative-breadcrumbs">
-                {anchor.ancestors?.map((ancestor) => (
-                    <span key={ancestor.id}>
-                        <Link
-                            to={`/narrative/${ancestor.id}?breadth=${breadth}`}
-                            className="breadcrumb-link"
-                        >
-                            {ancestor.title}
-                        </Link>
-                        <span className="breadcrumb-separator">→</span>
-                    </span>
-                ))}
+                {anchor.ancestors?.slice(0, -1).map((ancestor, i) => {
+                    const path = anchor.ancestors.slice(0, i + 1).map(a => a.id).join(',')
+                    return (
+                        <span key={ancestor.id}>
+                            <Link
+                                to={`/tree?path=${path}`}
+                                className="breadcrumb-link"
+                            >
+                                {ancestor.title}
+                            </Link>
+                            <span className="breadcrumb-separator">→</span>
+                        </span>
+                    )
+                })}
                 <span className="breadcrumb-current">{anchor.title}</span>
             </nav>
 
