@@ -2191,6 +2191,24 @@
   cursor: not-allowed;
 }
 
+.narrative-regenerate {
+  margin-top: 14px;
+  font-family: 'Source Sans Pro', -apple-system, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  background: #fff7ed;
+  color: #b45309;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.narrative-regenerate:hover {
+  background: #fde68a;
+}
+
 .flashcard-pool-hint {
   font-size: 13px;
   color: #777;

@@ -24,6 +24,7 @@ These are the chronological periods that divide this topic. Your narrative MUST:
 - Move through each period in order
 - **Reference each period using natural prose**, not the raw anchor title. The anchor titles (e.g. "Early Modern: 1500 - 1900 CE") are identifiers, not sentences. Your narrative should read like normal writing. Use `<strong data-title='EXACT ANCHOR TITLE'>your natural phrasing</strong>` (single quotes around the attribute, so it needs no escaping inside the JSON) so the system can link them. See examples below.
 - Help readers understand what changed between periods and why
+- **Be selective within each period.** Introduce each period and convey how it differed from the one before, but do not try to cover everything that happened inside it. Pick the few developments that make the overall arc clear and explain them properly; leave the rest to the deeper fractal levels. The reader should finish with a clear spine of the story, not an exhaustive catalogue. Depth and clarity beat coverage.
 
 ### How to Reference Periods in Prose
 
@@ -61,6 +62,20 @@ Your writing should emulate the storytelling style of Dan Carlin's Hardcore Hist
 **Conversational authority**: Write as someone who has deeply studied this topic and is sharing it with genuine enthusiasm—not as a textbook or encyclopedia.
 
 {{sharedVoice}}
+
+---
+
+## Clarity for a First-Time Reader (the most important section)
+
+Assume the reader has never heard these names and knows nothing about this period. Your first job is to make the spine of the story clear to them. Covering everything is explicitly NOT the goal: the deeper fractal levels exist to hold the detail this narrative leaves behind.
+
+- **Introduce before you rely on.** The first time you name a person, place, group, or institution, give the few words that establish who or what it is and why it matters here. Do not write "Sulla seized Rome" and move on. Write: "Sulla was a victorious general. In 88 BCE he marched his army into Rome itself, something no commander had done before, and seized power by force."
+- **One idea per sentence.** Do not put two people, or an event and its meaning, into the same sentence. "By the late republic, men like Marius, Sulla, Pompey, and Caesar commanded personal loyalties that dwarfed their constitutional authority" introduces four men and a constitutional crisis at once and explains none of them. Choose the one or two figures who carry the story, introduce them, and build the problem in steps.
+- **Explain the event before its significance.** "Caesar's crossing of the Rubicon in 49 BCE with his army was a declaration that the republican rules were no longer enforceable" welds the act to its meaning so the reader absorbs neither. Separate them across sentences: what the Rubicon was and why bringing an army across it was forbidden; what Caesar did; what it set off.
+- **Never leave a who / what / why dangling.** "His assassination in 44 BCE solved nothing" assumes the reader already knows who killed him, what they hoped to achieve, and what problem remained unsolved. Name the people, state what they wanted, and say why it failed.
+- **Selectivity beats coverage.** You do not need to mention everything that happened in a period. A few developments explained clearly beats a long list barely explained. When you must choose, drop the extra name and keep the explanation.
+
+**Economy means cutting padding, not context.** The "every sentence earns its place" guidance above means deleting filler and restatement. It never means compressing two ideas into one sentence, or dropping the identifying phrase a newcomer needs to follow you. When clarity and propulsion pull in different directions, clarity wins.
 
 ---
 
@@ -128,6 +143,8 @@ Begin by setting the stage: what was the world like **before** the first tempora
 ---
 
 ## Main Narrative (600-700 words)
+
+Treat the word budget as a ceiling, not a quota to fill. Spend it on context and the clear explanation of a few key developments, not on cramming in more names and events. If you are running short of room, cut facts; never cut the explanation that makes the remaining facts comprehensible to a newcomer.
 
 ### Structure for Temporal Narratives
 

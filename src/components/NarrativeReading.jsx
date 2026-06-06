@@ -459,6 +459,34 @@ function NarrativeReading() {
             .catch(() => setFactCheckStatus('error'))
     }, [anchor, loading, error, breadth])
 
+    // Force a fresh narrative from the current prompts. Gated behind ?regen=1 in the
+    // URL so it never shows for ordinary readers (each call costs an API generation).
+    const regenerateNarrative = async () => {
+        try {
+            setError(null)
+            setIsGenerating(true)
+            setLoadingStage('generating_narrative')
+            const resp = await fetch(`/api/generate-narrative?id=${id}&breadth=${breadth}&regenerate=true`)
+            const text = await resp.text()
+            let data
+            try { data = JSON.parse(text) }
+            catch { throw new Error('Regeneration returned an unexpected response (it may have timed out — try again).') }
+            if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to regenerate narrative')
+            // Allow the background fact-check to run again on the new text.
+            factCheckInFlight.current = null
+            setFactCheckStatus('idle')
+            setAnchor(data.anchor)
+            setLoadingStage('complete')
+        } catch (err) {
+            setError(err.message || 'Failed to regenerate narrative')
+            setLoadingStage('error')
+        } finally {
+            setIsGenerating(false)
+        }
+    }
+
+    const showRegen = searchParams.get('regen') === '1'
+
     // Calculate read time from word count or use estimated
     const getReadTime = () => {
         if (anchor?.estimatedReadTime) {
@@ -609,6 +637,17 @@ function NarrativeReading() {
                         </button>
                     ))}
                 </div>
+
+                {showRegen && (
+                    <button
+                        type="button"
+                        className="narrative-regenerate"
+                        onClick={regenerateNarrative}
+                        title="Discard this narrative and generate a fresh one from the current prompts"
+                    >
+                        ↻ Regenerate narrative
+                    </button>
+                )}
             </header>
 
             {/* Narrative area */}
