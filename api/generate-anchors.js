@@ -144,6 +144,7 @@ export default async function handler(req, res) {
         // Build the appropriate prompt based on breadth type.
         let systemPrompt;
         let cCandidates = null; // [{ code, name, level }] of the places C may divide
+        let cCosmic = false;    // cosmic branch uses free-text generation, not the ledger
         if (breadth === 'C') {
             // The universe of places to divide: the parent's own coverage if it is
             // itself a geographic anchor, otherwise the whole world.
@@ -154,25 +155,37 @@ export default async function handler(req, res) {
             let universe = [WORLD];
             const rc = parentRow.length > 0 ? parentRow[0].region_codes : null;
             if (Array.isArray(rc) && rc.length > 0) universe = rc;
-            const candidateCodes = expandToCandidates(universe);
-            cCandidates = candidateCodes.map(code => ({
-                code, name: getName(code), level: getLevel(code)
-            }));
-            console.log(`Breadth C: dividing ${universe.length} universe code(s) into ${cCandidates.length} candidate place(s)`);
-            // Nothing to subdivide (a leaf place, e.g. a single country or a cosmic
-            // body): don't fall back to the whole world or call the model.
-            if (cCandidates.length <= 1) {
-                console.log(`Breadth C: no further geographic subdivision for ${parentId}; skipping generation`);
-                return res.status(200).json({
-                    success: true, parentId, parentTitle, breadth,
-                    anchorsGenerated: 0, anchors: [],
-                    note: 'No further geographic subdivision for this place.'
-                });
+
+            // Cosmic branch: no place dataset and no completeness contract, so the
+            // model generates geographic regions freely rather than via the ledger.
+            cCosmic = universe.some(c => getLevel(c) === 'cosmic' || c === 'COSMIC');
+            if (cCosmic) {
+                console.log(`Breadth C (cosmic): free-text geographic generation for ${parentId}`);
+                systemPrompt = buildCosmicCPrompt(
+                    parentId, parentTitle, parentScope || 'No scope provided',
+                    ancestorPath, existingSiblings
+                );
+            } else {
+                const candidateCodes = expandToCandidates(universe);
+                cCandidates = candidateCodes.map(code => ({
+                    code, name: getName(code), level: getLevel(code)
+                }));
+                console.log(`Breadth C: dividing ${universe.length} universe code(s) into ${cCandidates.length} candidate place(s)`);
+                // Nothing to subdivide (a leaf place, e.g. a single country): don't
+                // fall back to the whole world or call the model.
+                if (cCandidates.length <= 1) {
+                    console.log(`Breadth C: no further geographic subdivision for ${parentId}; skipping generation`);
+                    return res.status(200).json({
+                        success: true, parentId, parentTitle, breadth,
+                        anchorsGenerated: 0, anchors: [],
+                        note: 'No further geographic subdivision for this place.'
+                    });
+                }
+                systemPrompt = buildBreadthCPrompt(
+                    parentId, parentTitle, parentScope || 'No scope provided',
+                    ancestorPath, existingSiblings, cCandidates
+                );
             }
-            systemPrompt = buildBreadthCPrompt(
-                parentId, parentTitle, parentScope || 'No scope provided',
-                ancestorPath, existingSiblings, cCandidates
-            );
         } else {
             const promptBuilder = breadth === 'A' ? buildBreadthAPrompt : buildBreadthBPrompt;
             systemPrompt = promptBuilder(
@@ -267,6 +280,25 @@ export default async function handler(req, res) {
             }));
 
             selectionReasoning = `Top ${count} candidates selected by score (gap heuristic: cut at >1.0 point drop).`;
+        } else if (breadth === 'C' && cCosmic) {
+            // Cosmic free-text division: take the regions as given and mark them with
+            // the COSMIC sentinel, so further drilling stays free-text and a future
+            // cleanup-by-missing-codes leaves them alone.
+            let cleaned = response.trim().replace(/```json\n?/g, '').replace(/```\n?/g, '');
+            const data = JSON.parse(cleaned);
+            const regions = Array.isArray(data.regions) ? data.regions : [];
+            anchors = regions.filter(r => r && r.title).map((r, i) => ({
+                title: r.title, scope: r.scope || '', position: i + 1, region_codes: ['COSMIC']
+            }));
+            if (data.catchAll && data.catchAll.title) {
+                anchors.push({
+                    title: data.catchAll.title, scope: data.catchAll.scope || '',
+                    position: anchors.length + 1, region_codes: ['COSMIC']
+                });
+            }
+            candidates = anchors.map(a => ({ title: a.title, scope: a.scope, selected: true }));
+            selectionReasoning = data.reasoning || 'Geographic regions of this place, generated freely (the cosmic branch has no fixed place list).';
+            console.log(`Breadth C (cosmic): ${anchors.length} region(s) generated`);
         } else if (breadth === 'C') {
             // Geographic (place-based) division. The model nominates a few named
             // regions by selecting place codes; the program computes the leftover
@@ -338,6 +370,16 @@ export default async function handler(req, res) {
             } catch (e) {
                 selectionReasoning = 'Temporal anchors provide complete chronological coverage of the parent topic.';
             }
+        }
+
+        // Safety: if parsing yielded no anchors, return cleanly rather than building
+        // an empty INSERT.
+        if (!Array.isArray(anchors) || anchors.length === 0) {
+            return res.status(200).json({
+                success: true, parentId, parentTitle, breadth,
+                anchorsGenerated: 0, anchors: [],
+                note: 'No anchors were generated for this place.'
+            });
         }
 
         // Store generation metadata in database
@@ -493,6 +535,53 @@ function normalizeMemberToCode(ref, candidates) {
         if (byInner) return byInner.code;
     }
     return null;
+}
+
+// Build the free-text cosmic geographic prompt (used for the Cosmic & Planetary
+// branch, where there is no place dataset). The model proposes the place's main
+// geographic regions directly, with an optional catch-all.
+function buildCosmicCPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings) {
+    const ancestorContext = formatAncestorContext(ancestorPath);
+    const siblingNote = existingSiblings && existingSiblings.length > 0
+        ? `\n**These regions already exist here — do not duplicate them:**\n${existingSiblings.map(s => `- ${s.title}`).join('\n')}\n`
+        : '';
+    return `# Geographic division of a cosmic place
+
+Divide this place into its main geographic regions for a history learning tree.
+
+**Place ID:** ${parentId}
+**Place:** ${parentTitle}
+**Scope:** ${parentScope}
+
+**How we got here:**
+${ancestorContext}
+${siblingNote}
+## What to do
+
+Give the 2 to 5 most significant geographic regions of this place — the real divisions a learner would want. For a moon or planet that means hemispheres, major surface features, or polar regions; for a galaxy or a region of space, its major structures. For each region:
+- a short title, 5 words maximum;
+- a 2-3 sentence scope describing it and its role in this object's history;
+- if the region is defined by a time period (an ancient terrain, an era of the body), put that period in brackets in the title, e.g. "Late Heavy Bombardment (~4.1–3.8 BYA)"; otherwise no brackets.
+
+Then decide on a catch-all: include one ONLY if meaningful area would otherwise be left out. If the named regions already cover the place well (for example, near side plus far side cover a whole moon), set "catchAll" to null.
+
+## Output: JSON only, no other text
+
+\`\`\`json
+{
+  "regions": [
+    { "title": "The Near Side", "scope": "The hemisphere permanently facing Earth, dominated by the dark basaltic maria; the face mapped and watched throughout human history." },
+    { "title": "The Far Side", "scope": "The hemisphere facing away from Earth, heavily cratered with few maria, unseen until the space age." }
+  ],
+  "catchAll": null,
+  "reasoning": "One sentence on why these are the right divisions."
+}
+\`\`\`
+
+**Rules:**
+- 2 to 5 named regions, titles 5 words maximum.
+- "catchAll" is either an object { "title": ..., "scope": ... } or null — null when the named regions already cover the place.
+- Output ONLY the JSON object.`;
 }
 
 // Build the geographic (Breadth-C) prompt. The model is handed the fixed list of

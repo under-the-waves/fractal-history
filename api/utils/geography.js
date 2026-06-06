@@ -216,6 +216,12 @@ export const COSMIC = {
     childrenOf.set(code, node.children || []);
     if (node.timePeriod) timePeriodOf.set(code, node.timePeriod);
   }
+  // Sentinel for free-text cosmic anchors generated below the seeded scaffold.
+  // Marks them as "intentionally cosmic, no fixed place list" — distinct from NULL
+  // region_codes (which means an old, ledger-less anchor that may be cleaned up).
+  levelOf.set('COSMIC', 'cosmic');
+  nameOf.set('COSMIC', 'Cosmic');
+  childrenOf.set('COSMIC', []);
 })();
 
 // Time period string for a code (e.g. "~550–180 MYA"), or null.
