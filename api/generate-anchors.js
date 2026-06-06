@@ -283,15 +283,12 @@ export default async function handler(req, res) {
 
             // Leftover = every candidate place the model did not claim.
             const leftoverCodes = cCandidates.map(c => c.code).filter(code => !claimed.has(code));
-            const leftoverExpandable = leftoverCodes.some(code => getChildren(code).length > 0);
-            const leftoverSignificant = !!(data.leftover && (data.leftover.significant ?? data.leftover.remainingSignificant));
 
             anchors = named.map((r, i) => ({
                 title: r.title,
                 scope: r.scope,
                 position: i + 1,
                 region_codes: r.members,
-                must_expand: false,
                 connectionStrength: r.connectionStrength
             }));
 
@@ -302,14 +299,11 @@ export default async function handler(req, res) {
                         'Places with a lesser connection to this topic, kept reachable for deeper exploration.',
                     position: anchors.length + 1,
                     region_codes: leftoverCodes,
-                    // Conservative: flag the leftover for exploration whenever finer
-                    // geography remains, rather than trusting the model's significance call.
-                    must_expand: leftoverExpandable,
                     connectionStrength: 0
                 });
             }
 
-            console.log(`Breadth C: ${named.length} named region(s), leftover holds ${leftoverCodes.length} place(s), must_expand=${leftoverExpandable} (model significant=${leftoverSignificant})`);
+            console.log(`Breadth C: ${named.length} named region(s), leftover holds ${leftoverCodes.length} place(s)`);
 
             // Candidate list for the "Why these regions?" panel.
             candidates = anchors.map(a => ({
@@ -382,19 +376,18 @@ export default async function handler(req, res) {
             return { anchorId, positionId, anchor };
         });
 
-        // Batch insert anchors (single query). region_codes / must_expand are only
-        // populated for geographic (breadth C) anchors; null / false otherwise.
+        // Batch insert anchors (single query). region_codes is only populated for
+        // geographic (breadth C) anchors; null otherwise.
         const anchorValues = anchorRows.map((r, i) => {
-            const off = i * 6;
-            return `($${off + 1}, $${off + 2}, $${off + 3}, $${off + 4}, $${off + 5}, $${off + 6})`;
+            const off = i * 5;
+            return `($${off + 1}, $${off + 2}, $${off + 3}, $${off + 4}, $${off + 5})`;
         }).join(', ');
         const anchorParams = anchorRows.flatMap(r => [
             r.anchorId, r.anchor.title, r.anchor.scope, 'pending',
-            r.anchor.region_codes ? JSON.stringify(r.anchor.region_codes) : null,
-            r.anchor.must_expand || false
+            r.anchor.region_codes ? JSON.stringify(r.anchor.region_codes) : null
         ]);
         const insertedRows = await query(
-            `INSERT INTO anchors (id, title, scope, generation_status, region_codes, must_expand) VALUES ${anchorValues} RETURNING id, title, scope, generation_status, region_codes, must_expand`,
+            `INSERT INTO anchors (id, title, scope, generation_status, region_codes) VALUES ${anchorValues} RETURNING id, title, scope, generation_status, region_codes`,
             anchorParams
         );
 

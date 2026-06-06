@@ -14,7 +14,7 @@ export default async function handler(req, res) {
         // If no parentId provided, return root
         if (!parentId) {
             const root = await sql`
-        SELECT a.id, a.title, a.scope, a.region_codes, a.must_expand, tp.level, tp.breadth, tp.position
+        SELECT a.id, a.title, a.scope, a.region_codes, tp.level, tp.breadth, tp.position
         FROM anchors a
         LEFT JOIN tree_positions tp ON a.id = tp.anchor_id
         WHERE a.id = '0-ROOT'
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 
         // Get children of specified parent and breadth
         const children = await sql`
-      SELECT a.id, a.title, a.scope, a.region_codes, a.must_expand, tp.level, tp.breadth, tp.position, tp.parent_position_id
+      SELECT a.id, a.title, a.scope, a.region_codes, tp.level, tp.breadth, tp.position, tp.parent_position_id
       FROM anchors a
       JOIN tree_positions tp ON a.id = tp.anchor_id
       WHERE tp.parent_position_id = (
