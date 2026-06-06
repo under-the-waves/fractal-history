@@ -65,20 +65,6 @@ Your writing should emulate the storytelling style of Dan Carlin's Hardcore Hist
 
 ---
 
-## Clarity for a First-Time Reader (the most important section)
-
-Assume the reader has never heard these names and knows nothing about this period. Your first job is to make the spine of the story clear to them. Covering everything is explicitly NOT the goal: the deeper fractal levels exist to hold the detail this narrative leaves behind.
-
-- **Introduce before you rely on.** The first time you name a person, place, group, or institution, give the few words that establish who or what it is and why it matters here. Do not write "Sulla seized Rome" and move on. Write: "Sulla was a victorious general. In 88 BCE he marched his army into Rome itself, something no commander had done before, and seized power by force."
-- **One idea per sentence.** Do not put two people, or an event and its meaning, into the same sentence. "By the late republic, men like Marius, Sulla, Pompey, and Caesar commanded personal loyalties that dwarfed their constitutional authority" introduces four men and a constitutional crisis at once and explains none of them. Choose the one or two figures who carry the story, introduce them, and build the problem in steps.
-- **Explain the event before its significance.** "Caesar's crossing of the Rubicon in 49 BCE with his army was a declaration that the republican rules were no longer enforceable" welds the act to its meaning so the reader absorbs neither. Separate them across sentences: what the Rubicon was and why bringing an army across it was forbidden; what Caesar did; what it set off.
-- **Never leave a who / what / why dangling.** "His assassination in 44 BCE solved nothing" assumes the reader already knows who killed him, what they hoped to achieve, and what problem remained unsolved. Name the people, state what they wanted, and say why it failed.
-- **Selectivity beats coverage.** You do not need to mention everything that happened in a period. A few developments explained clearly beats a long list barely explained. When you must choose, drop the extra name and keep the explanation.
-
-**Economy means cutting padding, not context.** The "every sentence earns its place" guidance above means deleting filler and restatement. It never means compressing two ideas into one sentence, or dropping the identifying phrase a newcomer needs to follow you. When clarity and propulsion pull in different directions, clarity wins.
-
----
-
 ## Historical Accuracy
 
 This is an educational project. Factual accuracy is non-negotiable.
@@ -190,7 +176,6 @@ NEVER use these:
 - Fabricated reactions, emotions, or perspectives from historical figures
 - "What happened next will shock you" or similar clickbait
 - Rhetorical questions when a direct statement works better
-- The vague "something" reveal: naming a thing by first calling it "something" for drama, especially before a colon. "What replaced him was something new: a republic, born in the late sixth century BCE" hides the point behind a placeholder. State it directly: "A republic replaced the monarchy in the late sixth century BCE." This also covers "something different", "something unprecedented", and "something that would change everything".
 {{sharedBans}}
 - Listing the periods as bullet points—they must flow as continuous narrative
 
