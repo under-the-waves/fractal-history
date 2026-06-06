@@ -159,6 +159,16 @@ export default async function handler(req, res) {
                 code, name: getName(code), level: getLevel(code)
             }));
             console.log(`Breadth C: dividing ${universe.length} universe code(s) into ${cCandidates.length} candidate place(s)`);
+            // Nothing to subdivide (a leaf place, e.g. a single country or a cosmic
+            // body): don't fall back to the whole world or call the model.
+            if (cCandidates.length <= 1) {
+                console.log(`Breadth C: no further geographic subdivision for ${parentId}; skipping generation`);
+                return res.status(200).json({
+                    success: true, parentId, parentTitle, breadth,
+                    anchorsGenerated: 0, anchors: [],
+                    note: 'No further geographic subdivision for this place.'
+                });
+            }
             systemPrompt = buildBreadthCPrompt(
                 parentId, parentTitle, parentScope || 'No scope provided',
                 ancestorPath, existingSiblings, cCandidates
@@ -551,6 +561,7 @@ ${candidateList}
 - 2 to 4 named regions. Members must be codes from the list above. No place in two regions.
 - A title may use a recognisable name for the grouping (e.g. "The Western Front"), 5 words maximum. But the title must NOT imply places the region leaves out, and the scope MUST name the actual places the region covers. If the members do not fit a tidy name, use a plainer geographic title. (Example: a region whose members are Northern Africa, the Middle East and Central Africa must not be titled just "Middle East and North Africa" — name Central Africa in the scope, or retitle so nothing is hidden.)
 - Set "significant" to true if any place left in the leftover still has a meaningful connection to the topic (so it should be explored further); false if everything remaining is minor.
+- If a region is a time-bounded entity (an ancient landmass, a celestial body, an extinct polity), put its period in brackets in the title, e.g. "Gondwana (~550–180 MYA)".
 - Output ONLY the JSON object.`;
 }
 

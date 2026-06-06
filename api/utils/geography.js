@@ -144,3 +144,88 @@ export function expandToCandidates(codes, max = 40) {
 
   return current;
 }
+
+// ---------------------------------------------------------------------------
+// Cosmic geography (hand-curated)
+//
+// A separate, hand-authored taxonomy for the "Cosmic & Planetary" branch, where
+// modern continents are anachronistic. It is NOT connected to the terrestrial
+// WORLD tree: cosmic "Earth" covers the young planet and its deep-time geography
+// (supercontinents), while the modern continents stay on the normal Level-1 path.
+//
+// The UNIVERSE node corresponds to the seeded "Cosmic & Planetary" anchor itself;
+// dividing it geographically walks this tree. Time periods feed the bracketed
+// title convention (e.g. "Gondwana (~550–180 MYA)").
+// ---------------------------------------------------------------------------
+const timePeriodOf = new Map();
+
+export const COSMIC = {
+  UNIVERSE: { name: 'The Universe', timePeriod: '13.8 BYA – present', scope: 'The whole observable cosmos from the Big Bang to today.', children: ['MILKY_WAY', 'BEYOND_MILKY_WAY'] },
+
+  MILKY_WAY: { name: 'The Milky Way', timePeriod: '~13.6 BYA – present', scope: 'Our home galaxy: its assembly from early matter, its hundreds of billions of stars and spiral structure, and the galactic environment that produced the Sun.', children: ['SOLAR_SYSTEM', 'WIDER_MILKY_WAY'] },
+  BEYOND_MILKY_WAY: { name: 'Beyond the Milky Way', timePeriod: '~13.8 BYA – present', scope: 'Everything beyond our galaxy: the Local Group, other galaxies, galaxy clusters, and the large-scale structure of the universe, to the extent it is known.', children: [] },
+
+  SOLAR_SYSTEM: { name: 'The Solar System', timePeriod: '~4.6 BYA – present', scope: 'The Sun and everything bound to it — the planets, moons, and small bodies that formed from the solar nebula about 4.6 billion years ago.', children: ['SUN', 'TERRESTRIAL_PLANETS', 'GIANT_PLANETS', 'SMALL_BODIES'] },
+  WIDER_MILKY_WAY: { name: 'The Wider Milky Way', timePeriod: '~13.6 BYA – present', scope: 'The galaxy beyond the Solar System: the galactic core, other star systems, nebulae, and the interstellar medium.', children: [] },
+
+  SUN: { name: 'The Sun', timePeriod: '~4.6 BYA – present', scope: 'The star at the centre of the Solar System: its formation, structure, energy output, and life cycle.', children: [] },
+  TERRESTRIAL_PLANETS: { name: 'The Terrestrial Planets', timePeriod: '~4.5 BYA – present', scope: 'The four rocky inner planets — Mercury, Venus, Earth, and Mars — that formed close to the Sun.', children: ['MERCURY', 'VENUS', 'EARTH_BODY', 'MARS'] },
+  GIANT_PLANETS: { name: 'The Giant Planets', timePeriod: '~4.5 BYA – present', scope: 'The four large outer planets: the gas giants Jupiter and Saturn and the ice giants Uranus and Neptune.', children: ['GAS_GIANTS', 'ICE_GIANTS'] },
+  SMALL_BODIES: { name: 'Small Bodies', timePeriod: '~4.6 BYA – present', scope: 'Asteroids, the Kuiper belt, comets, and the distant Oort cloud — leftover debris of the Solar System’s formation.', children: [] },
+
+  MERCURY: { name: 'Mercury', timePeriod: '~4.5 BYA – present', scope: 'The smallest, innermost planet: a cratered, airless world of temperature extremes.', children: [] },
+  VENUS: { name: 'Venus', timePeriod: '~4.5 BYA – present', scope: 'Earth’s twin in size, with a runaway greenhouse atmosphere and crushing surface pressure.', children: [] },
+  MARS: { name: 'Mars', timePeriod: '~4.5 BYA – present', scope: 'The cold, dry red planet, with evidence of ancient water and the largest volcanoes in the Solar System.', children: [] },
+  EARTH_BODY: { name: 'Earth', timePeriod: '~4.5 BYA – present', scope: 'Our home planet: its formation, structure, oceans and atmosphere, and the deep-time geography that preceded the modern continents.', children: ['THE_MOON', 'EARTH_DEEP_TIME'] },
+
+  THE_MOON: { name: 'The Moon', timePeriod: '~4.5 BYA – present', scope: 'Earth’s only natural satellite, formed about 4.5 billion years ago from the debris of a giant impact on the early Earth.', children: [] },
+  EARTH_DEEP_TIME: { name: 'Earth’s Deep-Time Geography', timePeriod: '~4.5 BYA – 200 MYA', scope: 'Earth’s changing surface before the modern continents: the earliest crust and the supercontinents that assembled and broke apart over billions of years. The modern continents take over on the normal Level-1 path.', children: ['EARLY_EARTH', 'RODINIA', 'GONDWANA', 'PANGAEA'] },
+
+  EARLY_EARTH: { name: 'Early Earth', timePeriod: 'Hadean & Archean, ~4.5–2.5 BYA', scope: 'Earth’s molten beginnings, the first crust and oceans, and the earliest life, before stable supercontinents.', children: [] },
+  RODINIA: { name: 'Rodinia', timePeriod: '~1.1 BYA – 750 MYA', scope: 'A supercontinent that assembled around 1.1 billion years ago and broke apart by roughly 750 million years ago.', children: [] },
+  GONDWANA: { name: 'Gondwana', timePeriod: '~550–180 MYA', scope: 'The southern supercontinent — South America, Africa, Arabia, India, Australia, and Antarctica — that later broke into much of the modern southern hemisphere.', children: [] },
+  PANGAEA: { name: 'Pangaea', timePeriod: '~335–200 MYA', scope: 'The single global supercontinent whose breakup, beginning ~200 million years ago, started the drift toward the modern continents.', children: [] },
+
+  GAS_GIANTS: { name: 'The Gas Giants', timePeriod: '~4.5 BYA – present', scope: 'Jupiter and Saturn: the two largest planets, made mostly of hydrogen and helium, each with extensive moon systems.', children: ['JUPITER', 'SATURN'] },
+  ICE_GIANTS: { name: 'The Ice Giants', timePeriod: '~4.5 BYA – present', scope: 'Uranus and Neptune: the outermost major planets, rich in water, ammonia, and methane ices.', children: ['URANUS', 'NEPTUNE'] },
+
+  JUPITER: { name: 'Jupiter', timePeriod: '~4.5 BYA – present', scope: 'The largest planet, with its Great Red Spot and many moons including the four Galilean satellites.', children: ['IO', 'EUROPA', 'GANYMEDE', 'CALLISTO'] },
+  SATURN: { name: 'Saturn', timePeriod: '~4.5 BYA – present', scope: 'The ringed gas giant, with its spectacular ring system and its large moon Titan.', children: ['TITAN', 'ENCELADUS', 'RHEA', 'IAPETUS'] },
+  URANUS: { name: 'Uranus', timePeriod: '~4.5 BYA – present', scope: 'The ice giant that orbits tipped on its side, with a faint ring system.', children: ['TITANIA', 'OBERON', 'UMBRIEL', 'ARIEL'] },
+  NEPTUNE: { name: 'Neptune', timePeriod: '~4.5 BYA – present', scope: 'The outermost ice giant, with the strongest winds in the Solar System and the moon Triton.', children: ['TRITON'] },
+
+  IO: { name: 'Io', timePeriod: '~4.5 BYA – present', scope: 'The most volcanically active body in the Solar System.', children: [] },
+  EUROPA: { name: 'Europa', timePeriod: '~4.5 BYA – present', scope: 'An icy moon of Jupiter with a probable subsurface ocean.', children: [] },
+  GANYMEDE: { name: 'Ganymede', timePeriod: '~4.5 BYA – present', scope: 'The largest moon in the Solar System, bigger than Mercury.', children: [] },
+  CALLISTO: { name: 'Callisto', timePeriod: '~4.5 BYA – present', scope: 'A heavily cratered, ancient icy moon of Jupiter.', children: [] },
+  TITAN: { name: 'Titan', timePeriod: '~4.5 BYA – present', scope: 'Saturn’s largest moon, with a thick atmosphere and lakes of liquid methane.', children: [] },
+  ENCELADUS: { name: 'Enceladus', timePeriod: '~4.5 BYA – present', scope: 'A small icy moon of Saturn venting water from a subsurface ocean.', children: [] },
+  RHEA: { name: 'Rhea', timePeriod: '~4.5 BYA – present', scope: 'Saturn’s second-largest moon, an icy, cratered world.', children: [] },
+  IAPETUS: { name: 'Iapetus', timePeriod: '~4.5 BYA – present', scope: 'A two-toned moon of Saturn, dark on one hemisphere and bright on the other.', children: [] },
+  TITANIA: { name: 'Titania', timePeriod: '~4.5 BYA – present', scope: 'The largest moon of Uranus.', children: [] },
+  OBERON: { name: 'Oberon', timePeriod: '~4.5 BYA – present', scope: 'A heavily cratered outer moon of Uranus.', children: [] },
+  UMBRIEL: { name: 'Umbriel', timePeriod: '~4.5 BYA – present', scope: 'A dark, ancient moon of Uranus.', children: [] },
+  ARIEL: { name: 'Ariel', timePeriod: '~4.5 BYA – present', scope: 'The brightest and geologically youngest large moon of Uranus.', children: [] },
+  TRITON: { name: 'Triton', timePeriod: '~4.5 BYA – present', scope: 'Neptune’s largest moon, orbiting backwards and likely a captured Kuiper-belt object.', children: [] },
+};
+
+(function registerCosmic() {
+  for (const [code, node] of Object.entries(COSMIC)) {
+    levelOf.set(code, 'cosmic');
+    nameOf.set(code, node.name);
+    childrenOf.set(code, node.children || []);
+    if (node.timePeriod) timePeriodOf.set(code, node.timePeriod);
+  }
+})();
+
+// Time period string for a code (e.g. "~550–180 MYA"), or null.
+export function getTimePeriod(code) {
+  return timePeriodOf.get(code) ?? null;
+}
+
+// Title with the bracketed time period when one applies, e.g. "Gondwana (~550–180 MYA)".
+export function displayTitle(code) {
+  const name = getName(code);
+  const tp = timePeriodOf.get(code);
+  return tp ? `${name} (${tp})` : name;
+}
