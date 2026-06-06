@@ -125,10 +125,18 @@ Follow these flashcard learning principles strictly:
 - Plain wording. Never use the construction "not X; it was Y" or "not just X, it's Y".
 - VARIED: within a sub-topic's ${perSubtopic} cards, target genuinely different facts, not reworded versions of the same one.
 
-REVERSIBLE CARDS: a card is reversible only when its answer is a specific, unique thing that could itself serve as a prompt (a named entity, place, date, or number) AND the question would still have a single clear answer when flipped. For such cards, add a "reverse" object with a naturally reworded question and answer -- never a mechanical swap.
-  Example forward -> Q: "How long ago did the Big Bang occur?"  A: "13.8 billion years"
-  Example reverse -> Q: "What happened about 13.8 billion years ago?"  A: "The Big Bang"
-Omit "reverse" entirely for conceptual "why/how did it matter" cards and any card whose flip would be ambiguous or have many valid answers.
+REVERSIBLE CARDS: a card is reversible only when it links TWO short, specific things that each uniquely identify the other, so either can be the prompt and the other the short answer (date <-> event, person <-> the one specific deed or place tied to them, term <-> its short gloss). To reverse it you SWAP the two: the forward ANSWER becomes the thing the reverse question asks about, and the reverse answer is the OTHER thing (the key fact from the forward question). The reverse answer MUST be a different string from the forward answer.
+  GOOD forward -> Q: "How long ago did the Big Bang occur?"  A: "13.8 billion years"
+  GOOD reverse -> Q: "What happened about 13.8 billion years ago?"  A: "The Big Bang"   (answer changed: "13.8 billion years" -> "The Big Bang")
+
+FORBIDDEN -- the same card asked twice, with the answer unchanged. This is NOT a reverse:
+  Q: "Against which power did Rome fight the Punic Wars?"  A: "Carthage"
+  Q: "What empire based in Tunisia fought Rome in the Punic Wars?"  A: "Carthage"   (WRONG: answer is still "Carthage")
+If the only way to flip a card keeps the same answer, the card is NOT reversible -- omit "reverse".
+
+Self-check before adding a reverse: (1) is reverse.answer a genuinely different string from the forward answer? (2) is the forward answer now the subject the reverse question asks about? If either fails, omit "reverse".
+
+Omit "reverse" entirely for conceptual "why/how did it matter" cards, for cards whose other half is a long descriptive phrase rather than a short answer, and for any flip that would be ambiguous or have many valid answers.
 
 Return JSON. Include "reverse" only where it genuinely applies:
 {
@@ -148,7 +156,19 @@ Return JSON. Include "reverse" only where it genuinely applies:
             throw new Error('Response missing questions array');
         }
 
-        // Normalise: ensure every card has a group, and drop malformed reverse objects.
+        // A "reverse" that keeps the same answer is just the same card reworded, not a
+        // genuine reverse. Detect that by comparing normalised answers (equal, or one
+        // contained in the other) and drop the reverse when it isn't a real swap.
+        const normAnswer = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const isSameAnswer = (a, b) => {
+            const x = normAnswer(a), y = normAnswer(b);
+            if (!x || !y) return false;
+            if (x === y) return true;
+            const [short, long] = x.length <= y.length ? [x, y] : [y, x];
+            return short.length >= 3 && long.includes(short);
+        };
+
+        // Normalise: ensure every card has a group, and drop malformed or fake reverses.
         data.questions = data.questions
             .filter(q => q && q.question && q.answer)
             .map(q => {
@@ -157,7 +177,8 @@ Return JSON. Include "reverse" only where it genuinely applies:
                     question: q.question,
                     answer: q.answer
                 };
-                if (q.reverse && q.reverse.question && q.reverse.answer) {
+                if (q.reverse && q.reverse.question && q.reverse.answer
+                    && !isSameAnswer(q.reverse.answer, q.answer)) {
                     card.reverse = { question: q.reverse.question, answer: q.reverse.answer };
                 }
                 return card;
