@@ -5,7 +5,7 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
 
     if (!data) return null;
 
-    const { parentTitle, breadth, candidates } = data;
+    const { parentTitle, breadth, candidates, selectionReasoning } = data;
 
     const getBreadthColor = (b) => {
         switch (b) {
@@ -59,14 +59,18 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
 
     const breadthColor = getBreadthColor(breadth);
 
-    // B and C anchors use the subdivision-scheme format (named schemes with ratings)
+    // B anchors (and legacy C) use the subdivision-scheme format (named schemes with ratings).
     const isSchemeFormat = (breadth === 'B' || breadth === 'C') && candidates?.[0]?.ratings;
+    // Current C anchors are geographic regions: no per-candidate scores, all selected.
+    const isGeographic = breadth === 'C' && !candidates?.[0]?.ratings;
 
-    // For A-anchors: sort by finalScore
-    // For B-anchors: sort by totalScore
+    // Schemes sort by totalScore, A-anchors by finalScore; geographic regions keep
+    // their generated order (the leftover "rest of the world" comes last).
     const sortedCandidates = isSchemeFormat
         ? [...(candidates || [])].sort((a, b) => b.totalScore - a.totalScore)
-        : [...(candidates || [])].sort((a, b) => b.finalScore - a.finalScore);
+        : isGeographic
+            ? [...(candidates || [])]
+            : [...(candidates || [])].sort((a, b) => b.finalScore - a.finalScore);
 
     return (
         <>
@@ -109,7 +113,7 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
                     {/* Breadth-specific explanation */}
                     <div className="why-panel-explanation">
                         {getBreadthDescription(breadth)}
-                        {!isSchemeFormat && (
+                        {!isSchemeFormat && !isGeographic && (
                             <div className="why-formula">
                                 Final Score = (Causal × 0.6) + (Human × 0.4)
                             </div>
@@ -120,6 +124,11 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
                             </div>
                         )}
                     </div>
+
+                    {/* The model's own explanation of why these anchors were chosen. */}
+                    {selectionReasoning && (
+                        <div className="why-reasoning">{selectionReasoning}</div>
+                    )}
 
                     {/* Content differs based on breadth type */}
                     {isSchemeFormat ? (
@@ -166,6 +175,39 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : isGeographic ? (
+                        // C-anchor: show the geographic regions and their member places.
+                        <div className="why-panel-candidates">
+                            <div className="why-schemes-intro">
+                                <strong>{sortedCandidates.length} region{sortedCandidates.length === 1 ? '' : 's'} covering {parentTitle}:</strong>
+                            </div>
+                            {sortedCandidates.map((region, index) => (
+                                <div key={index} className="why-scheme-wrapper">
+                                    <div
+                                        className="why-scheme-row selected"
+                                        style={{ borderLeftColor: breadthColor }}
+                                    >
+                                        <div className="why-scheme-header">
+                                            <span className="why-scheme-rank">{index + 1}.</span>
+                                            <span className="why-scheme-name">{region.title}</span>
+                                            {typeof region.connectionStrength === 'number' && region.connectionStrength > 0 && (
+                                                <span className="why-scheme-score">link {region.connectionStrength}/10</span>
+                                            )}
+                                        </div>
+                                        {region.scope && (
+                                            <div className="why-region-scope">{region.scope}</div>
+                                        )}
+                                        {region.members && region.members.length > 0 && (
+                                            <div className="why-scheme-anchors">
+                                                {region.members.map((m, i) => (
+                                                    <span key={i} className="why-scheme-anchor">{m}</span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -230,6 +272,15 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
                                 </span>
                                 <span className="why-footer-note">
                                     chosen from {sortedCandidates.length} approaches
+                                </span>
+                            </>
+                        ) : isGeographic ? (
+                            <>
+                                <span style={{ color: breadthColor }}>
+                                    {sortedCandidates.length} region{sortedCandidates.length === 1 ? '' : 's'}
+                                </span>
+                                <span className="why-footer-note">
+                                    complete geographic coverage
                                 </span>
                             </>
                         ) : (
