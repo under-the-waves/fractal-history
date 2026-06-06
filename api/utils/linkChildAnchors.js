@@ -13,6 +13,15 @@ function escapeRegex(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Escape a string for safe use inside a double-quoted HTML attribute.
+function escapeAttr(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 /**
  * Replace child anchor markers with styled links to that child's narrative.
  * @param {string} html - The narrative HTML string
@@ -27,6 +36,10 @@ function linkChildAnchors(html, children, breadth) {
 
     let result = html;
     for (const child of children) {
+        // The exact sub-anchor title, shown as a hover tooltip so readers can see what
+        // a prose phrase actually links to (e.g. "the late republic" -> "Late Republic: ...").
+        const attrTitle = escapeAttr(child.title);
+
         // Pattern 1: <strong data-title='Exact Title'>display text</strong>
         // Quote char is captured (group 1) and backreferenced (\1) so the opening and
         // closing quotes must match. Accepts both ' and " for backward compatibility.
@@ -35,7 +48,7 @@ function linkChildAnchors(html, children, breadth) {
             'g'
         );
         result = result.replace(dataPattern, (_, _quote, displayText) =>
-            `<a href="/narrative/${child.id}?breadth=A" class="sub-anchor-link ${breadthClass}">${displayText}</a>`
+            `<a href="/narrative/${child.id}?breadth=A" class="sub-anchor-link ${breadthClass}" title="${attrTitle}">${displayText}</a>`
         );
 
         // Pattern 2: <strong>Exact Title</strong> (fallback for A/C or older narratives)
@@ -43,8 +56,20 @@ function linkChildAnchors(html, children, breadth) {
             `<strong>${escapeRegex(child.title)}</strong>`,
             'g'
         );
-        const link = `<a href="/narrative/${child.id}?breadth=A" class="sub-anchor-link ${breadthClass}">${child.title}</a>`;
+        const link = `<a href="/narrative/${child.id}?breadth=A" class="sub-anchor-link ${breadthClass}" title="${attrTitle}">${child.title}</a>`;
         result = result.replace(plainPattern, link);
+
+        // Upgrade pass: narratives stored before hover labels existed already contain
+        // <a ... class="sub-anchor-link ..."> for this child but no title attribute. The
+        // negative lookahead skips links that already have a title (e.g. ones just created
+        // above), so this only backfills the missing ones — no regeneration needed.
+        const untitledLinkPattern = new RegExp(
+            `<a href="/narrative/${escapeRegex(child.id)}\\?breadth=A" class="(sub-anchor-link[^"]*)"(?![^>]*\\btitle=)`,
+            'g'
+        );
+        result = result.replace(untitledLinkPattern, (_, cls) =>
+            `<a href="/narrative/${child.id}?breadth=A" class="${cls}" title="${attrTitle}"`
+        );
     }
     return result;
 }

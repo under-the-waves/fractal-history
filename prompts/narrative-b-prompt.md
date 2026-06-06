@@ -190,6 +190,7 @@ NEVER use these:
 - Fabricated reactions, emotions, or perspectives from historical figures
 - "What happened next will shock you" or similar clickbait
 - Rhetorical questions when a direct statement works better
+- The vague "something" reveal: naming a thing by first calling it "something" for drama, especially before a colon. "What replaced him was something new: a republic, born in the late sixth century BCE" hides the point behind a placeholder. State it directly: "A republic replaced the monarchy in the late sixth century BCE." This also covers "something different", "something unprecedented", and "something that would change everything".
 {{sharedBans}}
 - Listing the periods as bullet points—they must flow as continuous narrative
 
