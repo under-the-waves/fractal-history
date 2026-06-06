@@ -9,12 +9,6 @@ import {
 import WhyTheseAnchors from './WhyTheseAnchors';
 import { getRandomFact } from '../data/historyFacts';
 
-// Parse the breadth letter (A/B/C) out of an anchor id like "5B-AAA". 0-ROOT has none.
-function breadthFromId(id) {
-    const m = /^\d+([ABC])/.exec(id || '');
-    return m ? m[1] : null;
-}
-
 function useIsMobile(breakpoint = 768) {
     const [isMobile, setIsMobile] = useState(() => {
         if (typeof window === 'undefined') return false;
@@ -403,8 +397,10 @@ function TreeVisualization() {
     };
 
     // Expand the tree straight to a node, given the full chain of ids from root to it.
-    // Used by deep links from narratives (breadcrumbs and sub-anchor links). Each id
-    // encodes its own breadth, so we fetch each level's children at the right breadth.
+    // Used by deep links from narratives (breadcrumbs and sub-anchor links). An anchor's
+    // breadth is NOT reliably encoded in its id (a temporal B-child can have a "5A-" id),
+    // so we discover each node's real breadth by loading its parent's children across all
+    // breadths and reading the breadth the data reports.
     const openPath = async (ids) => {
         if (!ids || ids.length === 0) return;
         setLoading(true);
@@ -412,34 +408,51 @@ function TreeVisualization() {
             const additions = {};
             const breadthSel = {};
 
+            const known = (id) => treeData[id] || additions[id] || getStaticAnchorById(id) || null;
+
             const haveChildren = (parent, b) =>
                 getStaticChildren(parent, b).length > 0 ||
                 Object.values(treeData).some(a => a.parentId === parent && a.breadth === b) ||
                 Object.values(additions).some(a => a.parentId === parent && a.breadth === b);
 
-            const loadChildren = async (parent, b) => {
-                if (haveChildren(parent, b)) return;
-                const data = await fetchChildrenData(parent, b);
-                if (data.success && Array.isArray(data.anchors)) {
-                    data.anchors.forEach(a => {
-                        additions[a.id] = {
-                            id: a.id, title: a.title, scope: a.scope, level: a.level,
-                            breadth: a.breadth, position: a.position, parentId: parent
-                        };
-                    });
-                }
+            // Load a parent's children across every breadth we don't already hold.
+            const loadAllBreadths = async (parent) => {
+                const missing = ['A', 'B', 'C'].filter(b => !haveChildren(parent, b));
+                const datas = await Promise.all(missing.map(b => fetchChildrenData(parent, b)));
+                datas.forEach(data => {
+                    if (data && data.success && Array.isArray(data.anchors)) {
+                        data.anchors.forEach(a => {
+                            additions[a.id] = {
+                                id: a.id, title: a.title, scope: a.scope, level: a.level,
+                                breadth: a.breadth, position: a.position, parentId: parent
+                            };
+                        });
+                    }
+                });
             };
 
-            // Walk each edge, loading the parent's children at the child's breadth.
+            const breadthWithChildren = (parent) =>
+                ['A', 'B', 'C'].find(b =>
+                    getStaticChildren(parent, b).length > 0 ||
+                    Object.values(treeData).some(a => a.parentId === parent && a.breadth === b) ||
+                    Object.values(additions).some(a => a.parentId === parent && a.breadth === b)
+                );
+
+            // Walk each edge: ensure the next node is loaded, then record the breadth it
+            // actually sits under so that level renders with the right children.
             for (let k = 0; k < ids.length - 1; k++) {
-                const b = breadthFromId(ids[k + 1]) || 'A';
-                breadthSel[ids[k]] = b;
-                await loadChildren(ids[k], b);
+                const parent = ids[k];
+                const next = ids[k + 1];
+                if (!known(next)) await loadAllBreadths(parent);
+                const node = known(next);
+                breadthSel[parent] = (node && node.breadth) || breadthWithChildren(parent) || 'A';
             }
-            // Load the target's own (analytical) children so its sub-anchors show on arrival.
+
+            // Load the target's children so its sub-anchors show on arrival, defaulting to
+            // a breadth that actually has children.
             const target = ids[ids.length - 1];
-            await loadChildren(target, 'A');
-            if (!breadthSel[target]) breadthSel[target] = 'A';
+            await loadAllBreadths(target);
+            breadthSel[target] = breadthWithChildren(target) || 'A';
 
             if (Object.keys(additions).length > 0) {
                 setTreeData(prev => ({ ...prev, ...additions }));
@@ -542,7 +555,9 @@ function TreeVisualization() {
             });
         });
 
-        return nodes;
+        // Safety net: never render a node whose anchor failed to load, so a missing
+        // deep-link target degrades gracefully instead of white-screening the tree.
+        return nodes.filter(n => n.anchor);
     };
 
 
