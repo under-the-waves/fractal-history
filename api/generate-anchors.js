@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles } from './utils/promptLoader.js';
 import { query, getAncestorPath } from './utils/db.js';
+import { WORLD, getName, getLevel, getChildren, expandToCandidates } from './utils/geography.js';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -140,19 +141,35 @@ export default async function handler(req, res) {
         ]);
 
         console.log(`Found ${ancestorPath.length} ancestors and ${existingSiblings.length} existing siblings`);
-        // Build the appropriate prompt based on breadth type
-        const promptBuilder = breadth === 'A'
-            ? buildBreadthAPrompt
-            : breadth === 'C'
-                ? buildBreadthCPrompt
-                : buildBreadthBPrompt;
-        const systemPrompt = promptBuilder(
-            parentId,
-            parentTitle,
-            parentScope || 'No scope provided',
-            ancestorPath,
-            existingSiblings
-        );
+        // Build the appropriate prompt based on breadth type.
+        let systemPrompt;
+        let cCandidates = null; // [{ code, name, level }] of the places C may divide
+        if (breadth === 'C') {
+            // The universe of places to divide: the parent's own coverage if it is
+            // itself a geographic anchor, otherwise the whole world.
+            const parentRow = await query(
+                'SELECT region_codes FROM anchors WHERE id = $1 LIMIT 1',
+                [parentId]
+            );
+            let universe = [WORLD];
+            const rc = parentRow.length > 0 ? parentRow[0].region_codes : null;
+            if (Array.isArray(rc) && rc.length > 0) universe = rc;
+            const candidateCodes = expandToCandidates(universe);
+            cCandidates = candidateCodes.map(code => ({
+                code, name: getName(code), level: getLevel(code)
+            }));
+            console.log(`Breadth C: dividing ${universe.length} universe code(s) into ${cCandidates.length} candidate place(s)`);
+            systemPrompt = buildBreadthCPrompt(
+                parentId, parentTitle, parentScope || 'No scope provided',
+                ancestorPath, existingSiblings, cCandidates
+            );
+        } else {
+            const promptBuilder = breadth === 'A' ? buildBreadthAPrompt : buildBreadthBPrompt;
+            systemPrompt = promptBuilder(
+                parentId, parentTitle, parentScope || 'No scope provided',
+                ancestorPath, existingSiblings
+            );
+        }
 
         const apiStart = Date.now();
         console.log('Calling Anthropic API...');
@@ -240,6 +257,71 @@ export default async function handler(req, res) {
             }));
 
             selectionReasoning = `Top ${count} candidates selected by score (gap heuristic: cut at >1.0 point drop).`;
+        } else if (breadth === 'C') {
+            // Geographic (place-based) division. The model nominates a few named
+            // regions by selecting place codes; the program computes the leftover
+            // as the complement, so no place can be silently lost.
+            let cleaned = response.trim().replace(/```json\n?/g, '').replace(/```\n?/g, '');
+            const data = JSON.parse(cleaned);
+
+            const candidateByCode = new Map(cCandidates.map(c => [c.code, c]));
+            const claimed = new Set();
+            const named = [];
+            for (const r of (data.namedRegions || [])) {
+                const members = (r.members || [])
+                    .map(m => normalizeMemberToCode(m, cCandidates))
+                    .filter(code => code && candidateByCode.has(code) && !claimed.has(code));
+                if (members.length === 0) continue; // empty or fully-duplicated region
+                members.forEach(code => claimed.add(code));
+                named.push({
+                    title: r.title,
+                    scope: r.scope,
+                    members,
+                    connectionStrength: Number(r.connectionStrength) || 0
+                });
+            }
+
+            // Leftover = every candidate place the model did not claim.
+            const leftoverCodes = cCandidates.map(c => c.code).filter(code => !claimed.has(code));
+            const leftoverExpandable = leftoverCodes.some(code => getChildren(code).length > 0);
+            const leftoverSignificant = !!(data.leftover && (data.leftover.significant ?? data.leftover.remainingSignificant));
+
+            anchors = named.map((r, i) => ({
+                title: r.title,
+                scope: r.scope,
+                position: i + 1,
+                region_codes: r.members,
+                must_expand: false,
+                connectionStrength: r.connectionStrength
+            }));
+
+            if (leftoverCodes.length > 0) {
+                anchors.push({
+                    title: (data.leftover && data.leftover.title) || 'Rest of the World',
+                    scope: (data.leftover && data.leftover.scope) ||
+                        'Places with a lesser connection to this topic, kept reachable for deeper exploration.',
+                    position: anchors.length + 1,
+                    region_codes: leftoverCodes,
+                    // Conservative: flag the leftover for exploration whenever finer
+                    // geography remains, rather than trusting the model's significance call.
+                    must_expand: leftoverExpandable,
+                    connectionStrength: 0
+                });
+            }
+
+            console.log(`Breadth C: ${named.length} named region(s), leftover holds ${leftoverCodes.length} place(s), must_expand=${leftoverExpandable} (model significant=${leftoverSignificant})`);
+
+            // Candidate list for the "Why these regions?" panel.
+            candidates = anchors.map(a => ({
+                title: a.title,
+                scope: a.scope,
+                members: (a.region_codes || []).map(code => getName(code)),
+                connectionStrength: a.connectionStrength,
+                selected: true
+            }));
+
+            selectionReasoning = data.coverageJustification ||
+                'Regions capture the topic\'s strongest geographic connections; remaining places are gathered into a leftover region that stays reachable.';
         } else {
             // Breadth B: existing parsing
             anchors = parseTemporalAnchorResponse(response, parentId);
@@ -300,16 +382,19 @@ export default async function handler(req, res) {
             return { anchorId, positionId, anchor };
         });
 
-        // Batch insert anchors (single query)
+        // Batch insert anchors (single query). region_codes / must_expand are only
+        // populated for geographic (breadth C) anchors; null / false otherwise.
         const anchorValues = anchorRows.map((r, i) => {
-            const off = i * 4;
-            return `($${off + 1}, $${off + 2}, $${off + 3}, $${off + 4})`;
+            const off = i * 6;
+            return `($${off + 1}, $${off + 2}, $${off + 3}, $${off + 4}, $${off + 5}, $${off + 6})`;
         }).join(', ');
         const anchorParams = anchorRows.flatMap(r => [
-            r.anchorId, r.anchor.title, r.anchor.scope, 'pending'
+            r.anchorId, r.anchor.title, r.anchor.scope, 'pending',
+            r.anchor.region_codes ? JSON.stringify(r.anchor.region_codes) : null,
+            r.anchor.must_expand || false
         ]);
         const insertedRows = await query(
-            `INSERT INTO anchors (id, title, scope, generation_status) VALUES ${anchorValues} RETURNING id, title, scope, generation_status`,
+            `INSERT INTO anchors (id, title, scope, generation_status, region_codes, must_expand) VALUES ${anchorValues} RETURNING id, title, scope, generation_status, region_codes, must_expand`,
             anchorParams
         );
 
@@ -388,146 +473,92 @@ function buildBreadthAPrompt(parentId, parentTitle, parentScope, ancestorPath, e
     });
 }
 
-// Build prompt for Breadth-B (Temporal) anchor generation
-function buildBreadthCPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings) {
-    // Format ancestor path, flagging any inherited geographic constraint
-    const ancestorContext = ancestorPath.length > 0
-        ? ancestorPath.map((a) => {
-            let constraintType = '';
-            if (a.breadth === 'A') constraintType = '(Analytical/Thematic constraint)';
-            else if (a.breadth === 'B') constraintType = '(Temporal constraint)';
-            else if (a.breadth === 'C') constraintType = '(Geographic constraint)';
-            return `Level ${a.level}: **${a.title}** ${constraintType}\n   Scope: ${a.scope}`;
-        }).join('\n\n')
-        : 'No ancestor path (this is a top-level anchor)';
+// Map a model-provided member reference (a place code, a place name, or a
+// "Name [CODE]" string) back to a known candidate code. Returns null on no match.
+function normalizeMemberToCode(ref, candidates) {
+    if (ref === null || ref === undefined) return null;
+    const raw = String(ref).trim();
+    const lower = raw.toLowerCase();
+    const byCode = candidates.find(c => c.code.toLowerCase() === lower);
+    if (byCode) return byCode.code;
+    const byName = candidates.find(c => c.name.toLowerCase() === lower);
+    if (byName) return byName.code;
+    const bracket = raw.match(/\[([^\]]+)\]\s*$/);
+    if (bracket) {
+        const inner = bracket[1].trim().toLowerCase();
+        const byInner = candidates.find(c => c.code.toLowerCase() === inner);
+        if (byInner) return byInner.code;
+    }
+    return null;
+}
 
-    const siblingContext = existingSiblings.length > 0
-        ? existingSiblings.map((s, i) => `${i + 1}. ${s.title}\n   Scope: ${s.scope || 'No scope'}`).join('\n\n')
-        : 'None yet - you are generating the first geographic divisions';
+// Build the geographic (Breadth-C) prompt. The model is handed the fixed list of
+// places that make up this topic's area and groups them into a few named regions
+// by strength of CONNECTION to the topic. The program forms the leftover from
+// whatever is not claimed, so coverage is guaranteed regardless of the model.
+function buildBreadthCPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings, candidates) {
+    const ancestorContext = formatAncestorContext(ancestorPath);
+    const candidateList = candidates.map(c => `- ${c.name} [${c.code}]`).join('\n');
+    const siblingNote = existingSiblings && existingSiblings.length > 0
+        ? `\n**These regions already exist for this topic — do not duplicate them:**\n${existingSiblings.map(s => `- ${s.title}`).join('\n')}\n`
+        : '';
 
-    // Inherited constraints (especially any geographic bound from ancestors)
-    const constraints = { topic: [], geographic: [], temporal: [], analytical: [] };
-    ancestorPath.forEach(a => {
-        if (a.breadth === 'A') constraints.analytical.push(a.title);
-        else if (a.breadth === 'B') constraints.temporal.push(a.title);
-        else if (a.breadth === 'C') constraints.geographic.push(a.title);
-        else constraints.topic.push(a.title);
-    });
+    return `# Geographic (place-based) division
 
-    const constraintSummary = `
-**Inherited Scope Constraints:**
-${constraints.topic.length > 0 ? `- Topic: ${constraints.topic.join(' → ')}` : ''}
-${constraints.geographic.length > 0 ? `- Geography: Already limited to ${constraints.geographic[constraints.geographic.length - 1]} - subdivide WITHIN this only` : '- Geography: the whole world is available'}
-${constraints.temporal.length > 0 ? `- Time: Inherited from ${constraints.temporal[constraints.temporal.length - 1]} - each region covers ONLY this period` : "- Time: each region is scoped to the parent topic's own timespan"}
-${constraints.analytical.length > 0 ? `- Thematic focus: ${constraints.analytical.join(', ')}` : ''}
+You are dividing a topic into geographic regions for a history learning tree.
 
-Every region you create must respect ALL of these constraints.
-    `.trim();
+**Topic ID:** ${parentId}
+**Topic:** ${parentTitle}
+**Topic scope:** ${parentScope}
 
-    return `# Breadth-C Geographic Anchor Selection Task
-
-## Your Task
-
-You are selecting **Breadth-C anchors** (geographic - regional divisions) for the parent anchor:
-
-**Parent ID:** ${parentId}
-**Parent Title:** ${parentTitle}
-**Parent Scope:** ${parentScope}
-
-Your goal is to find the BEST way to divide this topic geographically by:
-1. Considering 3 different ways to carve the topic into regions
-2. Rating each scheme on 3 criteria
-3. Selecting the highest-scoring scheme
-4. Generating the final region anchors PLUS a mandatory "Rest of the World" anchor
-
----
-
-## CRITICAL CONTEXT: Learning Path That Led Here
-
-**Full ancestor path (how we reached this anchor):**
-
+**How we got here:**
 ${ancestorContext}
+${siblingNote}
+## What a region means here
 
-${constraintSummary}
+A region is a place's CONNECTION to this topic — including its people, forces, money, and decisions WHEREVER they acted, not only events that physically happened on its soil. Example: under "World War I", the region "Australia" covers Australia's whole part in the war, including the Australians who fought at Gallipoli and in France, even though that fighting was far from Australia.
 
----
+So judge a place by the STRENGTH OF ITS CONNECTION to the topic, never by how much of the topic physically happened on its ground. A place where little physically happened can still have a strong connection through the people and forces it sent elsewhere.
 
-## Sibling Context: What Already Exists at This Level
+## Your material: the places that make up this topic's area
 
-${existingSiblings.length > 0 ? '**Existing C-anchors already generated:**\n\n' + siblingContext : siblingContext}
-${existingSiblings.length > 0 ? '\n**Important:** Do not duplicate these existing regions.\n' : ''}
+You may ONLY group the places listed below. Each line is "Name [CODE]". Refer to a place by its CODE.
 
----
+${candidateList}
 
-## What are C-Anchors (Geographic)?
+## What to do
 
-C-anchors divide a topic by PLACE. They answer: "Where did this topic happen, and how did it differ by region?"
+1. Pick the 2 to 4 places (or groups of places) with the STRONGEST connection to this topic and make each one a named region. A region may bundle several places from the list if they belong together for this topic. Give each a short title (5 words max) that names a place or place-grouping.
+2. List each region's members as CODES drawn ONLY from the list above. Never invent a code. Never put the same place in two regions. (The example codes below are illustrative — use the codes from your own list.)
+3. Leave the remaining places UNLISTED. The program gathers everything you do not name into a single leftover region automatically — you do not list its members. You only give the leftover a title and a one-line scope, and say whether any place still inside it has a significant connection to the topic.
+4. Score each named region's connection strength from 1 to 10.
 
-**Core principles:**
-1. **Bounded to THIS topic.** Each region covers everything about *this specific topic* in that place - and nothing else. Under "World War II", the region "The Americas" means the Americas' role in WWII, NOT a general history of the Americas.
-2. **Topic-relevant regions.** Choose the regions that genuinely matter for THIS topic. They differ from topic to topic. You want the real places where the topic played out, not a generic world map stamped onto every subject.
-3. **A mandatory catch-all anchor (always last).** In ADDITION to your chosen regions, the final list ALWAYS ends with one catch-all anchor covering everywhere the topic had a lesser presence, so nothing is excluded and every place stays reachable by drilling deeper. **Naming:** if ONE leftover region clearly stands out among what it absorbs, name it after that region - e.g. "The Andes and the Rest of the World"; if several leftovers are co-equal, name it plainly "Rest of the World". Its scope must ALWAYS name the main regions it absorbs. Do NOT count it among your scheme's regions - it is added on top.
-4. **Modern names, no archaic geography.** Use modern, recognisable region names (e.g. "Mesoamerica", "East Asia"). Explain historical geographic differences inside narratives later, never as separate anchors.
-5. **Inherited time scope.** Each region is scoped to the parent topic's timespan only (see constraints above).
-
----
-
-## Hard limits
-
-- Each scheme proposes **2 to 4 named regions** (NOT counting "Rest of the World").
-- The FINAL anchor list = the selected scheme's regions **+ exactly one "Rest of the World" anchor**, for a MAXIMUM of **5 anchors total**. Never produce more than 5. Prefer fewer, well-chosen regions.
-
----
-
-## Selection Process: Three Candidate Schemes
-
-Consider **exactly 3 different ways** to carve this topic geographically. All 3 must be GEOGRAPHIC (regional) schemes - not temporal or thematic. There are often genuinely different valid carvings (by continent, by civilisation, by theatre of action, by ecological zone); propose three a historian would recognise.
-
-Rate each scheme 1-3 on three criteria:
-- **naturalBreakpoints** (Natural Boundaries): do the regions reflect real geographic, cultural, or political divisions that matter for THIS topic?
-- **comparableDepth**: is the learning load reasonably balanced across regions (no single region swallowing everything)?
-- **historicalConvention**: does this carving match how historians actually regionalise this topic?
-
-Prefer the scheme whose regions, together with "Rest of the World", leave no significant part of the topic's geography unreachable.
-
-Mark exactly one scheme \`"selected": true\`. Generate the final \`anchors\` for that scheme only, then append the "Rest of the World" anchor as the last entry.
-
----
-
-## Output Format
-
-Return ONLY valid JSON in exactly this shape:
+## Output: JSON only, no other text
 
 \`\`\`json
 {
-  "geographicScopeInferred": { "extent": "the geographic extent this topic actually covers", "rationale": "one sentence" },
-  "candidateSchemes": [
+  "namedRegions": [
     {
-      "name": "Scheme name",
-      "anchors": ["Region One", "Region Two", "Region Three"],
-      "ratings": {
-        "naturalBreakpoints": { "score": 3, "justification": "..." },
-        "comparableDepth": { "score": 2, "justification": "..." },
-        "historicalConvention": { "score": 3, "justification": "..." }
-      },
-      "totalScore": 8,
-      "selected": true
+      "title": "Australia and New Zealand",
+      "scope": "These nations' part in the war: the ANZAC forces at Gallipoli and on the Western Front, home-front mobilisation, the conscription debates, and casualties.",
+      "members": ["AU", "NZ"],
+      "connectionStrength": 8
     }
   ],
-  "selectedScheme": "Scheme name",
-  "anchors": [
-    { "position": 1, "title": "Region One", "scope": "2-3 sentences on this region's role in THIS topic, bounded to the parent's time and topic.", "regionExtent": "the modern areas/countries this covers" },
-    { "position": 2, "title": "The Andes and the Rest of the World", "scope": "2-3 sentences that NAME the main absorbed regions (e.g. the Andes, the African Sahel, New Guinea) and the topic's lesser presence elsewhere, kept reachable for deeper drilling.", "regionExtent": "everywhere not covered above" }
-  ],
-  "coverageJustification": "Why the selected carving best covers this topic's geography, and how Rest of the World keeps every place reachable."
+  "leftover": {
+    "title": "Rest of the World",
+    "scope": "Places with a lesser connection to the war, kept reachable for deeper exploration.",
+    "significant": true
+  },
+  "coverageJustification": "One or two sentences on why these regions capture the topic's strongest geographic connections."
 }
 \`\`\`
 
-**CRITICAL:**
-- \`candidateSchemes\` must contain EXACTLY 3 entries, with exactly one \`"selected": true\`.
-- \`anchors\` must be the selected scheme's 2-4 regions PLUS a final catch-all anchor (named per principle 3) - MAXIMUM 5 total.
-- Titles must be clean region noun-phrases, 5 words maximum.
-- Output ONLY the JSON object, no markdown, no commentary.`;
+**Rules:**
+- 2 to 4 named regions. Members must be codes from the list above. No place in two regions.
+- A title may use a recognisable name for the grouping (e.g. "The Western Front"), 5 words maximum. But the title must NOT imply places the region leaves out, and the scope MUST name the actual places the region covers. If the members do not fit a tidy name, use a plainer geographic title. (Example: a region whose members are Northern Africa, the Middle East and Central Africa must not be titled just "Middle East and North Africa" — name Central Africa in the scope, or retitle so nothing is hidden.)
+- Set "significant" to true if any place left in the leftover still has a meaningful connection to the topic (so it should be explored further); false if everything remaining is minor.
+- Output ONLY the JSON object.`;
 }
 
 function buildBreadthBPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings) {
