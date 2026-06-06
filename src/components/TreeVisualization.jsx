@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     getBreadthColor,
@@ -34,6 +34,13 @@ function TreeVisualization() {
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
     const [loadingBreadth, setLoadingBreadth] = useState(null); // { nodeId, breadth } when loading
+
+    // Single continuous "busy" overlay (covers both the DB check and generation).
+    // overlayMounted keeps it in the DOM through its fade-out; overlayVisible drives
+    // the opacity transition. overlayFact is the history fact shown while waiting.
+    const [overlayMounted, setOverlayMounted] = useState(false);
+    const [overlayVisible, setOverlayVisible] = useState(false);
+    const [overlayFact, setOverlayFact] = useState(() => getRandomFact());
 
     // State for "Why these Anchors?" sidebar
     const [sidebarData, setSidebarData] = useState(null);
@@ -352,7 +359,8 @@ function TreeVisualization() {
                 return;
             }
 
-            setLoadingBreadth(null);
+            // Keep loadingBreadth set so the overlay stays mounted continuously –
+            // generating only changes the copy inside the same overlay, never swaps it.
             setGenerating(true);
             try {
                 const generateResponse = await fetch('/api/generate-anchors', {
@@ -555,8 +563,36 @@ function TreeVisualization() {
         return lines;
     };
 
-    // A history fact for the loading/generating overlays (new one per wait)
-    const overlayFact = useMemo(() => getRandomFact(), [generating, loadingBreadth]);
+    // We're waiting whenever we're checking the DB or generating new anchors.
+    const busy = !!loadingBreadth || generating;
+
+    // Mount/unmount the overlay with a fade. On busy: mount, then (next tick) fade in.
+    // On idle: fade out, then unmount once the transition has finished.
+    useEffect(() => {
+        if (busy) {
+            setOverlayMounted(true);
+            const id = setTimeout(() => setOverlayVisible(true), 20);
+            return () => clearTimeout(id);
+        }
+        setOverlayVisible(false);
+        const id = setTimeout(() => setOverlayMounted(false), 250);
+        return () => clearTimeout(id);
+    }, [busy]);
+
+    // Pick a fresh fact when a wait begins, and rotate every 8s through long waits.
+    // The same fact stays put across the DB-check → generation transition (no yank),
+    // and rotations avoid repeating the fact just shown.
+    useEffect(() => {
+        if (!busy) return;
+        const nextFact = (prev) => {
+            let f = getRandomFact();
+            if (f === prev) f = getRandomFact();
+            return f;
+        };
+        setOverlayFact(nextFact);
+        const id = setInterval(() => setOverlayFact(nextFact), 8000);
+        return () => clearInterval(id);
+    }, [busy]);
 
     if (loading) {
         return (
@@ -567,90 +603,57 @@ function TreeVisualization() {
         );
     }
 
-    // Overlay for generating new anchors (longer process)
-    const generatingOverlay = generating ? (
+    // One continuous overlay for the whole wait. The DB check and generation share it;
+    // only the sub-line copy changes when we cross into generation. It fades in/out and
+    // the history fact cross-fades as it rotates.
+    const busyOverlay = overlayMounted ? (
         <div style={{
             position: 'fixed',
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 9999
+            zIndex: 9999,
+            opacity: overlayVisible ? 1 : 0,
+            transition: 'opacity 0.25s ease'
         }}>
             <div style={{
                 backgroundColor: 'white',
                 padding: '30px',
                 borderRadius: '8px',
-                textAlign: 'center'
+                textAlign: 'center',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                maxWidth: '440px'
             }}>
-                <h2>Generating Anchors...</h2>
-                <p>This may take 10-20 seconds. Please wait.</p>
+                <h2 style={{ margin: '0 0 8px' }}>Exploring…</h2>
+                <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                    {generating
+                        ? 'Composing new anchors – this can take 10-20 seconds…'
+                        : 'Fetching from the archive…'}
+                </p>
                 <div style={{
                     marginTop: '20px',
                     fontSize: '24px'
                 }}>⏳</div>
-                <div style={{
-                    marginTop: '20px',
-                    maxWidth: '380px',
-                    fontSize: '14px',
-                    color: '#555',
-                    lineHeight: 1.5,
-                    textAlign: 'left',
-                    borderLeft: '3px solid #2c3e50',
-                    paddingLeft: '12px'
-                }}>
-                    <strong style={{ display: 'block', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#2c3e50', marginBottom: '4px' }}>Did you know?</strong>
-                    {overlayFact}
-                </div>
-            </div>
-        </div>
-    ) : null;
-
-    // Overlay for loading existing anchors
-    const loadingOverlay = loadingBreadth ? (
-        <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9998
-        }}>
-            <div style={{
-                backgroundColor: 'white',
-                padding: '20px 30px',
-                borderRadius: '8px',
-                textAlign: 'center',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-            }}>
-                <div style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: '#333',
-                    marginBottom: '8px'
-                }}>Loading...</div>
-                <div style={{
-                    fontSize: '14px',
-                    color: '#666'
-                }}>Please wait 5-10 seconds</div>
-                <div style={{
-                    marginTop: '16px',
-                    maxWidth: '360px',
-                    fontSize: '13px',
-                    color: '#555',
-                    lineHeight: 1.5,
-                    textAlign: 'left',
-                    borderLeft: '3px solid #2c3e50',
-                    paddingLeft: '12px'
-                }}>
+                <div
+                    key={overlayFact}
+                    className="overlay-fact-text"
+                    style={{
+                        marginTop: '20px',
+                        maxWidth: '380px',
+                        marginLeft: 'auto',
+                        marginRight: 'auto',
+                        fontSize: '14px',
+                        color: '#555',
+                        lineHeight: 1.5,
+                        textAlign: 'left',
+                        borderLeft: '3px solid #2c3e50',
+                        paddingLeft: '12px'
+                    }}>
                     <strong style={{ display: 'block', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#2c3e50', marginBottom: '4px' }}>Did you know?</strong>
                     {overlayFact}
                 </div>
@@ -692,8 +695,7 @@ function TreeVisualization() {
         return (
             <div className="tree-visualization mobile-tree-wrapper">
                 {introOverlay}
-                {generatingOverlay}
-                {loadingOverlay}
+                {busyOverlay}
 
                 {errorMessage && (
                     <div className="tree-error-banner" onClick={() => setErrorMessage(null)}>
@@ -871,8 +873,7 @@ function TreeVisualization() {
     return (
         <div className="tree-visualization">
             {introOverlay}
-            {generatingOverlay}
-            {loadingOverlay}
+            {busyOverlay}
 
             {/* Error banner */}
             {errorMessage && (
