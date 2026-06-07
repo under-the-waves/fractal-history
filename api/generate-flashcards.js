@@ -121,7 +121,7 @@ Follow these flashcard learning principles strictly:
   BAD  -> Q: "What did Churchill do in 1946?"  A: "A speech in Fulton, Missouri, where he said an 'iron curtain' had descended across Europe."
   GOOD -> Q: "In which US town did Churchill give his 'iron curtain' speech?"  A: "Fulton, Missouri"
   GOOD -> Q: "What phrase did Churchill use for the divide across Europe?"  A: "The Iron Curtain"
-- The answer must be findable in, or directly derivable from, the narrative text.
+- GROUNDED IN THE TEXT: both the question and the answer must be supported only by the narrative text above. Use no outside knowledge. If a fact is not stated in the narrative, do not write a card about it -- the reader has read exactly this text and nothing more, and must never be asked about something it does not contain.
 - Plain wording. Never use the construction "not X; it was Y" or "not just X, it's Y".
 - VARIED: within a sub-topic's ${perSubtopic} cards, target genuinely different facts, not reworded versions of the same one.
 
