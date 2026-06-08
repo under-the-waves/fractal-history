@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles } from './utils/promptLoader.js';
+import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles, renderAnalyticalFrame, renderParentSignpost } from './utils/promptLoader.js';
 import { query, getAncestorPath } from './utils/db.js';
 import { WORLD, getName, getLevel, getChildren, expandToCandidates } from './utils/geography.js';
 import dotenv from 'dotenv';
@@ -514,7 +514,9 @@ function buildBreadthAPrompt(parentId, parentTitle, parentScope, ancestorPath, e
         ancestorContext,
         siblingContext,
         siblingWarning,
-        forbiddenTitles
+        forbiddenTitles,
+        analyticalFrame: renderAnalyticalFrame(ancestorPath),
+        parentSignpost: renderParentSignpost(ancestorPath)
     });
 }
 
@@ -603,14 +605,20 @@ You are dividing a topic into geographic regions for a history learning tree.
 **Topic:** ${parentTitle}
 **Topic scope:** ${parentScope}
 
+**Analytical frame (what "connection to this topic" means below):** ${renderAnalyticalFrame(ancestorPath)}
+
+${renderParentSignpost(ancestorPath)}
+
 **How we got here:**
 ${ancestorContext}
 ${siblingNote}
 ## What a region means here
 
-A region is a place's CONNECTION to this topic — including its people, forces, money, and decisions WHEREVER they acted, not only events that physically happened on its soil. Example: under "World War I", the region "Australia" covers Australia's whole part in the war, including the Australians who fought at Gallipoli and in France, even though that fighting was far from Australia.
+Here "this topic" means the analytical frame above; if the frame is "None", judge places by their importance to this area's history overall, not by the parent's label.
 
-So judge a place by the STRENGTH OF ITS CONNECTION to the topic, never by how much of the topic physically happened on its ground. A place where little physically happened can still have a strong connection through the people and forces it sent elsewhere.
+A region is a place's CONNECTION to that frame — including its people, forces, money, and decisions WHEREVER they acted, not only events that physically happened on its soil. Example: under "World War I", the region "Australia" covers Australia's whole part in the war, including the Australians who fought at Gallipoli and in France, even though that fighting was far from Australia.
+
+So judge a place by the STRENGTH OF ITS CONNECTION to that frame, never by how much physically happened on its ground. A place where little physically happened can still have a strong connection through the people and forces it sent elsewhere.
 
 ## Your material: the places that make up this topic's area
 
@@ -709,7 +717,11 @@ You are selecting **Breadth-B anchors** (temporal - chronological divisions) for
 **Parent Title:** ${parentTitle}
 **Parent Scope:** ${parentScope}
 
-Your goal is to find the BEST way to divide this topic chronologically by:
+**Analytical frame (what the sub-periods are ABOUT):** ${renderAnalyticalFrame(ancestorPath)}
+
+${renderParentSignpost(ancestorPath)}
+
+Your goal is to find the BEST way to divide this period into sub-periods by:
 1. First considering 3 different subdivision schemes
 2. Rating each scheme on 3 criteria
 3. Selecting the highest-scoring scheme

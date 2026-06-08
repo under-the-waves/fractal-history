@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { analyticalAncestors } from '../../shared/ancestry.js';
 
 /**
  * Load a prompt template from a .md file and interpolate variables.
@@ -85,4 +86,65 @@ export function formatForbiddenTitles(ancestorPath) {
     }
 
     return ancestorPath.map(a => `- "${a.title}"`).join('\n');
+}
+
+/**
+ * Render the analytical frame for child generation.
+ *
+ * Analytical (thematic) framing is inherited ONLY from A-ancestors. Temporal (B)
+ * and geographic (C) ancestors — including an immediate B/C parent — contribute
+ * coordinates (when/where), never a theme. The nearest A-ancestor is the primary
+ * lens; any broader A-ancestors are context. When there is no A-ancestor at all,
+ * the children must not be narrowed to any theme.
+ *
+ * @param {Array} ancestorPath - root-first ancestor objects (parent is last)
+ * @returns {string} Frame text for the prompt
+ */
+export function renderAnalyticalFrame(ancestorPath) {
+    const aAncestors = analyticalAncestors(ancestorPath);
+    if (aAncestors.length === 0) {
+        return 'None. There is no analytical (thematic) ancestor, so do NOT narrow the '
+            + 'children to any single theme — cover everything significant within the '
+            + 'coordinates below.';
+    }
+    const nearest = aAncestors[aAncestors.length - 1];
+    let text = `**${nearest.title}** — ${nearest.scope || 'No scope defined'}\n`
+        + 'This is the lens for what the children are ABOUT.';
+    if (aAncestors.length > 1) {
+        const broader = aAncestors.slice(0, -1).map(a => a.title).join(' → ');
+        text += `\nBroader framing (context only): ${broader}.`;
+    }
+    return text;
+}
+
+/**
+ * Render the "parent is a signpost, not a theme" instruction.
+ *
+ * When the immediate parent is temporal (B) or geographic (C), its descriptive
+ * title is a coordinate (a when or a where), not a subject. Its wording must not
+ * restrict what the children may cover. Returns '' for an analytical (A) or root
+ * parent, where the title legitimately is the topic.
+ *
+ * @param {Array} ancestorPath - root-first ancestor objects (parent is last)
+ * @returns {string} Signpost instruction, or '' when not applicable
+ */
+export function renderParentSignpost(ancestorPath) {
+    if (!Array.isArray(ancestorPath) || ancestorPath.length === 0) return '';
+    const parent = ancestorPath[ancestorPath.length - 1];
+    if (!parent) return '';
+    if (parent.breadth === 'B') {
+        return `**Read the parent as a signpost, not a theme.** "${parent.title}" names a `
+            + 'TIME WINDOW (a *when*), not a subject. Its wording does not restrict what the '
+            + 'children may cover. Use only its date range as bounds, and cover everything '
+            + 'significant that happened within that window, framed by the analytical lens above.';
+    }
+    if (parent.breadth === 'C') {
+        return `**Read the parent as a signpost, not a theme.** "${parent.title}" names a `
+            + "PLACE (a *where*), not a subject. Its wording does not restrict what the children "
+            + "may cover. Cover this place's full CONNECTION to the analytical lens above — its "
+            + "people, forces, money, and decisions wherever they acted, not only events that "
+            + "physically happened on its soil (e.g. under 'World War I', 'Australia' covers the "
+            + "ANZACs at Gallipoli and in France, not just fighting on Australian land).";
+    }
+    return '';
 }

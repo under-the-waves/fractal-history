@@ -2,11 +2,15 @@
 
 ## Task
 
-Generate **exactly 10** candidate analytical anchors for this topic:
+Generate **exactly 10** candidate analytical anchors — the most causally important and impactful developments that fall WITHIN the parent below.
 
 **Parent ID:** {{parentId}}
 **Parent Title:** {{parentTitle}}
 **Parent Scope:** {{parentScope}}
+
+**Analytical frame (what these candidates should be ABOUT):** {{analyticalFrame}}
+
+{{parentSignpost}}
 
 These are A-anchor candidates: the most causally important and impactful aspects. The fractal goes deeper, so don't try to be comprehensive — focus on what matters most.
 
@@ -20,7 +24,7 @@ Resist Western/European-centric defaults. Consider non-Western developments fair
 
 {{ancestorContext}}
 
-**Anti-circularity:** Do NOT suggest anchors matching or essentially duplicating any ancestor above. Go DEEPER into "{{parentTitle}}", not back up to broader concepts.
+**Anti-circularity:** Do NOT suggest anchors matching or essentially duplicating any ancestor above. Go DEEPER, not back up to broader concepts already covered above.
 
 **Forbidden titles:** {{forbiddenTitles}}
 
