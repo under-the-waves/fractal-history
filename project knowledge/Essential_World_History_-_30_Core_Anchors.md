@@ -1,130 +1,93 @@
-# Essential World History - 30 Core Anchors
+# Essential World History – 30 Core Anchors
 
-## **The Absolute Minimum for Historical Literacy**
+> **Status:** Rewritten 2026-06-07. This supersedes the earlier version, whose
+> anchor IDs no longer matched the seeded Level 1 and whose coverage was heavily
+> weighted to post-1500 Europe (it openly dropped India, Islam, the medieval
+> world, the pre-Columbian Americas, and most of Africa). Those gaps are restored
+> below.
 
-1. 0-ROOT: The Story of Everything
-2. 1A-B4C7D: Cosmic Origins
-3. 1A-G7H2K: Agricultural Revolution
-4. 2A-Z5A3B: Farming Revolution
-5. 2A-I6J1K: Writing Systems
-6. 1A-M9N4P: Classical Civilizations
-7. 2A-R2S7T: Ancient Greece
-8. 2A-U4V1W: Roman Empire
-9. 2A-X8Y3Z: Ancient China
-10. 1A-S8T6U: Global Connections
-11. 2A-V2W7X: World Religions
-12. 2A-Y5Z1A: Silk Road
-13. 2A-B9C4D: Maritime Exploration
-14. 2A-E3F8G: Columbian Exchange
-15. 2A-H7I2J: Atlantic Slavery
-16. 1A-W7X4Y: Modern Revolutions
-17. 2A-Z1A6B: Scientific Revolution
-18. 2B-O8P6Q: The Enlightenment
-19. 2A-C9D3E: Industrial Revolution
-20. 2A-F5G8H: Democratic Revolutions
-21. 2A-I2J7K: Nationalism
-22. 2B-K6L1M: European Colonialism
-23. 1B-K4L1M: Contemporary Era
-24. 2A-N8O5P: World War One [PR: Nationalism]
-25. 2A-T6U3V: World War Two
-26. 2A-W1X7Y: Cold War
-27. 2A-Z4A8B: Decolonization [PR: European Colonialism]
-28. 2B-I3J1K: Digital Revolution
-29. 2B-O8P5Q: Climate Change Era
-30. 1C-Q2R6S: Ideas That Changed the World
+## Design constraints
 
----
+- **Big History scope.** The sequence starts before humans (cosmos, Earth, life),
+  consistent with the seeded Level 1 (Deep Time, Cosmic & Planetary, Emergence of
+  Life, Evolution of Humans). It is not human-only world history.
+- **Single-barrel topics.** Every anchor names one concept, matching the
+  generator's design. No "X & Y" compounds.
+- **Exactly 30, one per day.** Designed as a 30-day programme, one narrative per
+  day, broad to specific.
+- **Weighting:** deep time trimmed to 5 days; the post-1900 world expanded to 4
+  (the old single catch-all "Modern World" day is split into Cold War,
+  Decolonisation, and Digital Age).
 
-## **What This Sequence Covers:**
+## The 30
 
-### **Foundation (1-5):**
-- **Human origins** in cosmic context
-- **Agricultural Revolution** as the basis of civilization
-- **Writing** as the foundation of complex society
+Breadth: T = temporal, A = analytical, G = geographic. "Seeded" = already exists
+as a hand-seeded Level-1 anchor.
 
-### **Classical World (6-9):**
-- **Greece** (democracy, philosophy)
-- **Rome** (law, administration, empire)
-- **China** (bureaucracy, philosophy, continuity)
+| #  | Narrative          | Breadth | Seeded |
+|----|--------------------|---------|--------|
+| 1  | Everything         | root    | yes    |
+| 2  | Cosmos             | T       | yes    |
+| 3  | Life               | A       | yes    |
+| 4  | Humans             | A       | yes    |
+| 5  | Foragers           | T       | yes    |
+| 6  | Agriculture        | A       | yes    |
+| 7  | Cities             | A       |        |
+| 8  | Writing            | A       |        |
+| 9  | Empires            | A       |        |
+| 10 | Greece             | G       |        |
+| 11 | Rome               | G       |        |
+| 12 | India              | G       |        |
+| 13 | China              | G       |        |
+| 14 | Religion           | A       |        |
+| 15 | Islam              | G       |        |
+| 16 | Africa             | G       |        |
+| 17 | Americas           | G       |        |
+| 18 | Silk Road          | A       |        |
+| 19 | Mongols            | G       |        |
+| 20 | Exploration        | T       |        |
+| 21 | Columbian Exchange | A       |        |
+| 22 | Slavery            | A       |        |
+| 23 | Science            | A       | (gap)  |
+| 24 | Industry           | A       | yes    |
+| 25 | Revolutions        | A       |        |
+| 26 | Colonialism        | A       |        |
+| 27 | World Wars         | T       |        |
+| 28 | Cold War           | T       |        |
+| 29 | Decolonisation     | A       |        |
+| 30 | Digital Age        | T       |        |
 
-### **Global Connections (10-15):**
-- **World religions** as unifying forces
-- **Trade networks** connecting civilizations
-- **European exploration** linking continents
-- **Columbian Exchange** reshaping biology and culture
-- **Atlantic slavery** as forced global migration
+The arc: cosmos to Earth to life to humans to farming to cities to classical
+civilisations to world religions to the connected medieval world to the
+early-modern joining of the hemispheres to the scientific, industrial, and
+political transformations to the contemporary world.
 
-### **Modern Transformation (16-22):**
-- **Scientific method** changing how we understand reality
-- **Enlightenment** ideas reshaping politics
-- **Industrial Revolution** mechanizing production
-- **Democratic revolutions** spreading new political ideas
-- **Nationalism** creating modern nation-states
-- **European colonialism** imposing global hierarchy
+## Deliberately omitted
 
-### **Contemporary World (23-29):**
-- **World Wars** destroying old order
-- **Cold War** dividing the globe
-- **Decolonization** creating new nations
-- **Digital Revolution** connecting everyone
-- **Climate Change** as shared global challenge
+- **Climate** and **Globalisation** did not make the 30. Decolonisation earned its
+  slot because it created most of today's national map. The Digital Age narrative
+  should absorb globalisation; Climate is the first addition if the 30 cap is ever
+  relaxed.
+- **Decolonisation (29) overlaps Cold War (28)** in time (both ~1945–1990). The
+  ordering is thematic; each narrative should note they are the same decades seen
+  through different lenses.
 
-### **Meta-Framework (30):**
-- **Ideas That Changed the World** as analytical tool for understanding all previous developments
+## Reachability (tested 2026-06-07)
 
----
+Most of these 30 do not exist yet and must be generated. Generation is reachable
+but path-dependent:
 
-## **What's Sacrificed for Brevity:**
-
-### **Missing Thematic Frameworks:**
-- **Climate and Geography** - environmental forces
-- **Disease and Demographics** - population dynamics
-- **Human Migration** - cultural diffusion patterns
-- **Economic Systems** - capitalism, trade, finance
-
-### **Missing Civilizations:**
-- **Ancient India** - Buddhism, Hinduism, mathematics
-- **Islamic Expansion** - scientific golden age, cultural bridge
-- **Medieval Period** - feudalism, Renaissance, Black Death
-- **Indigenous Civilizations** - pre-contact Americas, Australia, Africa
-
-### **Missing Nuance:**
-- **Regional variations** in development
-- **Alternative pathways** to modernity
-- **Non-European perspectives** on global events
-- **Social movements** beyond political revolutions
-
----
-
-## **Why These 30 Work:**
-
-### **Coherent Narrative:**
-Creates a **single story** from agriculture through digital age that explains how we got to the present moment.
-
-### **Global Scope:**
-Includes **Europe, Asia, Americas, and Africa** in the transformation story.
-
-### **Essential Processes:**
-Covers the **major transitions** (agricultural, industrial, digital) that define human development.
-
-### **Contemporary Relevance:**
-Builds toward understanding **current global challenges** (nationalism, decolonization, climate change, digitalization).
-
-### **Analytical Framework:**
-Ends with **Ideas That Changed the World** so learners can analyze any other historical topic using concepts like democracy, human rights, scientific method.
-
----
-
-## **Perfect For:**
-- **Busy professionals** wanting historical context
-- **Students** needing foundation before deeper study  
-- **General audiences** seeking global perspective
-- **30-day learning challenges** or habit formation
-- **Introduction** before exploring specific interests in the larger fractal
-
-**Completion of these 30 anchors ensures:**
-- Understanding of **major human transitions**
-- **Global perspective** on how civilizations developed
-- **Context for current world** politics and challenges
-- **Framework for lifelong learning** about any historical topic
-- **Genuine historical literacy** despite compressed timeframe
+- **Narrow time before asking analytically.** Analytical generation on a coarse
+  era yields foundational themes (surplus, writing, cities, states), not specific
+  topics. Drill to the right temporal band first, then generate analytical
+  children. Worked example – the Mongols were reached at level 3:
+  `0-ROOT → Agricultural Civilizations (1B) → Medieval 500–1500 CE (2B) →
+  Mongol Empire Expansion (3A-BGHWQ)`.
+- **Open issue – geographic path mis-scoped.** Eurasia, Africa, Americas, and
+  Oceania have `region_codes = NULL`, so generating their geographic (C) children
+  divides the whole world, not the continent. The geographic anchors above
+  (Greece, India, China, Africa, Americas) are still reachable via the
+  temporal→analytical route, but the direct geographic path needs a `region_codes`
+  backfill first.
+- **Open issue – Level 1A is missing the Scientific Revolution.** Only four of the
+  five designed turning points are seeded. Science (#23) depends on it.
