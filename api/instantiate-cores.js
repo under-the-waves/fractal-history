@@ -1,7 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import dotenv from 'dotenv';
-import { getAuthenticatedUser } from './utils/auth.js';
-import { query } from './utils/db.js';
+import { getAuthenticatedUser } from '../lib/auth.js';
+import { query } from '../lib/db.js';
 import { generateAndStoreFlashcards } from './generate-flashcards.js';
 
 dotenv.config({ path: '.env.local' });

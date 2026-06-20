@@ -1,10 +1,10 @@
 // Seed the hand-curated cosmic geography under "Cosmic & Planetary" (1C-I6J1K).
-// Walks the COSMIC taxonomy in api/utils/geography.js and inserts one anchor per
+// Walks the COSMIC taxonomy in lib/geography.js and inserts one anchor per
 // node, with bracketed time-period titles and region_codes pointing at the
 // taxonomy. Idempotent (ON CONFLICT DO NOTHING).
 import { neon } from '@neondatabase/serverless';
 import { config } from 'dotenv';
-import { COSMIC, displayTitle } from './api/utils/geography.js';
+import { COSMIC, displayTitle } from './lib/geography.js';
 
 config({ path: '.env.local' });
 const sql = neon(process.env.DATABASE_URL);

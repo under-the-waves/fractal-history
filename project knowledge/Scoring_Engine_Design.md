@@ -23,7 +23,7 @@ only.)
 A node's **children** are all anchors directly beneath it in the tree, across every breadth
 (WW2's 3A analytical anchors, its 3B geographic anchors, and its 3C temporal anchors all roll up
 into WW2). The parent/child relationship and the ancestor walk come from `tree_positions`
-(`parent_position_id`), via the existing `getAncestorPath()` in `api/utils/db.js`.
+(`parent_position_id`), via the existing `getAncestorPath()` in `lib/db.js`.
 
 ## 3. The formulas
 
@@ -136,7 +136,7 @@ flags because the user-facing design is explicit slots.)
 - **On review** (`flashcards` PATCH, after the SRS update): recompute `own_raw` for that anchor
   (≤24 cards, cheap), take the delta versus the cached value, and propagate up the ancestor chain –
   `subtree_raw += wᵏ · Δ` at each ancestor `k` levels up. O(depth) writes (depth ≈ 6). See
-  `applyReviewDelta()` in `api/utils/scoring.js`.
+  `applyReviewDelta()` in `lib/scoring.js`.
 - **Selecting a personal slot** changes nothing until the card is answered (`r = 0` until reviewed).
 - **Nightly decay pass** (cron, midnight): for each active user, recompute `own_raw` from current
   (now-decayed) retention and rebuild `subtree_raw`. This is the only thing that moves scores *down*;

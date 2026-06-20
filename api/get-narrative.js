@@ -1,5 +1,5 @@
-import { linkChildAnchors } from './utils/linkChildAnchors.js';
-import { query, getAncestorPath } from './utils/db.js';
+import { linkChildAnchors } from '../lib/linkChildAnchors.js';
+import { query, getAncestorPath } from '../lib/db.js';
 
 // Get child anchors for a specific breadth
 async function getChildAnchors(parentId, breadth) {

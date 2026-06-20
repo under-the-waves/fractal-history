@@ -7,9 +7,9 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { neon } from '@neondatabase/serverless';
-import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles } from './api/utils/promptLoader.js';
-import { linkChildAnchors } from './api/utils/linkChildAnchors.js';
-import { query as poolQuery, getPool, getAncestorPath as getAncestorPathCTE } from './api/utils/db.js';
+import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles } from './lib/promptLoader.js';
+import { linkChildAnchors } from './lib/linkChildAnchors.js';
+import { query as poolQuery, getPool, getAncestorPath as getAncestorPathCTE } from './lib/db.js';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
