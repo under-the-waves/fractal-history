@@ -18,29 +18,22 @@ function getAnthropicClient() {
     return anthropic;
 }
 
-// Generate anchor ID in format like "2A-X7Y3Z"
-function generateAnchorId(parentId, position) {
-    // Handle different ID formats
-    let parentLevel;
-    if (parentId === '0-ROOT') {
-        parentLevel = 0;
-    } else if (parentId.match(/^\d+[A-Z]-/)) {
-        // Format: "2A-X7Y3Z" - extract the number before the letter
-        parentLevel = parseInt(parentId.match(/^(\d+)[A-Z]-/)[1]);
-    } else {
-        // Format: "C9D3E" - assume level 1 (top level anchors)
-        parentLevel = 1;
-    }
-
-    const childLevel = parentLevel + 1;
-
+// Generate a neutral, opaque anchor ID, e.g. "anc-7Y3ZK9Q2".
+//
+// The id is ONLY a unique key. It deliberately does NOT encode level or breadth:
+// those are properties of a tree_position (one anchor can sit at several positions),
+// and the authoritative values live in the tree_positions table. The old format
+// "{level}{breadth}-{hash}" baked in a level frozen at creation and ALWAYS used the
+// letter "A" regardless of the real breadth, which made the prefix misleading and
+// caused bugs (e.g. the deep-link crash from trusting the id letter). Per the project
+// decision, ids stay opaque and nothing parses level/breadth out of them.
+function generateAnchorId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let hash = '';
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) {
         hash += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-
-    return `${childLevel}A-${hash}`;
+    return `anc-${hash}`;
 }
 
 // Get existing sibling anchors at the same level
@@ -424,7 +417,10 @@ export default async function handler(req, res) {
 
         // Prepare anchor data with generated IDs
         const anchorRows = anchors.map(anchor => {
-            const anchorId = generateAnchorId(parentId, anchor.position);
+            const anchorId = generateAnchorId();
+            // position_id still encodes level+breadth, but from the AUTHORITATIVE
+            // childLevel/breadth here (a position is at exactly one level+breadth),
+            // not parsed from the anchor id. The hash segment is reused for traceability.
             const positionId = `${childLevel}${breadth}-${anchorId.split('-')[1]}`;
             return { anchorId, positionId, anchor };
         });
