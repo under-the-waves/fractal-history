@@ -23,7 +23,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { config } from 'dotenv';
-import { getLevel, getName, expandToCandidates, WORLD } from './api/utils/geography.js';
+import { getLevel, getName, expandToCandidates, WORLD } from './lib/geography.js';
 
 config({ path: '.env.local' });
 const sql = neon(process.env.DATABASE_URL);

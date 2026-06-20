@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles, renderAnalyticalFrame, renderParentSignpost, renderParentLabel, temporalCoordinate, geographicCoordinate } from './utils/promptLoader.js';
-import { query, getAncestorPath } from './utils/db.js';
-import { WORLD, getName, getLevel, getChildren, expandToCandidates } from './utils/geography.js';
+import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles, renderAnalyticalFrame, renderParentSignpost, renderParentLabel, temporalCoordinate, geographicCoordinate } from '../lib/promptLoader.js';
+import { query, getAncestorPath } from '../lib/db.js';
+import { WORLD, getName, getLevel, getChildren, expandToCandidates } from '../lib/geography.js';
 import dotenv from 'dotenv';
 
 // Load environment variables
