@@ -589,7 +589,16 @@ Then decide on a catch-all: include one ONLY if meaningful area would otherwise 
 // whatever is not claimed, so coverage is guaranteed regardless of the model.
 function buildBreadthCPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings, candidates) {
     const ancestorContext = formatAncestorContext(ancestorPath);
-    const candidateList = candidates.map(c => `- ${c.name} [${c.code}]`).join('\n');
+    // Ground each candidate with the places it actually contains, so the model writes
+    // scopes that match reality (e.g. it can see that "Western Europe" does NOT include
+    // the UK, which the ledger files under "Northern Europe").
+    const candidateList = candidates.map(c => {
+        const members = (getChildren(c.code) || []).map(getName);
+        if (members.length === 0) return `- ${c.name} [${c.code}]`;
+        const shown = members.slice(0, 15).join(', ');
+        const more = members.length > 15 ? `, …(${members.length} total)` : '';
+        return `- ${c.name} [${c.code}] — contains: ${shown}${more}`;
+    }).join('\n');
     const siblingNote = existingSiblings && existingSiblings.length > 0
         ? `\n**These regions already exist for this topic — do not duplicate them:**\n${existingSiblings.map(s => `- ${s.title}`).join('\n')}\n`
         : '';
@@ -653,7 +662,8 @@ ${candidateList}
 
 **Rules:**
 - 2 to 4 named regions. Members must be codes from the list above. No place in two regions.
-- A title may use a recognisable name for the grouping (e.g. "The Western Front"), 5 words maximum. But the title must NOT imply places the region leaves out, and the scope MUST name the actual places the region covers. If the members do not fit a tidy name, use a plainer geographic title. (Example: a region whose members are Northern Africa, the Middle East and Central Africa must not be titled just "Middle East and North Africa" — name Central Africa in the scope, or retitle so nothing is hidden.)
+- A title may use a recognisable name for the grouping (e.g. "The Western Front"), 5 words maximum, but the title must NOT imply places the region leaves out.
+- **The scope must match the members exactly.** Describe ONLY places contained in this region's members (use each candidate's "contains:" list above), and do NOT name any country or place that is not among them. Those "contains:" lists are authoritative — trust them over your own assumptions about which places belong to a grouping. (Example: the "Western Europe" grouping does NOT include Britain — the ledger files the United Kingdom under "Northern Europe" — so a "Western Europe" region's scope must not claim Britain. If you want Britain in a region, add the member that actually contains it.) If the members do not fit a tidy name, use a plainer geographic title and name the actual places in the scope.
 - Set "significant" to true if any place left in the leftover still has a meaningful connection to the topic (so it should be explored further); false if everything remaining is minor.
 - If a region is a time-bounded entity (an ancient landmass, a celestial body, an extinct polity), put its period in brackets in the title, e.g. "Gondwana (~550–180 MYA)".
 - Output ONLY the JSON object.`;
