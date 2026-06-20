@@ -2956,6 +2956,33 @@
     max-width: 100vw;
   }
 
+  /* On mobile the panel is full-width, so the off-panel side tab at
+     left: -40px lands off-screen. Turn it into an in-flow full-width bar
+     pinned to the top of the panel: always visible, large tap target. */
+  .why-panel-minimize {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: 100%;
+    height: auto;
+    min-height: 48px;
+    flex-direction: row;
+    border-radius: 0;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .why-panel-minimize .minimize-icon {
+    transform: rotate(90deg);
+  }
+
+  .why-panel-minimize .minimize-text {
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+    font-size: 14px;
+  }
+
   .legend-expanded {
     min-width: 0;
     max-width: calc(100vw - 32px);
