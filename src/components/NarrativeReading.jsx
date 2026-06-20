@@ -86,28 +86,44 @@ function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }
         }
     }
 
-    // Load already-saved flashcards on mount
+    // On mount: load already-saved flashcards, and auto-instantiate this narrative's core cards
+    // (first study). Instantiation runs in the background so the page is not blocked while the pool
+    // generates on a narrative's first view; the saved set is refreshed once it completes.
     useEffect(() => {
-        const loadSavedCards = async () => {
+        if (!auth.isSignedIn) return
+        let cancelled = false
+
+        const loadSavedCards = async (token) => {
+            const response = await fetch(`/api/flashcards?anchorId=${anchorId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const data = await response.json()
+            if (!cancelled && data.success) {
+                const matching = data.flashcards
+                    .filter(f => f.breadth === breadth)
+                    .map(f => f.question)
+                setSavedCards(new Set(matching))
+            }
+        }
+
+        const run = async () => {
             try {
                 const token = await auth.getToken()
-                const response = await fetch(`/api/flashcards?anchorId=${anchorId}`, {
+                await loadSavedCards(token)
+                // Ensure the 5 core cards exist for this user, then refresh the saved set.
+                fetch(`/api/instantiate-cores?id=${anchorId}&breadth=${breadth}`, {
+                    method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
-                const data = await response.json()
-                if (data.success) {
-                    const matching = data.flashcards
-                        .filter(f => f.breadth === breadth)
-                        .map(f => f.question)
-                    setSavedCards(new Set(matching))
-                }
+                    .then(() => { if (!cancelled) loadSavedCards(token) })
+                    .catch(() => {})
             } catch (err) {
                 console.error('Failed to load saved flashcards:', err)
             }
         }
-        if (auth.isSignedIn) {
-            loadSavedCards()
-        }
+
+        run()
+        return () => { cancelled = true }
     }, [auth, anchorId, breadth])
 
     // Save one or more {question, answer} items as independent cards (each gets its

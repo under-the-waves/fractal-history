@@ -185,6 +185,73 @@ export function selectCores(questions, childTitles) {
     return questions;
 }
 
+/**
+ * Generate the candidate pool for a narrative, mark its 5 cores, store it, and return the questions.
+ * Throws 'NARRATIVE_NOT_FOUND' if the narrative text does not exist yet. Reused by the handler and
+ * by per-user core instantiation (instantiate-cores.js).
+ */
+export async function generateAndStoreFlashcards(anchorId, breadth) {
+    const rows = await query(
+        'SELECT narrative FROM narratives WHERE anchor_id = $1 AND breadth = $2 LIMIT 1',
+        [anchorId, breadth]
+    );
+    if (!rows.length || !rows[0].narrative) {
+        throw new Error('NARRATIVE_NOT_FOUND');
+    }
+    const narrative = rows[0].narrative;
+
+    // Get anchor and child info in parallel
+    const [anchorResult, children] = await Promise.all([
+        query('SELECT id, title, scope FROM anchors WHERE id = $1 LIMIT 1', [anchorId]),
+        query(
+            `SELECT a.title FROM anchors a
+             JOIN tree_positions tp ON a.id = tp.anchor_id
+             WHERE tp.parent_position_id = (
+                 SELECT position_id FROM tree_positions WHERE anchor_id = $1 LIMIT 1
+             )
+             AND tp.breadth = $2
+             ORDER BY tp.position ASC`,
+            [anchorId, breadth]
+        )
+    ]);
+    const anchor = anchorResult[0];
+
+    console.log(`Generating flashcards for ${anchorId} breadth ${breadth}`);
+
+    const prompt = buildFlashcardPrompt({
+        anchorTitle: anchor?.title || anchorId,
+        breadth,
+        children,
+        narrative
+    });
+
+    const completion = await getAnthropicClient().messages.create({
+        model: prompt.model,
+        max_tokens: prompt.maxTokens,
+        system: prompt.system,
+        messages: [{ role: 'user', content: prompt.content }]
+    });
+
+    const text = completion.content[0].text.trim()
+        .replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    const data = JSON.parse(text);
+    if (!Array.isArray(data.questions)) {
+        throw new Error('Response missing questions array');
+    }
+
+    data.questions = normaliseQuestions(data.questions);
+    selectCores(data.questions, children.map(c => c.title));
+
+    await query(
+        'UPDATE narratives SET questions = $1 WHERE anchor_id = $2 AND breadth = $3',
+        [JSON.stringify(data.questions), anchorId, breadth]
+    );
+
+    const coreCount = data.questions.filter(q => q.core).length;
+    console.log(`Generated ${data.questions.length} flashcards (${coreCount} cores) for ${anchorId} breadth ${breadth}`);
+    return data.questions;
+}
+
 export default async function handler(req, res) {
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -199,84 +266,29 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Check if narrative already has questions stored
-        const existing = await query(
-            'SELECT questions, narrative FROM narratives WHERE anchor_id = $1 AND breadth = $2 LIMIT 1',
-            [anchorId, breadth]
-        );
-
-        // Skip the cache when the caller explicitly asks to regenerate the pool.
-        if (!refresh && existing.length > 0 && existing[0].questions) {
-            const questions = typeof existing[0].questions === 'string'
-                ? JSON.parse(existing[0].questions)
-                : existing[0].questions;
-            if (Array.isArray(questions) && questions.length > 0) {
-                return res.status(200).json({ success: true, questions, cached: true });
+        // Return the cached pool unless the caller explicitly asks to regenerate it.
+        if (!refresh) {
+            const existing = await query(
+                'SELECT questions FROM narratives WHERE anchor_id = $1 AND breadth = $2 LIMIT 1',
+                [anchorId, breadth]
+            );
+            if (existing.length > 0 && existing[0].questions) {
+                const questions = typeof existing[0].questions === 'string'
+                    ? JSON.parse(existing[0].questions)
+                    : existing[0].questions;
+                if (Array.isArray(questions) && questions.length > 0) {
+                    return res.status(200).json({ success: true, questions, cached: true });
+                }
             }
         }
 
-        const narrativeRow = existing.length > 0 ? existing[0] : null;
-        if (!narrativeRow || !narrativeRow.narrative) {
-            return res.status(404).json({ error: 'Narrative not found. Generate the narrative first.' });
-        }
-
-        const narrative = narrativeRow.narrative;
-
-        // Get anchor and child info in parallel
-        const [anchorResult, children] = await Promise.all([
-            query('SELECT id, title, scope FROM anchors WHERE id = $1 LIMIT 1', [anchorId]),
-            query(
-                `SELECT a.title FROM anchors a
-                 JOIN tree_positions tp ON a.id = tp.anchor_id
-                 WHERE tp.parent_position_id = (
-                     SELECT position_id FROM tree_positions WHERE anchor_id = $1 LIMIT 1
-                 )
-                 AND tp.breadth = $2
-                 ORDER BY tp.position ASC`,
-                [anchorId, breadth]
-            )
-        ]);
-        const anchor = anchorResult[0];
-
-        console.log(`Generating flashcards for ${anchorId} breadth ${breadth}`);
-
-        const prompt = buildFlashcardPrompt({
-            anchorTitle: anchor?.title || anchorId,
-            breadth,
-            children,
-            narrative
-        });
-
-        const completion = await getAnthropicClient().messages.create({
-            model: prompt.model,
-            max_tokens: prompt.maxTokens,
-            system: prompt.system,
-            messages: [{ role: 'user', content: prompt.content }]
-        });
-
-        const text = completion.content[0].text.trim()
-            .replace(/```json\n?/g, '').replace(/```\n?/g, '');
-        const data = JSON.parse(text);
-
-        if (!Array.isArray(data.questions)) {
-            throw new Error('Response missing questions array');
-        }
-
-        data.questions = normaliseQuestions(data.questions);
-        selectCores(data.questions, children.map(c => c.title));
-
-        // Store back into the narratives table
-        await query(
-            'UPDATE narratives SET questions = $1 WHERE anchor_id = $2 AND breadth = $3',
-            [JSON.stringify(data.questions), anchorId, breadth]
-        );
-
-        const coreCount = data.questions.filter(q => q.core).length;
-        console.log(`Generated ${data.questions.length} flashcards (${coreCount} cores) for ${anchorId} breadth ${breadth}`);
-
-        return res.status(200).json({ success: true, questions: data.questions, cached: false });
+        const questions = await generateAndStoreFlashcards(anchorId, breadth);
+        return res.status(200).json({ success: true, questions, cached: false });
 
     } catch (error) {
+        if (error.message === 'NARRATIVE_NOT_FOUND') {
+            return res.status(404).json({ error: 'Narrative not found. Generate the narrative first.' });
+        }
         console.error('Error generating flashcards:', error);
         return res.status(500).json({
             error: 'Failed to generate flashcards',
