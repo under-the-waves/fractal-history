@@ -2,9 +2,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
-import { factCheckNarrative } from './utils/factCheck.js';
-import { linkChildAnchors } from './utils/linkChildAnchors.js';
-import { query, getAncestorPath } from './utils/db.js';
+import { factCheckNarrative } from '../lib/factCheck.js';
+import { linkChildAnchors } from '../lib/linkChildAnchors.js';
+import { query, getAncestorPath } from '../lib/db.js';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
