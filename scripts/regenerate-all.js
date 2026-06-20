@@ -10,7 +10,7 @@ import { neon } from '@neondatabase/serverless';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
-import { factCheckNarrative } from '../api/utils/factCheck.js';
+import { factCheckNarrative } from '../lib/factCheck.js';
 
 dotenv.config({ path: '.env.local' });
 
