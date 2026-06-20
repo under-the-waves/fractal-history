@@ -20,14 +20,14 @@ export async function query(text, params = []) {
 export async function getAncestorPath(anchorId) {
     const rows = await query(`
         WITH RECURSIVE ancestors AS (
-            SELECT a.id, a.title, a.scope, tp.level, tp.breadth, tp.parent_position_id
+            SELECT a.id, a.title, a.scope, a.region_codes, tp.level, tp.breadth, tp.parent_position_id
             FROM anchors a
             JOIN tree_positions tp ON a.id = tp.anchor_id
             WHERE a.id = $1
 
             UNION ALL
 
-            SELECT a2.id, a2.title, a2.scope, tp2.level, tp2.breadth, tp2.parent_position_id
+            SELECT a2.id, a2.title, a2.scope, a2.region_codes, tp2.level, tp2.breadth, tp2.parent_position_id
             FROM ancestors anc
             JOIN tree_positions tp_parent ON tp_parent.position_id = anc.parent_position_id
             JOIN anchors a2 ON a2.id = tp_parent.anchor_id
@@ -42,6 +42,7 @@ export async function getAncestorPath(anchorId) {
         id: r.id,
         title: r.title,
         scope: r.scope || 'No scope defined',
+        region_codes: r.region_codes,
         level: r.level,
         breadth: r.breadth
     }));
@@ -50,6 +51,7 @@ export async function getAncestorPath(anchorId) {
         id: '0-ROOT',
         title: 'The Story of Everything',
         scope: 'All of history',
+        region_codes: null,
         level: 0,
         breadth: null
     });

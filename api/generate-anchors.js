@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles, renderAnalyticalFrame, renderParentSignpost } from './utils/promptLoader.js';
+import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles, renderAnalyticalFrame, renderParentSignpost, renderParentLabel, temporalCoordinate, geographicCoordinate } from './utils/promptLoader.js';
 import { query, getAncestorPath } from './utils/db.js';
 import { WORLD, getName, getLevel, getChildren, expandToCandidates } from './utils/geography.js';
 import dotenv from 'dotenv';
@@ -510,7 +510,7 @@ function buildBreadthAPrompt(parentId, parentTitle, parentScope, ancestorPath, e
     // Load and populate the template
     return loadPrompt('breadth-a-selection.md', {
         parentId,
-        parentTitle,
+        parentTitle: renderParentLabel(ancestorPath, parentTitle),
         parentScope,
         ancestorContext,
         siblingContext,
@@ -553,7 +553,7 @@ function buildCosmicCPrompt(parentId, parentTitle, parentScope, ancestorPath, ex
 Divide this place into its main geographic regions for a history learning tree.
 
 **Place ID:** ${parentId}
-**Place:** ${parentTitle}
+**Place:** ${renderParentLabel(ancestorPath, parentTitle)}
 **Scope:** ${parentScope}
 
 **How we got here:**
@@ -603,7 +603,7 @@ function buildBreadthCPrompt(parentId, parentTitle, parentScope, ancestorPath, e
 You are dividing a topic into geographic regions for a history learning tree.
 
 **Topic ID:** ${parentId}
-**Topic:** ${parentTitle}
+**Topic:** ${renderParentLabel(ancestorPath, parentTitle)}
 **Topic scope:** ${parentScope}
 
 **Analytical frame (what "connection to this topic" means below):** ${renderAnalyticalFrame(ancestorPath)}
@@ -664,17 +664,9 @@ ${candidateList}
 }
 
 function buildBreadthBPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings) {
-    // Format ancestor path with emphasis on temporal and scope constraints
-    const ancestorContext = ancestorPath.length > 0
-        ? ancestorPath.map((a, i) => {
-            let constraintType = '';
-            if (a.breadth === 'A') constraintType = '(Analytical/Thematic constraint)';
-            else if (a.breadth === 'B') constraintType = '(Temporal constraint)';
-            else if (a.breadth === 'C') constraintType = '(Geographic constraint)';
-
-            return `Level ${a.level}: **${a.title}** ${constraintType}\n   Scope: ${a.scope}`;
-        }).join('\n\n')
-        : 'No ancestor path (this is a top-level anchor)';
+    // Format ancestor path. Shared formatter hides temporal/geographic topical labels,
+    // showing only their coordinates (a when / a where).
+    const ancestorContext = formatAncestorContext(ancestorPath);
 
     // Format existing siblings
     const siblingContext = existingSiblings.length > 0
@@ -692,9 +684,10 @@ function buildBreadthBPrompt(parentId, parentTitle, parentScope, ancestorPath, e
     };
 
     ancestorPath.forEach(a => {
+        // B/C contribute coordinates only — their topical titles stay hidden.
         if (a.breadth === 'A') constraints.analytical.push(a.title);
-        else if (a.breadth === 'B') constraints.temporal.push(a.title);
-        else if (a.breadth === 'C') constraints.geographic.push(a.title);
+        else if (a.breadth === 'B') constraints.temporal.push(temporalCoordinate(a));
+        else if (a.breadth === 'C') constraints.geographic.push(geographicCoordinate(a));
         else constraints.topic.push(a.title);
     });
 
@@ -715,7 +708,7 @@ Your temporal anchors must respect ALL these constraints.
 You are selecting **Breadth-B anchors** (temporal - chronological divisions) for the parent anchor:
 
 **Parent ID:** ${parentId}
-**Parent Title:** ${parentTitle}
+**Parent:** ${renderParentLabel(ancestorPath, parentTitle)}
 **Parent Scope:** ${parentScope}
 
 **Analytical frame (what the sub-periods are ABOUT):** ${renderAnalyticalFrame(ancestorPath)}
