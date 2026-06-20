@@ -361,6 +361,7 @@ export default async function handler(req, res) {
         } else {
             // Breadth B: existing parsing
             anchors = parseTemporalAnchorResponse(response, parentId);
+            anchors = capTemporalAnchors(anchors, 5); // hard guarantee: never exceed 5 periods
             candidates = parseTemporalCandidates(response);
 
             try {
@@ -756,12 +757,13 @@ B-anchors represent **chronological divisions** of a topic. They answer: "How do
 2. **No Gaps**: Every moment in the parent's timespan should fall within at least one period
 3. **Natural Breakpoints**: Periods should reflect meaningful historical transitions
 4. **Comprehensive Scope**: Each period contains EVERYTHING happening during that time
+5. **Bounded Count**: Divide into **3 to 5 periods — never more than 5**. If natural breakpoints suggest more, merge the finest-grained adjacent periods until at most 5 remain. A few well-chosen periods beat many narrow ones.
 
 ---
 
 ## Selection Process: Three Candidate Schemes
 
-You must consider **exactly 3 different ways** to subdivide this topic chronologically.
+You must consider **exactly 3 different ways** to subdivide this topic chronologically. Each scheme must use **3 to 5 sub-periods — never more than 5.**
 
 **Important:** All 3 schemes must be TEMPORAL (chronological) subdivisions. Do NOT include geographic or thematic organization schemes - those belong in C-anchors and A-anchors respectively.
 
@@ -886,6 +888,8 @@ Provide your response as valid JSON:
 - Ensure all property names are in quotes
 - Ensure all string values are in quotes
 - Include exactly 3 candidate schemes
+- Each candidate scheme's "anchors" array must contain 3 to 5 periods (NEVER more than 5)
+- The final top-level "anchors" array must contain AT MOST 5 periods
 - Mark exactly one scheme as selected (the highest scoring)
 
 **CRITICAL:** Use human-readable date formats, NOT raw numbers.
@@ -1195,6 +1199,52 @@ function parseAnchorResponse(response, parentId) {
 }
 
 // Parse LLM response for Breadth-B (Temporal) anchors
+// Hard cap on temporal (B) anchors: a parent must NEVER divide into more than `max`
+// sub-periods. The prompt also asks for this, but a prompt is a soft constraint, so this
+// is the guarantee. We cannot simply drop extra periods the way analytical (A) anchors can
+// — each B period covers a contiguous slice of time, so dropping one would leave a gap in
+// coverage. Instead we MERGE the finest-grained adjacent pair (the most over-divided slice)
+// repeatedly until `max` remain, which preserves complete, gap-free coverage.
+function capTemporalAnchors(anchors, max = 5) {
+    if (!Array.isArray(anchors) || anchors.length <= max) return anchors;
+
+    console.warn(`Breadth B: model returned ${anchors.length} periods; merging down to ${max}.`);
+
+    const startVal = (a) => parseTimePeriodToSortValue(a.timeBoundaries?.start || a.title);
+    const spanOf = (a) => {
+        const span = Math.abs(startVal(a) - parseTimePeriodToSortValue(a.timeBoundaries?.end || a.title));
+        return Number.isFinite(span) ? span : Infinity; // unparseable: don't merge it preferentially
+    };
+    const nameOf = (a) => ((a.title || '').split(':')[0].trim() || a.title || 'Period');
+
+    // Oldest-first so "adjacent" means chronologically adjacent (older = larger sort value).
+    const work = [...anchors].sort((a, b) => startVal(b) - startVal(a));
+
+    while (work.length > max) {
+        let bestIdx = 0;
+        let bestSpan = Infinity;
+        for (let i = 0; i < work.length - 1; i++) {
+            const combined = spanOf(work[i]) + spanOf(work[i + 1]);
+            if (combined < bestSpan) { bestSpan = combined; bestIdx = i; }
+        }
+        const a = work[bestIdx];
+        const b = work[bestIdx + 1];
+        work.splice(bestIdx, 2, {
+            position: 0,
+            title: `${nameOf(a)} – ${nameOf(b)}`,
+            scope: [a.scope, b.scope].filter(Boolean).join(' '),
+            timeBoundaries: {
+                start: a.timeBoundaries?.start ?? b.timeBoundaries?.start,
+                end: b.timeBoundaries?.end ?? a.timeBoundaries?.end,
+            },
+            causalSignificance: 0, humanImpact: 0, finalScore: 0,
+        });
+    }
+
+    work.forEach((a, i) => { a.position = i + 1; });
+    return work;
+}
+
 function parseTemporalAnchorResponse(response, parentId) {
     try {
         // Remove markdown code blocks if present
