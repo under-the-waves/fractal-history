@@ -7,6 +7,7 @@ import {
     getAnchorById as getStaticAnchorById
 } from '../data/treeStructure';
 import WhyTheseAnchors from './WhyTheseAnchors';
+import OrientationPanel from './OrientationPanel';
 import { getRandomFact } from '../data/historyFacts';
 
 function useIsMobile(breakpoint = 768) {
@@ -844,6 +845,14 @@ function TreeVisualization() {
                         </nav>
                     )}
 
+                    {activePath.length > 0 && (
+                        <OrientationPanel
+                            chain={activePath.map(id => getAnchorById(id)).filter(Boolean)}
+                            currentId={activePath[activePath.length - 1]}
+                            onNavigate={navigateToAncestor}
+                        />
+                    )}
+
                     {expandedAnchor && (
                         <section
                             className={showStart ? 'mobile-tree-current mobile-tree-current-root' : 'mobile-tree-current'}
@@ -997,6 +1006,14 @@ function TreeVisualization() {
                     )}
                 </div>
             </div>
+
+            {activePath.length > 0 && (
+                <OrientationPanel
+                    chain={activePath.map(id => getAnchorById(id)).filter(Boolean)}
+                    currentId={activePath[activePath.length - 1]}
+                    onNavigate={navigateToAncestor}
+                />
+            )}
 
             <div
                 className="tree-container"

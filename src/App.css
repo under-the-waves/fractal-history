@@ -79,6 +79,82 @@
   font-size: 0.85rem;
 }
 
+/* "You are here" orientation panel (Frame / When / Where) */
+.orientation-panel {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e1e4e8;
+}
+
+.orientation-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a9099;
+}
+
+.orientation-axes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.orientation-axis {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #e1e4e8;
+  border-left: 3px solid var(--axis-color, #ccc);
+  border-radius: 6px;
+  overflow: hidden;
+  background: white;
+}
+
+.orientation-axis-label {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--axis-color, #555);
+  background: color-mix(in srgb, var(--axis-color, #ccc) 10%, white);
+}
+
+.orientation-axis-value {
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  color: #2c3e50;
+  background: white;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+button.orientation-axis-value {
+  cursor: pointer;
+}
+
+button.orientation-axis-value:hover {
+  background: color-mix(in srgb, var(--axis-color, #ccc) 14%, white);
+  text-decoration: underline;
+}
+
+.orientation-axis-value.is-current {
+  font-weight: 600;
+}
+
+.orientation-axis-value.is-empty {
+  color: #b0b6bd;
+}
+
 /* Collapsible breadth legend */
 .breadth-legend {
   margin-left: auto;
