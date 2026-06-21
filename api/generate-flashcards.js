@@ -71,7 +71,8 @@ ${subtopicInstruction}
 Follow these flashcard learning principles strictly:
 - ATOMIC: each card tests exactly ONE fact. Never join two facts with "and", "where", or a comma. NEVER answer with a list: if the natural answer is several items (e.g. "crafts, trade, writing, social hierarchies"), the question is too broad -- ask about ONE of them, or ask for the single category or count instead.
 - MINIMAL ANSWER: the answer is the single shortest unique thing the question asks for -- a name, term, place, or number. Usually 1-5 words; never a full descriptive sentence (hard cap ~10 words). This applies to headline cards too.
-- NO SELF-ANSWERING: the QUESTION must not contain, define, or paraphrase its own answer. BAD -> Q: "What was the crucial ability of the first self-replicating molecules?" A: "the ability to make copies of themselves" (the question already states it). Recast so the answer is a distinct fact the reader must actually recall.
+- NO SELF-ANSWERING: the answer's key word(s) must NOT appear in the question in any form, including word stems. If the question says "self-replicating molecules", the answer may NOT be "self-replication" or "the ability to copy themselves" -- the reader would read it straight off the question. Either test a different fact about that thing (when it arose, what it led to) or reword the question so it never names the answer.
+- NO TRICK OR MULTIPLE-CHOICE CARDS: never write "which of the following ..." or list the options inside the question, and never use answers like "all of them", "both", "none", or "all of the above". Every card is one open question with one specific thing to recall.
 - QUESTION TYPE MATCHES ANSWER: the question word must fit the answer's type -- ask "when" or "what year" ONLY when the answer is a date or time; "who" only for a person; "where" only for a place; use "what/which ... is called/named" when the answer is a term or name. Never ask "when did X happen?" and then answer with a term.
 - CORRECT ORIENTATION: put the descriptive context in the QUESTION; put the hard-to-recall item in the ANSWER.
   BAD  -> Q: "What did Churchill do in 1946?"  A: "A speech in Fulton, Missouri, where he said an 'iron curtain' had descended across Europe."
@@ -79,7 +80,7 @@ Follow these flashcard learning principles strictly:
   GOOD -> Q: "What phrase did Churchill use for the divide across Europe?"  A: "The Iron Curtain"
 - GROUNDED IN THE TEXT: both the question and the answer must be supported only by the narrative text above. Use no outside knowledge. If a fact is not stated in the narrative, do not write a card about it -- the reader has read exactly this text and nothing more, and must never be asked about something it does not contain.
 - Plain wording. Never use the construction "not X; it was Y" or "not just X, it's Y".
-- VARIED: within a sub-topic's ${perSubtopic} cards, target genuinely different facts, not reworded versions of the same one.
+- VARIED & GLOBALLY DISTINCT: every card in this whole set -- across ALL sub-topics AND the general cards -- must test a DIFFERENT fact. No two cards may share the same or a near-identical answer, or be rewordings of one another. You are writing them all in one pass, so before you finish, re-read your full list and replace any card that duplicates another.
 
 REVERSIBLE CARDS: a card is reversible only when it links TWO short, specific things that each uniquely identify the other, so either can be the prompt and the other the short answer (date <-> event, person <-> the one specific deed or place tied to them, term <-> its short gloss). To reverse it you SWAP the two: the forward ANSWER becomes the thing the reverse question asks about, and the reverse answer is the OTHER thing (the key fact from the forward question). The reverse answer MUST be a different string from the forward answer.
   GOOD forward -> Q: "How long ago did the Big Bang occur?"  A: "13.8 billion years"
@@ -125,26 +126,7 @@ export function normaliseQuestions(rawQuestions) {
         return short.length >= 3 && long.includes(short);
     };
 
-    const cards = rawQuestions
-        .filter(q => q && q.question && q.answer)
-        .map(q => {
-            const card = {
-                group: typeof q.group === 'string' && q.group ? q.group : 'general',
-                headline: !!q.headline,
-                question: q.question,
-                answer: q.answer
-            };
-            if (q.reverse && q.reverse.question && q.reverse.answer
-                && !isSameAnswer(q.reverse.answer, q.answer)) {
-                card.reverse = { question: q.reverse.question, answer: q.reverse.answer };
-            }
-            return card;
-        });
-
-    // Drop near-duplicate cards (e.g. a "general" card that repeats a sub-topic fact in different
-    // words). Compare content-word overlap (Jaccard, light stemming) on answers and on questions;
-    // when a pair collides, keep the headline card. This catches paraphrases that exact-string
-    // matching misses; it cannot catch every rewording, but removes the common cases.
+    // Content-word tokens (>=4 chars, de-stopworded, lightly stemmed) for the similarity checks below.
     const STOP = new Set('the a an and or of to in on was were is are be been being that this with for its it as by at from no not there here made which what who whom when where why how did do does than then into their they them these those during after before about over under out up down own same so such only very can will would could'.split(' '));
     const stem = w => w.replace(/(ments?|tions?|ing|edly|ed|es|s)$/, '');
     const tokenize = s => new Set(
@@ -158,6 +140,39 @@ export function normaliseQuestions(rawQuestions) {
         return inter / (a.size + b.size - inter);
     };
 
+    // Reject bad cards outright: trick / multiple-choice answers ("all of them"), and self-answering
+    // cards where every content word of the answer already appears in the question (so the reader
+    // could read it straight off). These are belt-and-braces behind the prompt rules.
+    const TRICK = /^(all|both|none|either|neither)\b|\b(all|both|none) of (them|these|the above)\b/i;
+    const selfAnswering = (q, a) => {
+        const at = tokenize(a);
+        if (!at.size) return false;
+        const qt = tokenize(q);
+        for (const w of at) if (!qt.has(w)) return false;
+        return true;
+    };
+
+    const cards = rawQuestions
+        .filter(q => q && q.question && q.answer)
+        .filter(q => !TRICK.test(String(q.answer).trim()) && !selfAnswering(q.question, q.answer))
+        .map(q => {
+            const card = {
+                group: typeof q.group === 'string' && q.group ? q.group : 'general',
+                headline: !!q.headline,
+                question: q.question,
+                answer: q.answer
+            };
+            if (q.reverse && q.reverse.question && q.reverse.answer
+                && !isSameAnswer(q.reverse.answer, q.answer)
+                && !TRICK.test(String(q.reverse.answer).trim())
+                && !selfAnswering(q.reverse.question, q.reverse.answer)) {
+                card.reverse = { question: q.reverse.question, answer: q.reverse.answer };
+            }
+            return card;
+        });
+
+    // Drop near-duplicate cards (paraphrases that exact-string matching misses): compare content-word
+    // overlap on answers and questions; when a pair collides, keep the headline card.
     const kept = [];
     for (const c of cards) {
         const tA = tokenize(c.answer), tQ = tokenize(c.question);
