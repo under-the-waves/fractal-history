@@ -37,6 +37,16 @@ function TreeVisualization() {
     const [generating, setGenerating] = useState(false);
     const [loadingBreadth, setLoadingBreadth] = useState(null); // { nodeId, breadth } when loading
 
+    // --- Background warm-up (prefetch + light pre-generation) -------------------
+    // After a node settles, quietly make the most-likely-next nodes ready: prefetch
+    // children that already exist, and pre-generate (STRUCTURE ONLY, never narratives)
+    // the current node's other breadths and one level ahead in the current breadth.
+    const PREGEN_ENABLED = true;
+    const PREGEN_SESSION_CAP = 40;            // max background generations per page session
+    const warmedRef = useRef(new Set());     // "parentId|breadth" already prefetched/attempted
+    const inFlightGenRef = useRef(new Set()); // generations in progress (foreground + background)
+    const pregenCountRef = useRef(0);        // background generations used this session
+
     // Single continuous "busy" overlay (covers both the DB check and generation).
     // overlayMounted keeps it in the DOM through its fade-out; overlayVisible drives
     // the opacity transition. overlayFact is the history fact shown while waiting.
@@ -312,6 +322,102 @@ function TreeVisualization() {
         return breadthSelections[nodeId] || 'A';
     };
 
+    // Merge fetched children into the cache without disturbing the active view.
+    const cacheChildren = (parentId, anchors) => {
+        if (!anchors || anchors.length === 0) return;
+        setTreeData(prev => {
+            let changed = false;
+            const next = { ...prev };
+            anchors.forEach(a => {
+                if (!next[a.id]) {
+                    next[a.id] = {
+                        id: a.id, title: a.title, scope: a.scope, level: a.level,
+                        breadth: a.breadth, position: a.position, parentId
+                    };
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    };
+
+    // Pre-generate a node's children in the background (STRUCTURE ONLY). Guarded so the
+    // same (node, breadth) is never generated twice at once by foreground + background,
+    // and capped per session.
+    const generateChildrenInBackground = async (parentId, breadth, title, scope) => {
+        const key = `${parentId}|${breadth}`;
+        if (inFlightGenRef.current.has(key) || pregenCountRef.current >= PREGEN_SESSION_CAP) return;
+        inFlightGenRef.current.add(key);
+        pregenCountRef.current += 1;
+        try {
+            const resp = await fetch('/api/generate-anchors', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ parentId, parentTitle: title, parentScope: scope, breadth })
+            });
+            const data = await resp.json();
+            if (data?.success && Array.isArray(data.anchors) && data.anchors.length > 0) {
+                cacheChildren(parentId, data.anchors);
+            }
+        } catch { /* background best-effort; ignore */ }
+        finally {
+            inFlightGenRef.current.delete(key);
+        }
+    };
+
+    // After the active node settles, warm the most-likely-next nodes on idle:
+    //   - the current node's OTHER two breadths (instant breadth toggles), and
+    //   - one level ahead in the CURRENT breadth (each visible child's children).
+    // Prefetch (fast) runs first for everything that already exists; pre-generation
+    // (slow, costly) runs after, only for what's missing. Cancels if the user moves on.
+    useEffect(() => {
+        if (activePath.length === 0) return;
+        const nodeId = activePath[activePath.length - 1];
+        const node = getAnchorById(nodeId);
+        if (!node) return;
+        const curBreadth = getActiveBreadth(nodeId);
+
+        const targets = [];
+        ['A', 'B', 'C'].forEach(b => {
+            if (b !== curBreadth) targets.push({ parentId: nodeId, breadth: b, title: node.title, scope: node.scope });
+        });
+        getChildren(nodeId, curBreadth).forEach(child => {
+            targets.push({ parentId: child.id, breadth: curBreadth, title: child.title, scope: child.scope });
+        });
+        if (targets.length === 0) return;
+
+        let cancelled = false;
+        const run = async () => {
+            const needGen = [];
+            // Phase 1: prefetch everything that already exists (fast, always fresh).
+            for (const t of targets) {
+                if (cancelled) return;
+                const key = `${t.parentId}|${t.breadth}`;
+                if (warmedRef.current.has(key)) continue;
+                if (getChildren(t.parentId, t.breadth).length > 0 || getStaticChildren(t.parentId, t.breadth).length > 0) {
+                    warmedRef.current.add(key);
+                    continue;
+                }
+                warmedRef.current.add(key);
+                const data = await fetchChildrenData(t.parentId, t.breadth);
+                if (data?.success && Array.isArray(data.anchors) && data.anchors.length > 0) {
+                    cacheChildren(t.parentId, data.anchors);
+                } else {
+                    needGen.push(t);
+                }
+            }
+            // Phase 2: pre-generate the rest (structure only), if enabled.
+            if (!PREGEN_ENABLED) return;
+            for (const t of needGen) {
+                if (cancelled) return;
+                await generateChildrenInBackground(t.parentId, t.breadth, t.title, t.scope);
+            }
+        };
+        // Defer so warm-up never competes with the user's active click.
+        const timer = setTimeout(run, 600);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [activePath, breadthSelections]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // Select a breadth on an anchor: instant update if children exist locally,
     // otherwise fetch from DB or generate via API. Used by both desktop SVG
     // breadth buttons and the mobile card layout.
@@ -363,6 +469,8 @@ function TreeVisualization() {
 
             // Keep loadingBreadth set so the overlay stays mounted continuously –
             // generating only changes the copy inside the same overlay, never swaps it.
+            const fgGenKey = `${nodeId}|${breadth}`;
+            inFlightGenRef.current.add(fgGenKey);
             setGenerating(true);
             try {
                 const generateResponse = await fetch('/api/generate-anchors', {
@@ -390,6 +498,7 @@ function TreeVisualization() {
                 setErrorMessage(`Error generating ${breadth}-anchors. Please try again.`);
                 setTimeout(() => setErrorMessage(null), 5000);
             } finally {
+                inFlightGenRef.current.delete(fgGenKey);
                 setGenerating(false);
             }
         } finally {

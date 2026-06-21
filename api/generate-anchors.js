@@ -18,29 +18,22 @@ function getAnthropicClient() {
     return anthropic;
 }
 
-// Generate anchor ID in format like "2A-X7Y3Z"
-function generateAnchorId(parentId, position) {
-    // Handle different ID formats
-    let parentLevel;
-    if (parentId === '0-ROOT') {
-        parentLevel = 0;
-    } else if (parentId.match(/^\d+[A-Z]-/)) {
-        // Format: "2A-X7Y3Z" - extract the number before the letter
-        parentLevel = parseInt(parentId.match(/^(\d+)[A-Z]-/)[1]);
-    } else {
-        // Format: "C9D3E" - assume level 1 (top level anchors)
-        parentLevel = 1;
-    }
-
-    const childLevel = parentLevel + 1;
-
+// Generate a neutral, opaque anchor ID, e.g. "anc-7Y3ZK9Q2".
+//
+// The id is ONLY a unique key. It deliberately does NOT encode level or breadth:
+// those are properties of a tree_position (one anchor can sit at several positions),
+// and the authoritative values live in the tree_positions table. The old format
+// "{level}{breadth}-{hash}" baked in a level frozen at creation and ALWAYS used the
+// letter "A" regardless of the real breadth, which made the prefix misleading and
+// caused bugs (e.g. the deep-link crash from trusting the id letter). Per the project
+// decision, ids stay opaque and nothing parses level/breadth out of them.
+function generateAnchorId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let hash = '';
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) {
         hash += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-
-    return `${childLevel}A-${hash}`;
+    return `anc-${hash}`;
 }
 
 // Get existing sibling anchors at the same level
@@ -424,7 +417,10 @@ export default async function handler(req, res) {
 
         // Prepare anchor data with generated IDs
         const anchorRows = anchors.map(anchor => {
-            const anchorId = generateAnchorId(parentId, anchor.position);
+            const anchorId = generateAnchorId();
+            // position_id still encodes level+breadth, but from the AUTHORITATIVE
+            // childLevel/breadth here (a position is at exactly one level+breadth),
+            // not parsed from the anchor id. The hash segment is reused for traceability.
             const positionId = `${childLevel}${breadth}-${anchorId.split('-')[1]}`;
             return { anchorId, positionId, anchor };
         });
@@ -593,7 +589,16 @@ Then decide on a catch-all: include one ONLY if meaningful area would otherwise 
 // whatever is not claimed, so coverage is guaranteed regardless of the model.
 function buildBreadthCPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings, candidates) {
     const ancestorContext = formatAncestorContext(ancestorPath);
-    const candidateList = candidates.map(c => `- ${c.name} [${c.code}]`).join('\n');
+    // Ground each candidate with the places it actually contains, so the model writes
+    // scopes that match reality (e.g. it can see that "Western Europe" does NOT include
+    // the UK, which the ledger files under "Northern Europe").
+    const candidateList = candidates.map(c => {
+        const members = (getChildren(c.code) || []).map(getName);
+        if (members.length === 0) return `- ${c.name} [${c.code}]`;
+        const shown = members.slice(0, 15).join(', ');
+        const more = members.length > 15 ? `, …(${members.length} total)` : '';
+        return `- ${c.name} [${c.code}] — contains: ${shown}${more}`;
+    }).join('\n');
     const siblingNote = existingSiblings && existingSiblings.length > 0
         ? `\n**These regions already exist for this topic — do not duplicate them:**\n${existingSiblings.map(s => `- ${s.title}`).join('\n')}\n`
         : '';
@@ -657,7 +662,8 @@ ${candidateList}
 
 **Rules:**
 - 2 to 4 named regions. Members must be codes from the list above. No place in two regions.
-- A title may use a recognisable name for the grouping (e.g. "The Western Front"), 5 words maximum. But the title must NOT imply places the region leaves out, and the scope MUST name the actual places the region covers. If the members do not fit a tidy name, use a plainer geographic title. (Example: a region whose members are Northern Africa, the Middle East and Central Africa must not be titled just "Middle East and North Africa" — name Central Africa in the scope, or retitle so nothing is hidden.)
+- A title may use a recognisable name for the grouping (e.g. "The Western Front"), 5 words maximum, but the title must NOT imply places the region leaves out.
+- **The scope must match the members exactly.** Describe ONLY places contained in this region's members (use each candidate's "contains:" list above), and do NOT name any country or place that is not among them. Those "contains:" lists are authoritative — trust them over your own assumptions about which places belong to a grouping. (Example: the "Western Europe" grouping does NOT include Britain — the ledger files the United Kingdom under "Northern Europe" — so a "Western Europe" region's scope must not claim Britain. If you want Britain in a region, add the member that actually contains it.) If the members do not fit a tidy name, use a plainer geographic title and name the actual places in the scope.
 - Set "significant" to true if any place left in the leftover still has a meaningful connection to the topic (so it should be explored further); false if everything remaining is minor.
 - If a region is a time-bounded entity (an ancient landmass, a celestial body, an extinct polity), put its period in brackets in the title, e.g. "Gondwana (~550–180 MYA)".
 - Output ONLY the JSON object.`;
