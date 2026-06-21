@@ -20,7 +20,9 @@ npm run lint     # Run ESLint
 
 **Key Directories:**
 - `src/components/` - React components (App.jsx manages view routing)
-- `api/` - Vercel serverless endpoints
+- `api/` - Vercel serverless endpoints (every `.js` here becomes a function - see the function budget below)
+- `lib/` - Backend-only helper modules, bundled into endpoints; NOT counted as functions
+- `shared/` - Helpers imported by BOTH frontend and backend (e.g. `ancestry.js`)
 - `src/data/` - Static data including tree hierarchy definitions
 
 **API Endpoints:**
@@ -28,6 +30,32 @@ npm run lint     # Run ESLint
 - `GET /api/get-generation-metadata` - Fetch AI selection reasoning
 - `GET /api/anchors` - Query tree positions
 - `POST /api/generate-anchors` - Generate new anchors via OpenAI
+
+## Serverless function budget (Vercel Hobby plan) - READ BEFORE ADDING TO `api/`
+
+**Hard limit: a deployment may contain at most 12 serverless functions.** Vercel
+counts every `.js` file under `api/` (recursively) as one function, and the project is
+on Vercel's free **Hobby** plan, which enforces this cap. Going over makes **every
+production deploy fail** at the post-build step with
+`exceeded_serverless_functions_per_deployment` - and the Vite build itself still
+succeeds, so the failure is easy to miss.
+
+**Current count: 9** (the 9 endpoints in `api/`) - 3 slots of headroom.
+
+**Before adding anything under `api/`, check the count stays ≤ 12:**
+```bash
+git ls-files 'api/' | grep -c '\.js$'
+```
+
+**Rules:**
+- Only real HTTP endpoints belong in `api/`; each one becomes a function.
+- Shared/helper code goes in `lib/` (backend-only) or `shared/` (frontend + backend). It
+  is bundled into the importing endpoint and does **not** count. Never put helpers in `api/`.
+- Need more than 12 endpoints? Either consolidate (one function dispatching on a query
+  param) or upgrade Vercel to Pro (raises the cap and lifts the ~100 deploys/day Hobby limit).
+
+History: this cap took the site down on 2026-06-20 when helpers in `api/utils/` pushed the
+count to 15; fixed by moving them to `lib/` (PR #4).
 
 ## Data Model
 
