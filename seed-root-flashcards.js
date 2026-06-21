@@ -31,7 +31,7 @@ const ROOT_A = [
     { group: 'sub:Industrial Revolution', core: false, question: 'In which country did the Industrial Revolution begin in the mid-1700s?', answer: 'Britain' },
     // General / across the topic
     { group: 'general', core: true, question: 'What name is given to the beginning of the universe, when it started expanding from a hot, dense state?', answer: 'The Big Bang' },
-    { group: 'general', core: false, question: 'What faint radiation, detected in 1964, is the leftover afterglow of the Big Bang?', answer: 'Cosmic microwave background radiation' },
+    { group: 'general', core: false, question: 'What faint radiation, detected in 1965, is the leftover afterglow of the Big Bang?', answer: 'Cosmic microwave background radiation' },
     { group: 'general', core: false, question: 'What did every great transition in this story have in common?', answer: 'A shift in how energy and information were organised' },
 ];
 
@@ -77,7 +77,7 @@ const ROOT_C = [
     { group: 'sub:Americas', core: false, question: 'Which Andean empire developed in isolation from the Old World before 1492?', answer: 'The Inca' },
     // Oceania
     { group: 'sub:Oceania', core: true, question: 'Who have the oldest continuous human culture, having lived in Australia for at least 65,000 years?', answer: 'Aboriginal Australians' },
-    { group: 'sub:Oceania', core: false, question: 'By around what year had Pacific seafarers reached Hawaii, navigating by stars and currents?', answer: 'Around 400 CE' },
+    { group: 'sub:Oceania', core: false, question: 'By around what year had Pacific seafarers reached Hawaii, navigating by stars and currents?', answer: 'Around 1000-1200 CE' },
     { group: 'sub:Oceania', core: false, question: 'Around what year did seafarers finally settle New Zealand?', answer: 'Around 1200 CE' },
 ];
 
