@@ -50,7 +50,7 @@ export function buildFlashcardPrompt({ anchorTitle, breadth, children, narrative
 - For EACH of the ${numSubtopics} sub-topics above, write exactly ${perSubtopic} cards, each testing a different aspect of that sub-topic. Tag each with "group": "sub:<exact sub-topic title>".
 ${headlineRule}
   Tag ONLY the headline card with "headline": true; the other ${perSubtopic - 1} cards must NOT carry that tag and should test genuinely different aspects.
-- Then write ${generalCount} more cards drawn from the rest of the narrative -- the opening hook, framing, connections between sub-topics, and overall significance -- that are not tied to any single sub-topic. Tag each of these with "group": "general", and list them with the single most essential, canonical one FIRST (it may be chosen as a core card).
+- Then write ${generalCount} more cards drawn from the rest of the narrative -- the opening hook, framing, connections between sub-topics, and overall significance -- that are not tied to any single sub-topic. Do NOT repeat a fact already tested by a sub-topic card. Tag each of these with "group": "general", and list them with the single most essential, canonical one FIRST (it may be chosen as a core card).
 Aim for roughly ${totalTarget} cards total.`
         : `Create a candidate pool of about ${generalCount} cards drawn from across the whole narrative -- the opening hook, the key facts, and the overall significance. Tag each with "group": "general", and list them with the most essential, canonical ones FIRST (the first cards may be chosen as core cards).`;
 
@@ -69,8 +69,10 @@ ${breadthGuidance}
 ${subtopicInstruction}
 
 Follow these flashcard learning principles strictly:
-- ATOMIC: each card tests exactly ONE fact. Never join two facts with "and", "where", or a comma.
+- ATOMIC: each card tests exactly ONE fact. Never join two facts with "and", "where", or a comma. NEVER answer with a list: if the natural answer is several items (e.g. "crafts, trade, writing, social hierarchies"), the question is too broad -- ask about ONE of them, or ask for the single category or count instead.
 - MINIMAL ANSWER: the answer is the single shortest unique thing the question asks for -- a name, term, place, or number. Usually 1-5 words; never a full descriptive sentence (hard cap ~10 words). This applies to headline cards too.
+- NO SELF-ANSWERING: the QUESTION must not contain, define, or paraphrase its own answer. BAD -> Q: "What was the crucial ability of the first self-replicating molecules?" A: "the ability to make copies of themselves" (the question already states it). Recast so the answer is a distinct fact the reader must actually recall.
+- QUESTION TYPE MATCHES ANSWER: the question word must fit the answer's type -- ask "when" or "what year" ONLY when the answer is a date or time; "who" only for a person; "where" only for a place; use "what/which ... is called/named" when the answer is a term or name. Never ask "when did X happen?" and then answer with a term.
 - CORRECT ORIENTATION: put the descriptive context in the QUESTION; put the hard-to-recall item in the ANSWER.
   BAD  -> Q: "What did Churchill do in 1946?"  A: "A speech in Fulton, Missouri, where he said an 'iron curtain' had descended across Europe."
   GOOD -> Q: "In which US town did Churchill give his 'iron curtain' speech?"  A: "Fulton, Missouri"
@@ -88,7 +90,7 @@ FORBIDDEN -- the same card asked twice, with the answer unchanged. This is NOT a
   Q: "What empire based in Tunisia fought Rome in the Punic Wars?"  A: "Carthage"   (WRONG: answer is still "Carthage")
 If the only way to flip a card keeps the same answer, the card is NOT reversible -- omit "reverse".
 
-Self-check before adding a reverse: (1) is reverse.answer a genuinely different string from the forward answer? (2) is the forward answer now the subject the reverse question asks about? If either fails, omit "reverse".
+Self-check before adding a reverse: (1) is reverse.answer a genuinely different string from the forward answer? (2) is the forward answer now the subject the reverse question asks about? (3) does the reverse question word match the reverse answer's type -- e.g. forward "What does the Cambrian Explosion refer to? -> the first animals" reverses to "What is the first appearance of animals in the fossil record called? -> the Cambrian Explosion", NOT "When did animals appear? -> the Cambrian Explosion"? If any fails, omit "reverse".
 
 Omit "reverse" entirely for conceptual "why/how did it matter" cards, for cards whose other half is a long descriptive phrase rather than a short answer, and for any flip that would be ambiguous or have many valid answers.
 
@@ -123,7 +125,7 @@ export function normaliseQuestions(rawQuestions) {
         return short.length >= 3 && long.includes(short);
     };
 
-    return rawQuestions
+    const cards = rawQuestions
         .filter(q => q && q.question && q.answer)
         .map(q => {
             const card = {
@@ -138,6 +140,35 @@ export function normaliseQuestions(rawQuestions) {
             }
             return card;
         });
+
+    // Drop near-duplicate cards (e.g. a "general" card that repeats a sub-topic fact in different
+    // words). Compare content-word overlap (Jaccard, light stemming) on answers and on questions;
+    // when a pair collides, keep the headline card. This catches paraphrases that exact-string
+    // matching misses; it cannot catch every rewording, but removes the common cases.
+    const STOP = new Set('the a an and or of to in on was were is are be been being that this with for its it as by at from no not there here made which what who whom when where why how did do does than then into their they them these those during after before about over under out up down own same so such only very can will would could'.split(' '));
+    const stem = w => w.replace(/(ments?|tions?|ing|edly|ed|es|s)$/, '');
+    const tokenize = s => new Set(
+        String(s).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+            .filter(w => w.length >= 4 && !STOP.has(w)).map(stem)
+    );
+    const jaccard = (a, b) => {
+        if (!a.size || !b.size) return 0;
+        let inter = 0;
+        for (const x of a) if (b.has(x)) inter++;
+        return inter / (a.size + b.size - inter);
+    };
+
+    const kept = [];
+    for (const c of cards) {
+        const tA = tokenize(c.answer), tQ = tokenize(c.question);
+        const dup = kept.find(k => jaccard(tA, k._tA) >= 0.55 || jaccard(tQ, k._tQ) >= 0.7);
+        if (!dup) {
+            kept.push(Object.assign({}, c, { _tA: tA, _tQ: tQ }));
+        } else if (c.headline && !dup.headline) {
+            Object.assign(dup, c, { _tA: tA, _tQ: tQ }); // prefer the headline of a duplicate pair
+        }
+    }
+    return kept.map(({ _tA, _tQ, ...c }) => c);
 }
 
 /**

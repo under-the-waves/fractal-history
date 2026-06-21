@@ -165,6 +165,7 @@ function FlashcardSaveSection({ anchorId, breadth }) {
     const auth = useAuth()
     const [preparing, setPreparing] = useState(true)
     const [reloadKey, setReloadKey] = useState(0)
+    const loadingFact = useMemo(() => getRandomFact(), [])
 
     // On mount (first study): ensure this narrative's pool + 5 cores exist and are instantiated for
     // the user (generates on first view), then reveal the flashcard panel.
@@ -204,9 +205,19 @@ function FlashcardSaveSection({ anchorId, breadth }) {
     return (
         <section className="flashcard-save-section">
             <h2 className="flashcard-save-heading">Flashcards</h2>
-            {preparing
-                ? <p className="flashcard-pool-hint">Preparing flashcards...</p>
-                : <PersonalSlots auth={auth} anchorId={anchorId} breadth={breadth} reloadKey={reloadKey} />}
+            {preparing ? (
+                <div className="flashcard-preparing">
+                    <div className="loading-spinner"></div>
+                    <p className="loading-stage">Generating flashcards...</p>
+                    <p className="loading-note">First-time generation may take 20-30 seconds</p>
+                    <div className="loading-fact">
+                        <span className="loading-fact-label">Did you know?</span>
+                        <p className="loading-fact-text">{loadingFact}</p>
+                    </div>
+                </div>
+            ) : (
+                <PersonalSlots auth={auth} anchorId={anchorId} breadth={breadth} reloadKey={reloadKey} />
+            )}
         </section>
     )
 }
