@@ -327,11 +327,15 @@ async function handleGetSlots(req, res, userId) {
             WHERE user_id = ${userId} AND anchor_id = ${anchorId} AND breadth = ${breadth} AND is_personal_slot
         `;
         const selected = new Set(slotRows.map(r => r.question));
+        const cores = pool
+            .filter(q => q.core)
+            .map(q => ({ question: q.question, answer: q.answer }));
         const available = pool
             .filter(q => !q.core)
             .map(q => ({ question: q.question, answer: q.answer, group: q.group, selected: selected.has(q.question) }));
         return res.status(200).json({
             success: true,
+            cores,
             available,
             used: selected.size,
             max: PERSONAL_SLOT_MAX

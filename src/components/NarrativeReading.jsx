@@ -4,6 +4,7 @@ import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
 import { citationsToFootnotes } from '../utils/citationsToFootnotes'
 import { getRandomFact } from '../data/historyFacts'
+import './scoredCards.css'
 
 // Loading stages for generation process
 const LOADING_STAGES = {
@@ -46,6 +47,87 @@ function groupFlashcards(cards) {
     })
     // Stable partition: everything except 'general' keeps its order, 'general' last.
     return groups.sort((a, b) => (a.key === 'general' ? 1 : 0) - (b.key === 'general' ? 1 : 0))
+}
+
+// The scored-cards panel: the 5 automatic core cards, plus the learner's up-to-3 personal picks
+// (chosen from the non-core pool). Drives /api/flashcards mode=slots and the set-slot action.
+function PersonalSlots({ auth, anchorId, breadth, reloadKey }) {
+    const [data, setData] = useState(null)
+    const [busy, setBusy] = useState(null)
+    const [error, setError] = useState(null)
+
+    const load = useCallback(async () => {
+        try {
+            const token = await auth.getToken()
+            const res = await fetch(`/api/flashcards?mode=slots&anchorId=${anchorId}&breadth=${breadth}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const d = await res.json()
+            if (d.success) setData(d)
+        } catch (err) {
+            console.error('Failed to load slots:', err)
+        }
+    }, [auth, anchorId, breadth])
+
+    useEffect(() => { load() }, [load, reloadKey])
+
+    const toggle = async (card, enabled) => {
+        setBusy(card.question)
+        setError(null)
+        try {
+            const token = await auth.getToken()
+            const res = await fetch('/api/flashcards', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'set-slot', anchorId, breadth, question: card.question, answer: card.answer, enabled })
+            })
+            const d = await res.json()
+            if (!d.success) setError(d.error || 'Could not update slot')
+            await load()
+        } catch (err) {
+            setError('Could not update slot')
+        } finally {
+            setBusy(null)
+        }
+    }
+
+    // Nothing to show until the pool (and so its cores) have been generated.
+    if (!data || ((data.cores?.length || 0) === 0 && (data.available?.length || 0) === 0)) return null
+
+    const atMax = data.used >= data.max
+    return (
+        <div className="scored-cards">
+            <h3 className="scored-cards-heading">Cards that count toward your score</h3>
+
+            <p className="scored-cards-sub">Core cards &middot; everyone gets these ({data.cores.length})</p>
+            <ul className="scored-core-list">
+                {data.cores.map((c, i) => (
+                    <li key={i} className="scored-core-item">
+                        <span className="scored-badge">Core</span>
+                        <span className="scored-q">{c.question}</span>
+                    </li>
+                ))}
+            </ul>
+
+            <p className="scored-cards-sub">Your picks &middot; {data.used}/{data.max}</p>
+            {error && <p className="flashcard-error">{error}</p>}
+            <ul className="scored-slot-list">
+                {data.available.map((c, i) => (
+                    <li key={i} className={`scored-slot-item ${c.selected ? 'selected' : ''}`}>
+                        <button
+                            type="button"
+                            className={`scored-slot-toggle ${c.selected ? 'selected' : ''}`}
+                            disabled={busy === c.question || (!c.selected && atMax)}
+                            onClick={() => toggle(c, !c.selected)}
+                        >
+                            {c.selected ? 'Remove' : (atMax ? 'Slots full' : 'Add')}
+                        </button>
+                        <span className="scored-q">{c.question}</span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    )
 }
 
 function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }) {
@@ -205,6 +287,8 @@ function FlashcardSaveSection({ anchorId, breadth, questions: initialQuestions }
                 cards can be saved in either direction, or both.
             </p>
             {generateError && <p className="flashcard-error">{generateError}</p>}
+
+            <PersonalSlots auth={auth} anchorId={anchorId} breadth={breadth} reloadKey={questions.length} />
 
             {groups.map(group => {
                 const unsavedForward = group.cards.filter(c => !savedCards.has(c.question))
