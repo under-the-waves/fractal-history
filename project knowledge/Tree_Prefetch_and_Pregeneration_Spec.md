@@ -114,5 +114,43 @@ costly if naive; the policy below keeps it affordable.
 
 ---
 
+## Implementation status (2026-06-21)
+
+**Built** (PR #3, `src/components/TreeVisualization.jsx`): Part A prefetch + pre-generation
+of the current node's other two breadths and one level ahead in the current breadth. A
+background effect fires ~600 ms after the active node settles, runs prefetch (Phase 1) then
+pre-generation (Phase 2), and cancels on navigation. NOT yet behaviourally verified in a
+browser — verify on a preview deploy before relying on it.
+
+**Guards in the code — keep these; each prevents a specific problem:**
+- **`inFlightGenRef`** (shared foreground + background set) — the important one. `generate-anchors`
+  is not atomic: it checks "do children exist?" then inserts. Two concurrent POSTs for the same
+  node (e.g. the user taps the B tab while the background warmer is also generating B) would both
+  pass the check and **double-insert children**. This set makes foreground and background skip a
+  node already being generated. Removing it reintroduces duplicate children.
+- **`PREGEN_SESSION_CAP` (40)** — the runaway backstop. Pre-generation spends money and writes to
+  the DB automatically as the user browses; the cap bounds the blast radius of any bug or unusually
+  long session. Tune against real Haiku cost + observed hit-rate; do not remove.
+- **`warmedRef`** — per-(node, breadth) dedupe, so the effect re-running on every navigation doesn't
+  re-attempt the same targets. Cheap insurance against redundant fetches.
+- **Cancellation (`cancelled` flag)** — does NOT abort an in-flight API call. A generation already
+  started runs to completion and its result is saved to the DB (so the spend is never wasted — a
+  later visitor benefits). Cancellation only stops the loop from *queuing more* work for a branch
+  the user has left, redirecting the session budget to where the user actually is. It is an
+  economy, not a waste.
+- **600 ms defer** — keeps warm-up from competing with the user's active click.
+
+**Future tuning / TODO (later session):**
+- Add **hit-rate telemetry** (how often warmed content is actually used) before scaling tiers.
+- Set `PREGEN_SESSION_CAP` and consider a per-day/global cost ceiling once Haiku per-call cost is
+  confirmed from the API reference.
+- **Behaviour to monitor:** browsing now auto-generates structure — watch tree growth and cost.
+  `PREGEN_ENABLED = false` is the kill-switch.
+- Consider a **persistent client cache** (survives refresh) — separate from warm-up.
+- Deferred: "all breadths one level ahead" (15×) and multi-level pre-generation — only if telemetry
+  justifies the cost.
+
+---
+
 *Origin: design discussion 2026-06-21 (why some tree clicks load and others don't). See
 `Anchor_Reuse_and_Navigation_Spec_v2.md`.*
