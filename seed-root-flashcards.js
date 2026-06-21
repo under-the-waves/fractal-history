@@ -58,6 +58,29 @@ const ROOT_B = [
     { group: 'sub:Contemporary: 1900 - Present', core: false, question: 'What rivalry from 1947 to 1991 divided the world between the US and the USSR?', answer: 'The Cold War' },
 ];
 
+const ROOT_C = [
+    // Cosmic & Planetary
+    { group: 'sub:Cosmic & Planetary', core: true, question: 'What event, around 13.8 billion years ago, created all the matter and energy in the universe?', answer: 'The Big Bang' },
+    { group: 'sub:Cosmic & Planetary', core: false, question: 'How long ago did Earth form from the debris around the young sun?', answer: 'About 4.6 billion years ago' },
+    { group: 'sub:Cosmic & Planetary', core: false, question: 'What period, around 540 million years ago, saw complex multi-celled animals appear suddenly?', answer: 'The Cambrian explosion' },
+    // Africa
+    { group: 'sub:Africa', core: true, question: 'In which two regions of Africa did the first anatomically modern humans appear, about 300,000 years ago?', answer: 'Morocco and East Africa' },
+    { group: 'sub:Africa', core: false, question: 'Around when did a small group of humans first leave Africa and spread across the globe?', answer: 'Around 70,000 years ago' },
+    { group: 'sub:Africa', core: false, question: 'What monuments did the Nile Valley kingdoms begin building around 2600 BCE?', answer: 'The pyramids' },
+    // Eurasia
+    { group: 'sub:Eurasia', core: true, question: 'In which region of Eurasia did the first experiments in agriculture take place, around 10,000 BCE?', answer: 'The Fertile Crescent' },
+    { group: 'sub:Eurasia', core: false, question: 'Which animal, domesticated on the Eurasian steppes around 3500 BCE, gave certain groups a military advantage?', answer: 'The horse' },
+    { group: 'sub:Eurasia', core: false, question: 'Which mountain range, raised by India colliding with Asia, divided Eurasia into distinct climate zones?', answer: 'The Himalayas' },
+    // Americas
+    { group: 'sub:Americas', core: true, question: 'How did the first humans reach the Americas from Asia?', answer: 'Across a land bridge from Siberia' },
+    { group: 'sub:Americas', core: false, question: 'What share of the indigenous American population is estimated to have died within a century of European contact after 1492?', answer: 'Between 50 and 90 percent' },
+    { group: 'sub:Americas', core: false, question: 'Which Andean empire developed in isolation from the Old World before 1492?', answer: 'The Inca' },
+    // Oceania
+    { group: 'sub:Oceania', core: true, question: 'Who have the oldest continuous human culture, having lived in Australia for at least 65,000 years?', answer: 'Aboriginal Australians' },
+    { group: 'sub:Oceania', core: false, question: 'By around what year had Pacific seafarers reached Hawaii, navigating by stars and currents?', answer: 'Around 400 CE' },
+    { group: 'sub:Oceania', core: false, question: 'Around what year did seafarers finally settle New Zealand?', answer: 'Around 1200 CE' },
+];
+
 // Warn if an answer's content words do not appear in the narrative (loose; ignores spelling/number-only).
 function checkGrounding(label, pool, narrative) {
     const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
@@ -77,7 +100,7 @@ function checkGrounding(label, pool, narrative) {
 }
 
 async function seed() {
-    for (const [breadth, pool] of [['A', ROOT_A], ['B', ROOT_B]]) {
+    for (const [breadth, pool] of [['A', ROOT_A], ['B', ROOT_B], ['C', ROOT_C]]) {
         const rows = await sql`SELECT narrative FROM narratives WHERE anchor_id='0-ROOT' AND breadth=${breadth} LIMIT 1`;
         if (!rows.length || !rows[0].narrative) {
             console.log(`  [Root ${breadth}] no narrative -- skipped`);
