@@ -86,3 +86,53 @@ Create `.env.local` with:
 - `src/components/TreeVisualization.jsx` - Large (900+ lines) interactive SVG tree component
 - `api/generate-anchors.js` - Core AI integration for anchor generation
 - `src/data/treeStructure.js` - Complete anchor hierarchy definition
+
+## Parallel Sessions Protocol
+
+When more than one Claude session (or person) works on this repo at the same time,
+follow this protocol. It exists because all sessions previously shared one working
+directory and pushed straight to `main`, which caused two failures: git index race
+conditions (one session's staging area clobbered another's), and one broken commit
+blocking every session's deploy because `main` is the production deploy target.
+
+**Rules:**
+
+1. **One branch per session. Never push to `main` directly while another session is
+   active.** Branch names: `feat/<area>` for features, `fix/<area>` for fixes,
+   `ops/<area>` for tooling or config. Example: `feat/anchor-generation`,
+   `fix/mobile-why-panel`.
+
+2. **One git worktree per session.** Each session works in its own directory with its
+   own index, so sessions cannot corrupt each other's staging area. They share the
+   same git history and object store, so branches and fetches are visible to all.
+   Create one with the helper:
+
+   ```powershell
+   pwsh scripts/new-worktree.ps1 feat/my-feature
+   # -> creates ../fractal-history-wt/feat-my-feature off the latest origin/main
+   ```
+
+   Then `cd` into that directory and run `npm install` once (each worktree has its
+   own `node_modules`).
+
+3. **Test on the branch's Vercel preview deploy, not on production.** Pushing a
+   branch creates an isolated preview URL. A broken branch never affects production
+   or the other sessions. Find the preview URL on the PR or the Vercel dashboard.
+
+4. **Local dev servers contend for ports.** The local workaround binds fixed ports
+   (`:3000` frontend, `:3001` API), so only one session can run it at a time. If you
+   need local dev while another session holds those ports, either rely on the preview
+   deploy instead, or override the ports in `vite.dev-local.config.js` and
+   `dev-api-server.mjs` for your session.
+
+5. **Merge to `main` only via a pull request, and only when the preview deploy is
+   green.** `main` stays deployable at all times. Open the PR with
+   `gh pr create --fill --base main`.
+
+6. **Stay in your lane.** Edit the files your task owns. If two sessions must touch
+   the same file, coordinate through the human rather than editing the shared
+   working tree.
+
+**Deploy mechanism:** Vercel auto-deploys production from `origin/main` and creates a
+preview deploy for every other branch. This supersedes any older instruction to push
+fixes straight to `main`; that default only holds for a single solo session.
