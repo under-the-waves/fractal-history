@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@clerk/react';
+import { useClerkEnabled } from '../hooks/useClerkAuth';
 import {
     getBreadthColor,
     treeStructure,
@@ -24,8 +26,53 @@ function useIsMobile(breakpoint = 768) {
     return isMobile;
 }
 
+// Small SVG mastery ring + 0-100 number, drawn in a node's top-right corner. Only shown for nodes
+// the signed-in user has a score for.
+function MasteryRing({ score, cx, cy, r = 11 }) {
+    const pct = Math.max(0, Math.min(100, score));
+    const C = 2 * Math.PI * r;
+    const offset = C * (1 - pct / 100);
+    return (
+        <g pointerEvents="none">
+            <circle cx={cx} cy={cy} r={r} fill="white" stroke="#e3e3e3" strokeWidth="3" />
+            <circle
+                cx={cx} cy={cy} r={r} fill="none" stroke="#2e9e5b" strokeWidth="3"
+                strokeDasharray={C} strokeDashoffset={offset} strokeLinecap="round"
+                transform={`rotate(-90 ${cx} ${cy})`}
+            />
+            <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize="9" fontWeight="700" fill="#333">
+                {Math.round(pct)}
+            </text>
+        </g>
+    );
+}
+
+// Auth-gated loader: fetches the signed-in user's per-node mastery scores once and lifts them up.
+// Rendered only when Clerk is enabled, so useAuth is always inside ClerkProvider. Renders nothing.
+function MasteryScoreLoader({ onLoaded }) {
+    const auth = useAuth();
+    useEffect(() => {
+        if (!auth.isSignedIn) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const token = await auth.getToken();
+                const res = await fetch('/api/scores', { headers: { Authorization: `Bearer ${token}` } });
+                const data = await res.json();
+                if (!cancelled && data.success) onLoaded(data.scores || {});
+            } catch (err) {
+                console.error('Failed to load mastery scores:', err);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [auth.isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+    return null;
+}
+
 function TreeVisualization() {
     const isMobile = useIsMobile();
+    const clerkEnabled = useClerkEnabled();
+    const [scores, setScores] = useState({});
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [activePath, setActivePath] = useState([]);
@@ -1024,6 +1071,7 @@ function TreeVisualization() {
                     overflowX: 'auto'
                 }}
             >
+                {clerkEnabled && <MasteryScoreLoader onLoaded={setScores} />}
                 <svg
                     viewBox={`0 0 ${svgWidth} ${svgHeight}`}
                     width="100%"
@@ -1096,6 +1144,11 @@ function TreeVisualization() {
                                         </tspan>
                                     ))}
                                 </text>
+
+                                {/* Mastery ring (top-right) for nodes the user has a score for */}
+                                {scores[node.anchor.id] != null && (
+                                    <MasteryRing score={scores[node.anchor.id]} cx={nodeWidth - 16} cy={18} />
+                                )}
 
                                 {/* Action buttons */}
                                 <g>
