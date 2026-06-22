@@ -1,8 +1,29 @@
 # Scoring Engine Design (Phase 2)
 
-Status: agreed design, not yet wired in. Lives on branch `feat/scoring-engine`.
-Builds on the core-flashcard / headline work (see `3D_learning_structure_and_flashcard_design`
-and `Core_design_decisions`). Read those first.
+Status: built on branch `feat/scoring-engine`. Builds on the core-flashcard / headline work (see
+`3D_learning_structure_and_flashcard_design` and `Core_design_decisions`). Read those first.
+
+## REVISED MODEL (2026-06-22) — unbounded XP, single number per node
+
+This supersedes the 0-100 saturating display and the `w`/`τ` maths described further down (kept for
+history). The live model in `lib/scoring.js`:
+
+- **own(node) = min(B, (B / FULL_CARDS) · Σ retention over the node's scored cards)** — `B = 20`,
+  `FULL_CARDS = 5`. Mastering ~5 of a node's cards (its cores) is worth `B` *regardless of depth*, so
+  every node is worth the same to itself; extra slots/breadths help reach and hold `B` but can't push
+  one node above it.
+- **score(node) = own(node) + R · Σ score(child)** — recursive, `R = 0.95` (gentle taper). A child is
+  worth `R·20 ≈ 19` *to its parent*, but 20 to itself. Cached as `subtree_raw`.
+- **Displayed value = the rounded raw score itself** (no ring, no 0-100 cap). A leaf shows ~20, a
+  high node shows the discounted sum of everything beneath it; the root climbs into the thousands /
+  tens-of-thousands because each level has far more anchors than the last (effort to climb higher
+  grows faster than the per-anchor points fall). Tree nodes show this as a small green XP badge.
+- Retention (forgetting curve) and the incremental O(depth) review propagation are unchanged.
+- Per-node leaderboard still ranks on `subtree_raw` (now the XP number).
+
+---
+
+### Original (superseded) design follows.
 
 ## 1. What we are measuring
 

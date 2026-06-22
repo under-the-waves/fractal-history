@@ -26,22 +26,19 @@ function useIsMobile(breakpoint = 768) {
     return isMobile;
 }
 
-// Small SVG mastery ring + 0-100 number, drawn in a node's top-right corner. Only shown for nodes
-// the signed-in user has a score for.
-function MasteryRing({ score, cx, cy, r = 11 }) {
-    const pct = Math.max(0, Math.min(100, score));
-    const C = 2 * Math.PI * r;
-    const offset = C * (1 - pct / 100);
+// Small XP badge (a pill showing the node's score) drawn in a node's top-right corner. Only shown
+// for nodes the signed-in user has a score for. Large scores are abbreviated (e.g. 1.2k, 21k).
+function MasteryBadge({ score, nodeWidth }) {
+    const label = score >= 1000
+        ? (score / 1000).toFixed(score >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k'
+        : String(score);
+    const w = 14 + label.length * 6.5;
+    const x = nodeWidth - w - 6;
     return (
         <g pointerEvents="none">
-            <circle cx={cx} cy={cy} r={r} fill="white" stroke="#e3e3e3" strokeWidth="3" />
-            <circle
-                cx={cx} cy={cy} r={r} fill="none" stroke="#2e9e5b" strokeWidth="3"
-                strokeDasharray={C} strokeDashoffset={offset} strokeLinecap="round"
-                transform={`rotate(-90 ${cx} ${cy})`}
-            />
-            <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize="9" fontWeight="700" fill="#333">
-                {Math.round(pct)}
+            <rect x={x} y={8} width={w} height={16} rx={8} fill="#2e9e5b" />
+            <text x={x + w / 2} y={16} textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="700" fill="white">
+                {label}
             </text>
         </g>
     );
@@ -1145,9 +1142,9 @@ function TreeVisualization() {
                                     ))}
                                 </text>
 
-                                {/* Mastery ring (top-right) for nodes the user has a score for */}
+                                {/* Mastery XP badge (top-right) for nodes the user has a score for */}
                                 {scores[node.anchor.id] != null && (
-                                    <MasteryRing score={scores[node.anchor.id]} cx={nodeWidth - 16} cy={18} />
+                                    <MasteryBadge score={scores[node.anchor.id]} nodeWidth={nodeWidth} />
                                 )}
 
                                 {/* Action buttons */}
