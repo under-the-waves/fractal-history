@@ -56,7 +56,7 @@ function MasteryScoreLoader({ onLoaded }) {
                 const token = await auth.getToken();
                 const res = await fetch('/api/scores', { headers: { Authorization: `Bearer ${token}` } });
                 const data = await res.json();
-                if (!cancelled && data.success) onLoaded(data.scores || {});
+                if (!cancelled && data.success) onLoaded({ scores: data.scores || {}, breadths: data.breadths || {} });
             } catch (err) {
                 console.error('Failed to load mastery scores:', err);
             }
@@ -70,6 +70,7 @@ function TreeVisualization() {
     const isMobile = useIsMobile();
     const clerkEnabled = useClerkEnabled();
     const [scores, setScores] = useState({});
+    const [breadths, setBreadths] = useState({});
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [activePath, setActivePath] = useState([]);
@@ -1068,7 +1069,7 @@ function TreeVisualization() {
                     overflowX: 'auto'
                 }}
             >
-                {clerkEnabled && <MasteryScoreLoader onLoaded={setScores} />}
+                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, breadths }) => { setScores(scores); setBreadths(breadths); }} />}
                 <svg
                     viewBox={`0 0 ${svgWidth} ${svgHeight}`}
                     width="100%"
@@ -1211,6 +1212,22 @@ function TreeVisualization() {
                                                             >
                                                                 {breadth}
                                                             </text>
+                                                            {/* Completion dot: green = breadth mastered, amber = in progress */}
+                                                            {(() => {
+                                                                const bOwn = breadths[node.anchor.id]?.[breadth] || 0;
+                                                                if (bOwn <= 0) return null;
+                                                                return (
+                                                                    <circle
+                                                                        cx={buttonX + buttonWidth - 2.5}
+                                                                        cy={nodeHeight - 22 + 2.5}
+                                                                        r={2.6}
+                                                                        fill={bOwn >= 19 ? '#2e9e5b' : '#e0a030'}
+                                                                        stroke="white"
+                                                                        strokeWidth="0.6"
+                                                                        pointerEvents="none"
+                                                                    />
+                                                                );
+                                                            })()}
                                                         </g>
                                                     );
                                                 })}

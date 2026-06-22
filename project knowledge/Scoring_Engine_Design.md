@@ -8,10 +8,12 @@ Status: built on branch `feat/scoring-engine`. Builds on the core-flashcard / he
 This supersedes the 0-100 saturating display and the `w`/`τ` maths described further down (kept for
 history). The live model in `lib/scoring.js`:
 
-- **own(node) = min(B, (B / FULL_CARDS) · Σ retention over the node's scored cards)** — `B = 20`,
-  `FULL_CARDS = 5`. Mastering ~5 of a node's cards (its cores) is worth `B` *regardless of depth*, so
-  every node is worth the same to itself; extra slots/breadths help reach and hold `B` but can't push
-  one node above it.
+- **own(node) = Σ over breadths of min(B, (B / FULL_CARDS) · Σ retention in that breadth)** — `B = 20`,
+  `FULL_CARDS = 5`. Each narrative (A/B/C) is independently worth up to `B`, so mastering one breadth =
+  20 and a node with all three mastered = 60, *regardless of depth*. The per-breadth scores are exposed
+  by `/api/scores` (`breadths` map), and each node's A/B/C buttons show a completion dot
+  (green = breadth mastered, amber = in progress) so you can see which breadths are done and that each
+  remaining one is worth ~`B`.
 - **score(node) = own(node) + R · Σ score(child)** — recursive, `R = 0.95` (gentle taper). A child is
   worth `R·20 ≈ 19` *to its parent*, but 20 to itself. Cached as `subtree_raw`.
 - **Displayed value = the rounded raw score itself** (no ring, no 0-100 cap). A leaf shows ~20, a
