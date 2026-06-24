@@ -702,7 +702,14 @@ ${candidateList}
 **Rules:**
 - 2 to 4 named regions. Members must be codes from the list above. No place in two regions.
 - A title may use a recognisable name for the grouping (e.g. "The Western Front"), 5 words maximum, but the title must NOT imply places the region leaves out.
-- **The scope must match the members exactly.** Describe ONLY places contained in this region's members (use each candidate's "contains:" list above), and do NOT name any country or place that is not among them. Those "contains:" lists are authoritative — trust them over your own assumptions about which places belong to a grouping. (Example: the "Western Europe" grouping does NOT include Britain — the ledger files the United Kingdom under "Northern Europe" — so a "Western Europe" region's scope must not claim Britain. If you want Britain in a region, add the member that actually contains it.) If the members do not fit a tidy name, use a plainer geographic title and name the actual places in the scope.
+- **The scope must match the members exactly.** Describe ONLY places contained in this region's members (use each candidate's "contains:" list above), and do NOT name any country or place that is not among them. Those "contains:" lists are authoritative — trust them over your own assumptions about which places belong to a grouping. If the members do not fit a tidy name, use a plainer geographic title and name the actual places in the scope.
+- **Watch these counterintuitive placements — they are the exact mistakes to avoid.** This ledger groups some places differently from common intuition; never name one of these as part of a region whose members do not actually contain it (always check the "contains:" lists):
+  - **Iran / Persia** is filed under *Southern Asia* — NOT the Middle East or Western Asia.
+  - **Spain and Portugal** are *Southern Europe* — NOT Western Europe.
+  - **Georgia, Armenia, Azerbaijan** are *Western Asia* — NOT Europe.
+  - **United Kingdom and Ireland** are *Northern Europe* — NOT Western Europe.
+  - **Mexico** is *North America* — NOT Central America.
+  So a "Middle East"/"Western Asia" region must not claim Persia or Iran; a "Western Europe" region must not claim Spain, Portugal, or Britain; and so on. You may mention such a place only to say what the region connected to or traded with — never as part of it.
 - Set "significant" to true if any place left in the leftover still has a meaningful connection to the topic (so it should be explored further); false if everything remaining is minor.
 - If a region is a time-bounded entity (an ancient landmass, a celestial body, an extinct polity), put its period in brackets in the title, e.g. "Gondwana (~550–180 MYA)".
 - Output ONLY the JSON object.`;
