@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@clerk/react';
+import { useClerkEnabled } from '../hooks/useClerkAuth';
 import {
     getBreadthColor,
     treeStructure,
@@ -24,8 +26,51 @@ function useIsMobile(breakpoint = 768) {
     return isMobile;
 }
 
+// Small XP badge (a pill showing the node's score) drawn in a node's top-right corner. Only shown
+// for nodes the signed-in user has a score for. Large scores are abbreviated (e.g. 1.2k, 21k).
+function MasteryBadge({ score, nodeWidth }) {
+    const label = score >= 1000
+        ? (score / 1000).toFixed(score >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k'
+        : String(score);
+    const w = 14 + label.length * 6.5;
+    const x = nodeWidth - w - 6;
+    return (
+        <g pointerEvents="none">
+            <rect x={x} y={8} width={w} height={16} rx={8} fill="#2e9e5b" />
+            <text x={x + w / 2} y={16} textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="700" fill="white">
+                {label}
+            </text>
+        </g>
+    );
+}
+
+// Auth-gated loader: fetches the signed-in user's per-node mastery scores once and lifts them up.
+// Rendered only when Clerk is enabled, so useAuth is always inside ClerkProvider. Renders nothing.
+function MasteryScoreLoader({ onLoaded }) {
+    const auth = useAuth();
+    useEffect(() => {
+        if (!auth.isSignedIn) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const token = await auth.getToken();
+                const res = await fetch('/api/scores', { headers: { Authorization: `Bearer ${token}` } });
+                const data = await res.json();
+                if (!cancelled && data.success) onLoaded({ scores: data.scores || {}, breadths: data.breadths || {} });
+            } catch (err) {
+                console.error('Failed to load mastery scores:', err);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [auth.isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+    return null;
+}
+
 function TreeVisualization() {
     const isMobile = useIsMobile();
+    const clerkEnabled = useClerkEnabled();
+    const [scores, setScores] = useState({});
+    const [breadths, setBreadths] = useState({});
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [activePath, setActivePath] = useState([]);
@@ -1133,6 +1178,7 @@ function TreeVisualization() {
                     overflowX: 'auto'
                 }}
             >
+                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, breadths }) => { setScores(scores); setBreadths(breadths); }} />}
                 <svg
                     viewBox={`0 0 ${svgWidth} ${svgHeight}`}
                     width="100%"
@@ -1206,6 +1252,11 @@ function TreeVisualization() {
                                     ))}
                                 </text>
 
+                                {/* Mastery XP badge (top-right) for nodes the user has a score for */}
+                                {scores[node.anchor.id] != null && (
+                                    <MasteryBadge score={scores[node.anchor.id]} nodeWidth={nodeWidth} />
+                                )}
+
                                 {/* Action buttons */}
                                 <g>
                                     {/* Show buttons on all nodes except unclicked ROOT */}
@@ -1270,6 +1321,22 @@ function TreeVisualization() {
                                                             >
                                                                 {breadth}
                                                             </text>
+                                                            {/* Completion dot: green = breadth mastered, amber = in progress */}
+                                                            {(() => {
+                                                                const bOwn = breadths[node.anchor.id]?.[breadth] || 0;
+                                                                if (bOwn <= 0) return null;
+                                                                return (
+                                                                    <circle
+                                                                        cx={buttonX + buttonWidth - 2.5}
+                                                                        cy={nodeHeight - 22 + 2.5}
+                                                                        r={2.6}
+                                                                        fill={bOwn >= 19 ? '#2e9e5b' : '#e0a030'}
+                                                                        stroke="white"
+                                                                        strokeWidth="0.6"
+                                                                        pointerEvents="none"
+                                                                    />
+                                                                );
+                                                            })()}
                                                         </g>
                                                     );
                                                 })}

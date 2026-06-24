@@ -107,7 +107,7 @@ Begin with a **discrete anecdote, moment, or discovery** that illuminates your t
 - Assume the reader knows nothing. Explain who people are (roles before names), where places are (modern geographic references), when things happened
 - Minimize proper names. Use descriptions where possible
 - Create mystery or tension that makes the reader want to understand more
-- End the hook by stating what it reveals (not with clickbait questions)
+- End the hook by moving straight into the narrative. Do NOT editorialise about the anecdote (no "this shows...", no "a good place to start a story about...") and do not end on a clickbait question
 - Include ONE piece of primary source evidence maximum if it genuinely illuminates the point
 
 **Then pivot** to introduce the geographic scope of your narrative.
