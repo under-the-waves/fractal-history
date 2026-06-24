@@ -36,3 +36,6 @@ playwright-report/
 dev-api-server.mjs
 vite.dev-local.config.js
 test-factcheck.mjs
+
+# Retrofit recovery backups (local only)
+backup-retrofit-*.json
