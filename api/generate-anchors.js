@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles, renderAnalyticalFrame, renderParentSignpost, renderParentLabel, temporalCoordinate, geographicCoordinate } from '../lib/promptLoader.js';
-import { query, getAncestorPath } from '../lib/db.js';
+import { query, getAncestorPath, findExistingEventAnchor, wouldCreateCycle } from '../lib/db.js';
 import { WORLD, getName, getLevel, getChildren, expandToCandidates } from '../lib/geography.js';
 import dotenv from 'dotenv';
 
@@ -34,6 +34,14 @@ function generateAnchorId() {
         hash += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return `anc-${hash}`;
+}
+
+// Coerce a model-provided event year to an integer, or null. Accepts numbers and numeric strings
+// (negative for BCE). Unparseable/blank -> null, so reuse simply will not match on it.
+function toYearOrNull(v) {
+    if (v === null || v === undefined || v === '') return null;
+    const n = typeof v === 'number' ? v : parseInt(String(v).replace(/[^\d-]/g, ''), 10);
+    return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
 // Get existing sibling anchors at the same level
@@ -250,7 +258,11 @@ export default async function handler(req, res) {
                 position: 0,
                 causalSignificance: a.causalSignificance,
                 humanImpact: a.humanImpact,
-                finalScore: a.finalScore
+                finalScore: a.finalScore,
+                // Own-extent tags for anchor reuse (only bounded datable events are reuse-eligible).
+                isDatableEvent: a.isDatableEvent === true,
+                eventStart: a.isDatableEvent === true ? toYearOrNull(a.eventStart) : null,
+                eventEnd: a.isDatableEvent === true ? toYearOrNull(a.eventEnd) : null
             }));
             anchors.sort((a, b) => b.sortValue - a.sortValue);
             anchors.forEach((a, i) => { a.position = i + 1; });
@@ -425,44 +437,71 @@ export default async function handler(req, res) {
             return { anchorId, positionId, anchor };
         });
 
-        // Batch insert anchors (single query). region_codes is only populated for
-        // geographic (breadth C) anchors; null otherwise.
-        const anchorValues = anchorRows.map((r, i) => {
-            const off = i * 5;
-            return `($${off + 1}, $${off + 2}, $${off + 3}, $${off + 4}, $${off + 5})`;
-        }).join(', ');
-        const anchorParams = anchorRows.flatMap(r => [
-            r.anchorId, r.anchor.title, r.anchor.scope, 'pending',
-            r.anchor.region_codes ? JSON.stringify(r.anchor.region_codes) : null
-        ]);
-        const insertedRows = await query(
-            `INSERT INTO anchors (id, title, scope, generation_status, region_codes) VALUES ${anchorValues} RETURNING id, title, scope, generation_status, region_codes`,
-            anchorParams
-        );
+        // ANCHOR REUSE: a generated child that is a bounded datable event already present elsewhere
+        // is SHARED rather than duplicated — we add a (non-canonical) position pointing at the
+        // existing anchor instead of minting a new one, so the concept keeps one narrative and one
+        // score. Only breadth-A datable events are eligible; the cycle guard keeps the tree a DAG.
+        for (const r of anchorRows) {
+            r.reuseOf = null;
+            if (breadth === 'A' && r.anchor.isDatableEvent) {
+                const existingId = await findExistingEventAnchor(
+                    r.anchor.title, r.anchor.eventStart, r.anchor.eventEnd
+                );
+                if (existingId && existingId !== parentId && !(await wouldCreateCycle(existingId, parentPosId))) {
+                    r.reuseOf = existingId;
+                    console.log(`Reusing existing anchor ${existingId} for datable event "${r.anchor.title}" (no new anchor minted)`);
+                }
+            }
+        }
 
-        // Batch insert tree positions (single query)
-        const posValues = anchorRows.map((r, i) => {
-            const off = i * 6;
-            return `($${off + 1}, $${off + 2}, $${off + 3}, $${off + 4}, $${off + 5}, $${off + 6})`;
-        }).join(', ');
-        const posParams = anchorRows.flatMap(r => [
-            r.positionId, r.anchorId, parentPosId, childLevel, breadth, r.anchor.position
-        ]);
-        await query(
-            `INSERT INTO tree_positions (position_id, anchor_id, parent_position_id, level, breadth, position) VALUES ${posValues}`,
-            posParams
-        );
+        // Mint anchors only for the non-reused (fresh) rows. region_codes is populated for geographic
+        // (breadth C) anchors; the event own-extent columns only for breadth-A datable events.
+        const freshRows = anchorRows.filter(r => !r.reuseOf);
+        const insertedById = new Map();
+        for (const r of freshRows) {
+            const isEvent = breadth === 'A' && r.anchor.isDatableEvent;
+            const [row] = await query(
+                `INSERT INTO anchors (id, title, scope, generation_status, region_codes, is_datable_event, event_start_year, event_end_year)
+                 VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7)
+                 RETURNING id, title, scope, generation_status, region_codes`,
+                [
+                    r.anchorId, r.anchor.title, r.anchor.scope,
+                    r.anchor.region_codes ? JSON.stringify(r.anchor.region_codes) : null,
+                    isEvent, isEvent ? r.anchor.eventStart : null, isEvent ? r.anchor.eventEnd : null
+                ]
+            );
+            insertedById.set(r.anchorId, row);
+        }
 
-        // Build response
-        const insertedAnchors = insertedRows.map((row, i) => ({
-            ...row,
-            level: childLevel,
-            breadth,
-            position: anchorRows[i].anchor.position,
-            causalSignificance: anchorRows[i].anchor.causalSignificance,
-            humanImpact: anchorRows[i].anchor.humanImpact,
-            finalScore: anchorRows[i].anchor.finalScore,
-        }));
+        // Insert every position. Fresh rows point at the new anchor and are canonical; reused rows
+        // point at the existing anchor and are non-canonical (its original home stays canonical).
+        for (const r of anchorRows) {
+            await query(
+                `INSERT INTO tree_positions (position_id, anchor_id, parent_position_id, level, breadth, position, is_canonical)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [r.positionId, r.reuseOf || r.anchorId, parentPosId, childLevel, breadth, r.anchor.position, !r.reuseOf]
+            );
+        }
+
+        // Build response: fresh rows use the inserted anchor; reused rows resolve to the shared anchor.
+        const reusedIds = anchorRows.filter(r => r.reuseOf).map(r => r.reuseOf);
+        const reusedAnchors = reusedIds.length > 0
+            ? await query(`SELECT id, title, scope, generation_status, region_codes FROM anchors WHERE id = ANY($1)`, [reusedIds])
+            : [];
+        const reusedById = new Map(reusedAnchors.map(a => [a.id, a]));
+        const insertedAnchors = anchorRows.map(r => {
+            const base = r.reuseOf ? reusedById.get(r.reuseOf) : insertedById.get(r.anchorId);
+            return {
+                ...base,
+                level: childLevel,
+                breadth,
+                position: r.anchor.position,
+                causalSignificance: r.anchor.causalSignificance,
+                humanImpact: r.anchor.humanImpact,
+                finalScore: r.anchor.finalScore,
+                reused: !!r.reuseOf,
+            };
+        });
 
         return res.status(200).json({
             success: true,

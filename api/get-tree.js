@@ -27,13 +27,16 @@ export default async function handler(req, res) {
             });
         }
 
-        // Get children of specified parent and breadth
+        // Get children of specified parent and breadth. A parent anchor may sit at more than one
+        // tree position once anchors are reused, so gather children under ANY of its positions
+        // (lazy shared-by-anchor rendering) rather than one arbitrary position. On a plain tree the
+        // parent has a single position, so this returns exactly the same rows as before.
         const children = await sql`
       SELECT a.id, a.title, a.scope, a.region_codes, tp.level, tp.breadth, tp.position, tp.parent_position_id
       FROM anchors a
       JOIN tree_positions tp ON a.id = tp.anchor_id
-      WHERE tp.parent_position_id = (
-        SELECT position_id FROM tree_positions WHERE anchor_id = ${parentId} LIMIT 1
+      WHERE tp.parent_position_id IN (
+        SELECT position_id FROM tree_positions WHERE anchor_id = ${parentId}
       )
       AND tp.breadth = ${breadth || 'A'}
       ORDER BY tp.position ASC

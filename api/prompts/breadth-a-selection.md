@@ -43,6 +43,7 @@ Resist Western/European-centric defaults. Consider non-Western developments fair
 3. **Include difficult topics.** Wars, genocides, slavery, colonial violence — if causally significant, include them.
 4. **Score honestly.** Causal Significance (1-10): how directly this reshaped subsequent history. Human Impact (1-10): how many people were affected and how severely. Final Score = (Causal x 0.6) + (Impact x 0.4).
 5. **Generic titles for broad processes** (e.g. "Urbanization"), **specific titles for bounded events** (e.g. "Siege of Leningrad").
+6. **Tag bounded datable events.** A bounded datable event is a discrete occurrence with a fixed start and end that is the SAME wherever it is met (a war, a treaty, a specific revolution, a named disaster) — e.g. World War I is 1914–1918 anywhere. Set `isDatableEvent` true for these and give integer `eventStart`/`eventEnd` years (negative for BCE, e.g. -44). Broad, open-ended PROCESSES or themes (Industrialization, Urbanization, Nationalism, the Factory System) are NOT datable events — set `isDatableEvent` false and omit the years. When unsure, choose false.
 
 ---
 
@@ -57,6 +58,9 @@ Respond with ONLY valid JSON, no other text:
       "title": "Short Name",
       "timePeriod": "approximate dates",
       "scope": "2-3 sentences: what it covers, what's included, what's excluded",
+      "isDatableEvent": true,
+      "eventStart": 1914,
+      "eventEnd": 1918,
       "causalSignificance": 8,
       "causalJustification": "One sentence",
       "humanImpact": 7,
@@ -69,4 +73,5 @@ Respond with ONLY valid JSON, no other text:
 
 **CRITICAL:**
 - `candidates` must contain EXACTLY 10 entries
+- `isDatableEvent` is required on every candidate; include `eventStart`/`eventEnd` (integer years) only when it is true
 - Output ONLY the JSON object, no markdown, no explanation
