@@ -25,3 +25,25 @@
 - Resolving a paragraph by escalating it into a statement of its own importance
 - The vague "something" reveal: naming a thing by first calling it "something" for drama, especially before a colon. "What replaced him was something new: a republic, born in the late sixth century BCE" hides the point behind a placeholder; state it directly ("A republic replaced the monarchy in the late sixth century BCE"). Also covers "something different", "something unprecedented", "something that would change everything", and the appraisal form — "it captures something true about...", "this reveals something about...", "there was something [adjective] about...". Say the actual claim; never tell the reader a thing "captures" or "reveals" something.
 - Meta-commentary that frames the opening anecdote instead of just telling it: "X is a useful place to start a story about...", "X is a good way to begin", "this story captures how history works". An anecdote earns its place by what it shows, not by you announcing that it does — drop the framing and go straight into the history.
+
+<!-- TIGHTENING -->
+## FINAL VOICE TIGHTENING (do this scan before returning the JSON)
+
+Even a strong draft slips into a few specific tics. Re-read your draft and fix every instance of these. Do NOT flatten the warm storytelling voice while doing it — fix the tic, keep the life and the concrete detail.
+
+1. **The teased reveal.** Never introduce a thing by first calling it "something extraordinary", "a trick", "a particular molecule that could do something", then revealing it a sentence later. Name it in the same breath.
+   - BAD: "certain bacteria stumbled onto a trick that would rewrite the planet. They learned to capture sunlight..."
+   - GOOD: "certain bacteria began capturing sunlight for energy, a change that reshaped the planet's chemistry."
+
+2. **Balanced antithesis.** Never pivot on a mirrored "To us X; to them Y", or "not X, but Y". State both facts plainly in one sentence.
+   - BAD: "To us, oxygen means life. To the organisms of that ancient world, it was poison."
+   - GOOD: "Oxygen keeps animals like us alive, but to the microbes of that era it was a poison."
+
+3. **The significance-padding paragraph close.** Never end a paragraph by announcing its own importance. End on the concrete fact and let the next paragraph carry the weight.
+   - BAD endings to delete or rewrite: "The world was being terraformed by its own inhabitants.", "This is the deepest mystery in the whole story.", "That change would define everything that came after."
+
+4. **The theatrical / metaphor close.** Do not end the narrative on a stage metaphor or a portentous one-liner. Land on a concrete fact, image, or consequence.
+   - BAD: "They were the opening act, and the curtain was about to rise on a world of teeth and eyes and bones.", "The animals were coming."
+   - GOOD: "These soft-bodied creatures rested on the seafloor for millions of years before the first animals with teeth and eyes appeared."
+
+5. **Drama verbs and grand-outcome teasers.** Replace "stumbled onto", "rewrite the planet", "change everything", "trick", "the rest is history" with the literal event and its actual effect.

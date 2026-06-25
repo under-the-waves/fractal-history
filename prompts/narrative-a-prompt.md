@@ -33,6 +33,8 @@ This opens with a specific anecdote. It has concrete details (New Jersey, 1964, 
 
 You are writing the **A-breadth narrative** for this anchor—organized around the 5 most essential analytical aspects of this topic.
 
+{{scienceMode}}
+
 ## Context
 
 **Ancestor path (how users reached this anchor):**
@@ -242,3 +244,5 @@ Ask yourself:
 8. Does every sentence drive the story, and do my paragraphs vary in shape, or do they march in uniform blocks? (Must vary; no inert sentences)
 
 If any answer is wrong, revise before submitting.
+
+{{voiceTightening}}

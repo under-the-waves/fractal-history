@@ -44,18 +44,44 @@ function loadPromptTemplate(breadth) {
     }
 }
 
+// Narrative generation model. Opus follows the voice bans far more reliably than
+// Sonnet and explains mechanisms (not just event sequences); narratives are cached
+// per anchor, so this cost is one-time per anchor, not per reader.
+const NARRATIVE_MODEL = 'claude-opus-4-8';
+
+// Roots whose subtrees are natural-science / pre-civilisational, where explaining the
+// physical mechanism matters more than narrating a sequence of events. Detected by
+// ancestry, so every descendant narrative inherits science-mode.
+const SCIENCE_ROOTS = new Set([
+    '1A-E8F2G', // Emergence of Life on Earth
+    '1A-Q7R2S', // Evolution of Humans
+    '1B-T4U9V', // Deep Time: 13.8 BYA - 3 MYA
+    '1B-W1X6Y', // Foraging Era: 3 MYA - 10,000 BCE
+    '1C-I6J1K'  // Cosmic & Planetary
+]);
+
+const SCIENCE_MODE_BLOCK = `## SCIENCE TOPIC: EXPLAIN THE MECHANISM
+
+This is a natural-science / pre-civilisational topic. Most readers have no scientific background, so leaning on a sequence of events ("this happened, then that happened") teaches them little.
+
+- For each major development, explain the MECHANISM: what physically happened at the level of molecules, cells, bodies, or geology, and why that produced the effect it did. "Walking upright freed the hands" is an assertion; explain what changed in the skeleton and why that mattered.
+- Establish the BASELINE first. Before describing a change, say what the world was like just before it, so the reader has something to measure the change against (e.g. what life or the planet looked like before this step).
+- Define every scientific term in passing, the first time you use it, in a few plain words.`;
+
 // Load shared voice/style guidance used across all breadths.
-// Single source of truth: prompts/_shared-voice.md, split into a VOICE section
-// and a BANS section by sentinel comments. Read fresh each call so edits apply live.
+// Single source of truth: prompts/_shared-voice.md, split into VOICE, BANS, and
+// TIGHTENING sections by sentinel comments. Read fresh each call so edits apply live.
 function loadSharedVoice() {
     const sharedPath = path.join(process.cwd(), 'prompts', '_shared-voice.md');
     const raw = fs.readFileSync(sharedPath, 'utf-8');
-    const m = raw.match(/<!-- VOICE -->([\s\S]*?)<!-- BANS -->([\s\S]*)/);
-    if (!m) {
-        // Fallback: treat the whole file as voice guidance, no separate bans
-        return { voice: raw.trim(), bans: '' };
+    const m = raw.match(/<!-- VOICE -->([\s\S]*?)<!-- BANS -->([\s\S]*?)<!-- TIGHTENING -->([\s\S]*)/);
+    if (m) {
+        return { voice: m[1].trim(), bans: m[2].trim(), tightening: m[3].trim() };
     }
-    return { voice: m[1].trim(), bans: m[2].trim() };
+    // Fallback: no tightening section
+    const m2 = raw.match(/<!-- VOICE -->([\s\S]*?)<!-- BANS -->([\s\S]*)/);
+    if (!m2) return { voice: raw.trim(), bans: '', tightening: '' };
+    return { voice: m2[1].trim(), bans: m2[2].trim(), tightening: '' };
 }
 
 // Get child anchors for a given parent and breadth
@@ -125,8 +151,10 @@ function populatePromptTemplate(template, data) {
         .replace(/\{\{ancestorPath\}\}/g, data.ancestorPath)
         .replace(/\{\{prerequisites\}\}/g, data.prerequisites)
         .replace(/\{\{childAnchors\}\}/g, data.childAnchors)
+        .replace(/\{\{scienceMode\}\}/g, () => data.scienceMode || '')
         .replace(/\{\{sharedVoice\}\}/g, () => data.sharedVoice)
-        .replace(/\{\{sharedBans\}\}/g, () => data.sharedBans);
+        .replace(/\{\{sharedBans\}\}/g, () => data.sharedBans)
+        .replace(/\{\{voiceTightening\}\}/g, () => data.voiceTightening || '');
 }
 
 // Parse the LLM response JSON
@@ -258,6 +286,7 @@ export default async function handler(req, res) {
 
         // Populate template
         const shared = loadSharedVoice();
+        const isScienceNode = ancestors.some(a => SCIENCE_ROOTS.has(a.id));
         const prompt = populatePromptTemplate(promptTemplate, {
             anchorId: anchorId,
             anchorTitle: anchor.title,
@@ -265,14 +294,16 @@ export default async function handler(req, res) {
             ancestorPath: formatAncestorPath(ancestors),
             prerequisites: 'None', // Can be expanded later to track user progress
             childAnchors: formatChildAnchors(children, breadth),
+            scienceMode: isScienceNode ? SCIENCE_MODE_BLOCK : '',
             sharedVoice: shared.voice,
-            sharedBans: shared.bans
+            sharedBans: shared.bans,
+            voiceTightening: shared.tightening
         });
 
         // Step 5: Call LLM API
-        console.log('Calling Anthropic API for narrative generation...');
+        console.log(`Calling Anthropic API for narrative generation (${NARRATIVE_MODEL}${isScienceNode ? ', science mode' : ''})...`);
         const completion = await getAnthropicClient().messages.create({
-            model: 'claude-sonnet-4-6',
+            model: NARRATIVE_MODEL,
             max_tokens: 2500,
             system: 'You are an expert historian and educational writer. You write engaging, accurate historical narratives in the style of Dan Carlin\'s Hardcore History podcast. Always respond with valid JSON as specified in the prompt.',
             messages: [
