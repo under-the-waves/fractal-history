@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles, renderAnalyticalFrame, renderParentSignpost, renderParentLabel, temporalCoordinate, geographicCoordinate } from '../lib/promptLoader.js';
 import { query, getAncestorPath, findExistingEventAnchor, wouldCreateCycle } from '../lib/db.js';
-import { WORLD, getName, getLevel, getChildren, expandToCandidates } from '../lib/geography.js';
+import { WORLD, getName, getLevel, getChildren, expandToCandidates, expandToCountries, resolveCountries } from '../lib/geography.js';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -144,8 +144,10 @@ export default async function handler(req, res) {
         console.log(`Found ${ancestorPath.length} ancestors and ${existingSiblings.length} existing siblings`);
         // Build the appropriate prompt based on breadth type.
         let systemPrompt;
-        let cCandidates = null; // [{ code, name, level }] of the places C may divide
+        let cCandidates = null; // [{ code, name, level }] of the places C may divide (subdivision mode)
         let cCosmic = false;    // cosmic branch uses free-text generation, not the ledger
+        let cMode = null;       // 'country' (group countries) | 'subdivision' (legacy ledger) | null
+        let cUniverse = null;   // array of cca2 the node divides over (country mode)
         if (breadth === 'C') {
             // The universe of places to divide: the parent's own coverage if it is
             // itself a geographic anchor, otherwise the whole world.
@@ -167,25 +169,40 @@ export default async function handler(req, res) {
                     ancestorPath, existingSiblings
                 );
             } else {
-                const candidateCodes = expandToCandidates(universe);
-                cCandidates = candidateCodes.map(code => ({
-                    code, name: getName(code), level: getLevel(code)
-                }));
-                console.log(`Breadth C: dividing ${universe.length} universe code(s) into ${cCandidates.length} candidate place(s)`);
-                // Nothing to subdivide (a leaf place, e.g. a single country): don't
-                // fall back to the whole world or call the model.
-                if (cCandidates.length <= 1) {
-                    console.log(`Breadth C: no further geographic subdivision for ${parentId}; skipping generation`);
-                    return res.status(200).json({
-                        success: true, parentId, parentTitle, breadth,
-                        anchorsGenerated: 0, anchors: [],
-                        note: 'No further geographic subdivision for this place.'
-                    });
+                // Resolve the universe to its member countries. With 2+ countries we GROUP countries
+                // (the model forms historically meaningful regions, code owns completeness). With a
+                // single country we are at a leaf and fall back to dividing it into ISO subdivisions.
+                const universeCountries = [...expandToCountries(universe)];
+                if (universeCountries.length >= 2) {
+                    cMode = 'country';
+                    cUniverse = universeCountries;
+                    const isWholeWorld = universe.length === 1 && universe[0] === WORLD;
+                    console.log(`Breadth C (country): grouping over ${universeCountries.length} countries${isWholeWorld ? ' (whole world)' : ''}`);
+                    systemPrompt = buildCountryGroupingPrompt(
+                        parentId, parentTitle, parentScope || 'No scope provided',
+                        ancestorPath, existingSiblings, cUniverse, isWholeWorld
+                    );
+                } else {
+                    // Single country (or nothing): legacy subdivision division into states/provinces.
+                    const candidateCodes = expandToCandidates(universe);
+                    cCandidates = candidateCodes.map(code => ({
+                        code, name: getName(code), level: getLevel(code)
+                    }));
+                    if (cCandidates.length <= 1) {
+                        console.log(`Breadth C: no further geographic subdivision for ${parentId}; skipping generation`);
+                        return res.status(200).json({
+                            success: true, parentId, parentTitle, breadth,
+                            anchorsGenerated: 0, anchors: [],
+                            note: 'No further geographic subdivision for this place.'
+                        });
+                    }
+                    cMode = 'subdivision';
+                    console.log(`Breadth C (subdivision): dividing into ${cCandidates.length} subdivisions`);
+                    systemPrompt = buildBreadthCPrompt(
+                        parentId, parentTitle, parentScope || 'No scope provided',
+                        ancestorPath, existingSiblings, cCandidates
+                    );
                 }
-                systemPrompt = buildBreadthCPrompt(
-                    parentId, parentTitle, parentScope || 'No scope provided',
-                    ancestorPath, existingSiblings, cCandidates
-                );
             }
         } else {
             const promptBuilder = breadth === 'A' ? buildBreadthAPrompt : buildBreadthBPrompt;
@@ -304,10 +321,55 @@ export default async function handler(req, res) {
             candidates = anchors.map(a => ({ title: a.title, scope: a.scope, selected: true }));
             selectionReasoning = data.reasoning || 'Geographic regions of this place, generated freely (the cosmic branch has no fixed place list).';
             console.log(`Breadth C (cosmic): ${anchors.length} region(s) generated`);
+        } else if (breadth === 'C' && cMode === 'country') {
+            // Country-grouping division: the model named groups of countries. Resolve each member to a
+            // country code, keep only those inside this node's universe and not already claimed, then
+            // let code compute the leftover — so every country has a home and none is claimed twice.
+            let cleaned = response.trim().replace(/```json\n?/g, '').replace(/```\n?/g, '');
+            const data = JSON.parse(cleaned);
+
+            const universeSet = new Set(cUniverse);
+            const claimed = new Set();
+            const named = [];
+            for (const g of (data.groups || [])) {
+                // Each member may expand to several countries (a historical state). Keep those in the
+                // universe and not yet claimed, deduped within the group.
+                const members = [];
+                for (const code of (g.members || []).flatMap(m => resolveCountries(m))) {
+                    if (universeSet.has(code) && !claimed.has(code) && !members.includes(code)) members.push(code);
+                }
+                if (members.length === 0) continue; // unrecognised, out-of-universe, or fully duplicated
+                members.forEach(code => claimed.add(code));
+                named.push({ title: g.title, scope: g.scope, members, connectionStrength: Number(g.connectionStrength) || 0 });
+            }
+
+            const leftoverCodes = cUniverse.filter(code => !claimed.has(code));
+
+            anchors = named.map((r, i) => ({
+                title: r.title, scope: r.scope, position: i + 1,
+                region_codes: r.members, connectionStrength: r.connectionStrength
+            }));
+            if (leftoverCodes.length > 0) {
+                anchors.push({
+                    title: (data.leftover && data.leftover.title) || 'Rest of the World',
+                    scope: (data.leftover && data.leftover.scope) ||
+                        'Countries with a lesser connection to this topic, kept reachable for deeper exploration.',
+                    position: anchors.length + 1, region_codes: leftoverCodes, connectionStrength: 0
+                });
+            }
+
+            console.log(`Breadth C (country): ${named.length} group(s), leftover holds ${leftoverCodes.length} countr${leftoverCodes.length === 1 ? 'y' : 'ies'}`);
+
+            candidates = anchors.map(a => ({
+                title: a.title, scope: a.scope,
+                members: (a.region_codes || []).map(getName),
+                connectionStrength: a.connectionStrength, selected: true
+            }));
+            selectionReasoning = data.coverageJustification ||
+                'Country groups capture the topic\'s strongest geographic connections; the rest are gathered into a leftover.';
         } else if (breadth === 'C') {
-            // Geographic (place-based) division. The model nominates a few named
-            // regions by selecting place codes; the program computes the leftover
-            // as the complement, so no place can be silently lost.
+            // Legacy subdivision division (a single country into its states/provinces). The model
+            // nominates named regions by selecting place codes; the program computes the leftover.
             let cleaned = response.trim().replace(/```json\n?/g, '').replace(/```\n?/g, '');
             const data = JSON.parse(cleaned);
 
@@ -703,15 +765,79 @@ ${candidateList}
 - 2 to 4 named regions. Members must be codes from the list above. No place in two regions.
 - A title may use a recognisable name for the grouping (e.g. "The Western Front"), 5 words maximum, but the title must NOT imply places the region leaves out.
 - **The scope must match the members exactly.** Describe ONLY places contained in this region's members (use each candidate's "contains:" list above), and do NOT name any country or place that is not among them. Those "contains:" lists are authoritative — trust them over your own assumptions about which places belong to a grouping. If the members do not fit a tidy name, use a plainer geographic title and name the actual places in the scope.
-- **Watch these counterintuitive placements — they are the exact mistakes to avoid.** This ledger groups some places differently from common intuition; never name one of these as part of a region whose members do not actually contain it (always check the "contains:" lists):
-  - **Iran / Persia** is filed under *Southern Asia* — NOT the Middle East or Western Asia.
-  - **Spain and Portugal** are *Southern Europe* — NOT Western Europe.
-  - **Georgia, Armenia, Azerbaijan** are *Western Asia* — NOT Europe.
-  - **United Kingdom and Ireland** are *Northern Europe* — NOT Western Europe.
-  - **Mexico** is *North America* — NOT Central America.
-  So a "Middle East"/"Western Asia" region must not claim Persia or Iran; a "Western Europe" region must not claim Spain, Portugal, or Britain; and so on. You may mention such a place only to say what the region connected to or traded with — never as part of it.
 - Set "significant" to true if any place left in the leftover still has a meaningful connection to the topic (so it should be explored further); false if everything remaining is minor.
 - If a region is a time-bounded entity (an ancient landmass, a celestial body, an extinct polity), put its period in brackets in the title, e.g. "Gondwana (~550–180 MYA)".
+- Output ONLY the JSON object.`;
+}
+
+// Build the country-grouping geographic prompt. The model groups COUNTRIES (not whole UN subregions)
+// into a few historically meaningful regions by their connection to the topic. The program computes
+// the leftover from whatever the model does not claim, so every country still has a home and none is
+// claimed twice — the model only has to name the relevant players, not partition all ~195.
+// See project knowledge/Geographic_Country_Grouping_Design.md.
+export function buildCountryGroupingPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings, universeCca2, isWholeWorld) {
+    const ancestorContext = formatAncestorContext(ancestorPath);
+    const siblingNote = existingSiblings && existingSiblings.length > 0
+        ? `\n**These regions already exist for this topic — do not duplicate them:**\n${existingSiblings.map(s => `- ${s.title}`).join('\n')}\n`
+        : '';
+
+    // When the area is already narrowed to a manageable set, list it so the model groups within it.
+    // For a whole-world division we do not list ~195 countries; the model names the relevant ones
+    // from its own knowledge and the program validates them against the world set.
+    const scopeList = (!isWholeWorld && universeCca2.length <= 60)
+        ? `\n## The countries in scope\n\nGroup only from these ${universeCca2.length} countries:\n${universeCca2.map(getName).sort().join(', ')}\n`
+        : `\n## The countries in scope\n\nThe whole world is in scope. Name the countries with a real connection to this topic; everything you do not name is gathered into a leftover automatically.\n`;
+
+    return `# Geographic division by country grouping
+
+You are dividing a topic into geographic regions for a history learning tree, by grouping COUNTRIES.
+
+**Topic ID:** ${parentId}
+**Topic:** ${renderParentLabel(ancestorPath, parentTitle)}
+**Topic scope:** ${parentScope}
+
+**Analytical frame (what "connection to this topic" means):** ${renderAnalyticalFrame(ancestorPath)}
+
+${renderParentSignpost(ancestorPath)}
+
+**How we got here:**
+${ancestorContext}
+${siblingNote}
+## What a region means here
+
+A region is a group of countries that share a CONNECTION to this topic — through their people, forces, money, and decisions WHEREVER those acted, not only events that physically happened on their soil. Example: under "World War I", a region "Australia and New Zealand" covers the ANZACs who fought at Gallipoli and in France, far from home.
+
+You decide which countries belong together for THIS topic — there is no fixed map. Group them the way a historian teaching this topic would: by their role, alliance, or shared part in it (e.g. for a war: the major belligerents, the home fronts, the colonial theatres; for a cultural movement: the heartlands, then where it spread).
+${scopeList}
+## What to do
+
+1. Form **2 to 4 named regions**, each a group of countries with a strong, coherent connection to the topic. A region can be one country or several that belong together.
+2. List each region's members as country names or ISO codes.
+3. Give each region a short title (5 words max), a 2-3 sentence scope, and a connection strength from 1 to 10.
+4. You do NOT need to place every country. Name only those with a real connection; the program sweeps everyone else into a single leftover region. Optionally give that leftover a title and one-line scope.
+
+## Output: JSON only, no other text
+
+\`\`\`json
+{
+  "groups": [
+    {
+      "title": "Allied Powers",
+      "scope": "Britain, France, Russia, Italy and the United States: the principal Entente belligerents — their armies, war economies, and the alliance politics that bound them.",
+      "members": ["United Kingdom", "France", "Russia", "Italy", "United States"],
+      "connectionStrength": 9
+    }
+  ],
+  "leftover": { "title": "Rest of the World", "scope": "Countries with a lesser connection to this topic, kept reachable for deeper exploration." },
+  "coverageJustification": "One or two sentences on why these groupings capture the topic's strongest geographic connections."
+}
+\`\`\`
+
+**Rules:**
+- 2 to 4 groups. Members must be **present-day countries** — use recognisable modern names or ISO codes. For a historical state, list its **modern successor countries** instead of the empire's name: e.g. Austria-Hungary → Austria, Hungary, Czechia, Slovakia, Slovenia, Croatia; the Ottoman Empire → Türkiye (and its successor states if relevant); the USSR → Russia, Ukraine, and the other former republics. The scope prose may still use the historical name; the member list must be modern countries.
+- **The scope must describe ONLY that group's own member countries and their connection to the topic.** You may mention an outside place only to say what the group connected to or acted upon — never as part of the group.
+- Titles 5 words maximum. A title must not imply countries the group leaves out.
+- If a region is a time-bounded entity, put its period in brackets in the title.
 - Output ONLY the JSON object.`;
 }
 

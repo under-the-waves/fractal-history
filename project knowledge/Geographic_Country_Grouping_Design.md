@@ -1,6 +1,9 @@
 # Geographic Division by Country Grouping — Design Note
 
-> **Status:** Proposed, not built. Worked through 2026-06-25.
+> **Status:** IMPLEMENTED on branch `feat/geo-country-grouping` (2026-06-25). Validated end-to-end
+> with a real "World War I" whole-world division: genuine historical groupings (Central Powers,
+> Allied Powers, Colonial & Dominion Forces), exact code-computed completeness (249/249), historical
+> states (Austria-Hungary, Ottoman Empire) decomposed to modern successor countries.
 > **Supersedes (if adopted):** the UN-subregion building blocks in `lib/geography.js` for the
 > *division* step. Relates to the deferred "curated override" idea in
 > `fractal_geographic_taxonomy` and to the scope-grounding fix already shipped.
