@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { useAuth } from '@clerk/react'
+import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
 import './generative.css'
 
@@ -163,16 +163,26 @@ function GenerativeLearning() {
 
     const wordCount = text.trim().split(/\s+/).filter(Boolean).length
 
-    // Start the write path. If the study cards are already cached, go straight to study; otherwise
-    // generate them on demand (research -> cards, ~1 min) behind a loading screen, then study.
+    // Start the write path. Requires sign-in: generation costs API spend and marking is per-user, so the
+    // whole write-your-own path is gated (the choice card shows a sign-in button when logged out — this
+    // is a backstop). If the study cards are already cached, go straight to study; otherwise generate
+    // them on demand (research -> cards, ~1 min) behind a loading screen, then study.
     const startWrite = async () => {
         setError(null)
+        if (clerkEnabled && !isSignedIn) {
+            setError('Please sign in to write your own.')
+            return
+        }
         if (data) { setStage('study'); return }
         setStage('generating')
         try {
+            const token = clerkEnabled ? await getToken() : null
             const res = await fetch('/api/learn?action=generate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify({ id, breadth }),
             })
             const d = await res.json()
@@ -238,19 +248,36 @@ function GenerativeLearning() {
                             <span className="gl-choice-card-cta">Read →</span>
                         </button>
 
-                        <button
-                            type="button"
-                            className="gl-choice-card gl-choice-card-featured"
-                            onClick={startWrite}
-                        >
-                            <span className="gl-choice-badge">Earns more</span>
-                            <span className="gl-choice-card-title">Write your own</span>
-                            <span className="gl-choice-card-desc">
-                                Study the facts, then write the history yourself and get it marked.
-                                Harder, but you remember far more.
-                            </span>
-                            <span className="gl-choice-card-cta">{data ? 'Start →' : 'Prepare & start →'}</span>
-                        </button>
+                        {clerkEnabled && !isSignedIn ? (
+                            // Logged out: the whole write-your-own path is gated (generation costs API
+                            // spend and marking is per-user). Clicking opens the Clerk sign-in modal;
+                            // once signed in this card re-renders to the start button below.
+                            <SignInButton mode="modal">
+                                <button type="button" className="gl-choice-card gl-choice-card-featured">
+                                    <span className="gl-choice-badge">Earns more</span>
+                                    <span className="gl-choice-card-title">Write your own</span>
+                                    <span className="gl-choice-card-desc">
+                                        Study the facts, then write the history yourself and get it marked.
+                                        Harder, but you remember far more.
+                                    </span>
+                                    <span className="gl-choice-card-cta">Sign in to start →</span>
+                                </button>
+                            </SignInButton>
+                        ) : (
+                            <button
+                                type="button"
+                                className="gl-choice-card gl-choice-card-featured"
+                                onClick={startWrite}
+                            >
+                                <span className="gl-choice-badge">Earns more</span>
+                                <span className="gl-choice-card-title">Write your own</span>
+                                <span className="gl-choice-card-desc">
+                                    Study the facts, then write the history yourself and get it marked.
+                                    Harder, but you remember far more.
+                                </span>
+                                <span className="gl-choice-card-cta">{data ? 'Start →' : 'Prepare & start →'}</span>
+                            </button>
+                        )}
                     </div>
                     {error && <p className="gl-error">{error}</p>}
                 </div>

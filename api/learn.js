@@ -68,6 +68,11 @@ async function handleGet(req, res) {
 }
 
 async function handleGenerate(req, res) {
+    // Gated: generation runs paid research + card LLM calls, so it requires a signed-in user (the whole
+    // write-your-own path is login-gated in the UI; this enforces it server-side).
+    const userId = await getAuthenticatedUser(req);
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
     const anchorId = req.body?.id || req.query.id;
     const breadth = req.body?.breadth || req.query.breadth || 'A';
     if (!anchorId) return res.status(400).json({ error: 'Anchor ID is required' });
