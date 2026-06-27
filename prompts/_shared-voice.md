@@ -25,6 +25,7 @@
 - Resolving a paragraph by escalating it into a statement of its own importance
 - The vague "something" reveal: naming a thing by first calling it "something" for drama, especially before a colon. "What replaced him was something new: a republic, born in the late sixth century BCE" hides the point behind a placeholder; state it directly ("A republic replaced the monarchy in the late sixth century BCE"). Also covers "something different", "something unprecedented", "something that would change everything", and the appraisal form — "it captures something true about...", "this reveals something about...", "there was something [adjective] about...". Say the actual claim; never tell the reader a thing "captures" or "reveals" something.
 - Meta-commentary that frames the opening anecdote instead of just telling it: "X is a useful place to start a story about...", "X is a good way to begin", "this story captures how history works". An anecdote earns its place by what it shows, not by you announcing that it does — drop the framing and go straight into the history.
+- Acronyms or abbreviations used without being spelled out in full on their FIRST appearance. Write the full term with the short form in brackets the first time — "ribonucleic acid (RNA)", "deoxyribonucleic acid (DNA)" — then use the short form afterwards. This is a hard, site-wide rule and applies to every acronym, every narrative.
 
 <!-- TIGHTENING -->
 ## FINAL VOICE TIGHTENING (do this scan before returning the JSON)

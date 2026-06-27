@@ -910,7 +910,7 @@ function TreeVisualization() {
                 <ul className="intro-steps">
                     <li><strong>Tap any topic</strong> to see its sub-topics.</li>
                     <li><strong>A / B / C</strong> switch between analytical, temporal, and geographic views.</li>
-                    <li><strong>Read</strong> opens the narrative for the current topic.</li>
+                    <li><strong>Learn</strong> opens the topic — read the narrative or write your own.</li>
                 </ul>
                 <button className="intro-btn" onClick={dismissIntro} autoFocus>Start exploring →</button>
             </div>
@@ -1049,9 +1049,9 @@ function TreeVisualization() {
 
                                     <button
                                         className="mobile-primary-btn"
-                                        onClick={() => navigate(`/narrative/${expandedAnchor.id}?breadth=${activeBreadth}`)}
+                                        onClick={() => navigate(`/learn/${expandedAnchor.id}?breadth=${activeBreadth}`)}
                                     >
-                                        Read this article →
+                                        Learn this topic →
                                     </button>
 
                                     {sidebarData && (
@@ -1095,11 +1095,11 @@ function TreeVisualization() {
                                             className="mobile-child-read"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                navigate(`/narrative/${child.anchor.id}?breadth=${getActiveBreadth(child.anchor.id)}`);
+                                                navigate(`/learn/${child.anchor.id}?breadth=${getActiveBreadth(child.anchor.id)}`);
                                             }}
-                                            aria-label={`Read ${child.anchor.title}`}
+                                            aria-label={`Learn ${child.anchor.title}`}
                                         >
-                                            Read →
+                                            Learn →
                                         </button>
                                     </li>
                                 ))}
@@ -1342,8 +1342,8 @@ function TreeVisualization() {
                                                 })}
                                             </g>
 
-                                            {/* Right button: Read */}
-                                            <g onClick={() => navigate(`/narrative/${node.anchor.id}?breadth=${getActiveBreadth(node.id)}`)} style={{ cursor: 'pointer' }}>
+                                            {/* Right button: Learn */}
+                                            <g onClick={() => navigate(`/learn/${node.anchor.id}?breadth=${getActiveBreadth(node.id)}`)} style={{ cursor: 'pointer' }}>
                                                 <rect
                                                     x={nodeWidth / 2 + 5}
                                                     y={nodeHeight - 28}
@@ -1361,7 +1361,7 @@ function TreeVisualization() {
                                                     fontSize="10"
                                                     fontWeight="bold"
                                                 >
-                                                    Read →
+                                                    Learn →
                                                 </text>
                                             </g>
                                         </>

@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from
 import { Show, SignInButton, UserButton } from '@clerk/react'
 import { useClerkEnabled } from './hooks/useClerkAuth'
 import NarrativeReading from './components/NarrativeReading'
+import GenerativeLearning from './components/GenerativeLearning'
 import TreeVisualization from './components/TreeVisualization.jsx'
 import AboutPage from './components/AboutPage'
 import FlashcardsPage from './components/FlashcardsPage'
@@ -43,6 +44,7 @@ function AppContent() {
         <Route path="/" element={<TreeVisualization />} />
         <Route path="/tree" element={<TreeVisualization />} />
         <Route path="/narrative/:id" element={<NarrativeReading />} />
+        <Route path="/learn/:id" element={<GenerativeLearning />} />
         <Route path="/flashcards" element={<FlashcardsPage />} />
         <Route path="/about" element={<AboutPage onBack={() => navigate('/')} />} />
       </Routes>

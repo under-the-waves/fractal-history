@@ -1,0 +1,324 @@
+/* Prototype styles for the generative-learning flow. Scoped under .gl-page. */
+
+.gl-page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 24px 20px 80px;
+    color: #1c1c1e;
+}
+
+.gl-back-bar { margin-bottom: 24px; }
+.gl-back {
+    display: inline-block;
+    color: #6b7280;
+    text-decoration: none;
+    font-size: 14px;
+}
+.gl-back:hover { color: #1c1c1e; }
+
+.gl-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 12px;
+    font-weight: 600;
+    color: #8b5cf6;
+    margin: 0 0 8px;
+}
+
+.gl-title {
+    font-size: 32px;
+    line-height: 1.15;
+    margin: 0 0 12px;
+    font-weight: 700;
+}
+
+.gl-scope {
+    color: #4b5563;
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 0 0 28px;
+}
+
+.gl-instruction {
+    color: #4b5563;
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0 0 24px;
+}
+
+/* ---------- Choice ---------- */
+.gl-choice-prompt {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 4px 0 20px;
+}
+.gl-choice-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+@media (max-width: 640px) { .gl-choice-cards { grid-template-columns: 1fr; } }
+
+.gl-choice-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    text-align: left;
+    padding: 24px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.gl-choice-card:hover {
+    border-color: #c4b5fd;
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.12);
+    transform: translateY(-2px);
+}
+.gl-choice-card-featured { border-color: #ddd6fe; background: #faf8ff; }
+.gl-choice-card-disabled {
+    cursor: default;
+    background: #f9fafb;
+    border-style: dashed;
+    opacity: 0.7;
+}
+.gl-choice-card-disabled:hover { border-color: #e5e7eb; box-shadow: none; transform: none; }
+.gl-choice-card-disabled .gl-choice-badge { background: #9ca3af; }
+.gl-choice-card-title { font-size: 18px; font-weight: 700; }
+.gl-choice-card-desc { color: #6b7280; font-size: 14px; line-height: 1.5; flex: 1; }
+.gl-choice-card-cta { color: #8b5cf6; font-weight: 600; font-size: 14px; margin-top: 6px; }
+.gl-choice-badge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: #8b5cf6;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+}
+
+/* ---------- Study ---------- */
+.gl-subanchor { margin: 0 0 28px; }
+.gl-subanchor-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 19px;
+    font-weight: 700;
+    margin: 0 0 14px;
+}
+.gl-subanchor-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #ede9fe;
+    color: #7c3aed;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.gl-fact {
+    border: 1px solid #eceef1;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    background: #fff;
+}
+.gl-fact-headline { font-size: 15px; font-weight: 600; margin: 0 0 5px; line-height: 1.45; }
+.gl-fact-when {
+    margin: 0 0 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #7c3aed;
+    letter-spacing: 0.01em;
+}
+
+.gl-layer-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.gl-layer-tab {
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    color: #4b5563;
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.12s;
+}
+.gl-layer-tab:hover { border-color: #c4b5fd; color: #1c1c1e; }
+.gl-layer-tab.active { background: #ede9fe; border-color: #c4b5fd; color: #6d28d9; font-weight: 600; }
+
+ul.gl-layer-body {
+    margin: 12px 0 0;
+    padding: 12px 16px 12px 32px;
+    background: #faf8ff;
+    border-radius: 8px;
+    color: #374151;
+    font-size: 14px;
+    line-height: 1.55;
+    list-style: disc;
+}
+.gl-layer-body li { margin: 0 0 7px; }
+.gl-layer-body li:last-child { margin-bottom: 0; }
+
+/* Scene-setting card sits above the numbered sub-anchors */
+.gl-prelude { padding: 16px; background: #f6f7f9; border: 1px solid #eceef1; border-radius: 14px; }
+.gl-prelude .gl-fact { background: #fff; }
+.gl-prelude-title { font-size: 17px; color: #374151; }
+
+.gl-study-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 28px;
+}
+
+/* ---------- Write ---------- */
+.gl-rubric {
+    margin: 0 0 18px;
+    padding-left: 20px;
+    color: #4b5563;
+    font-size: 14px;
+    line-height: 1.8;
+}
+.gl-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    font-size: 16px;
+    line-height: 1.6;
+    font-family: inherit;
+    resize: vertical;
+}
+.gl-textarea:focus { outline: none; border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15); }
+.gl-write-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 13px;
+    color: #9ca3af;
+}
+
+/* ---------- Buttons ---------- */
+.gl-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 11px 20px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s;
+}
+.gl-btn-primary { background: #8b5cf6; color: #fff; }
+.gl-btn-primary:hover { background: #7c3aed; }
+.gl-btn-primary:disabled { background: #d1d5db; cursor: not-allowed; }
+.gl-btn-ghost { background: transparent; color: #6b7280; }
+.gl-btn-ghost:hover { color: #1c1c1e; }
+
+/* ---------- Marking ---------- */
+.gl-marking { text-align: center; padding: 80px 0; }
+.gl-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #ede9fe;
+    border-top-color: #8b5cf6;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    animation: gl-spin 0.8s linear infinite;
+}
+@keyframes gl-spin { to { transform: rotate(360deg); } }
+.gl-marking-text { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
+.gl-marking-note { color: #9ca3af; font-size: 14px; margin: 0; }
+
+/* ---------- Result ---------- */
+.gl-scoreboard {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    padding: 24px;
+    background: #faf8ff;
+    border: 1px solid #ede9fe;
+    border-radius: 14px;
+    margin-bottom: 20px;
+}
+.gl-score { display: flex; align-items: baseline; }
+.gl-score-num { font-size: 48px; font-weight: 800; color: #7c3aed; line-height: 1; }
+.gl-score-denom { font-size: 20px; color: #a78bfa; margin-left: 2px; }
+.gl-coverage { display: flex; flex-direction: column; }
+.gl-coverage-num { font-size: 24px; font-weight: 700; }
+.gl-coverage-label { font-size: 13px; color: #6b7280; }
+
+.gl-rationale {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #374151;
+    margin: 0 0 24px;
+    padding: 0 4px;
+}
+
+.gl-section {
+    border-left: 3px solid #e5e7eb;
+    padding: 4px 0 4px 16px;
+    margin-bottom: 20px;
+}
+.gl-tone-error { border-left-color: #ef4444; }
+.gl-tone-warn { border-left-color: #f59e0b; }
+.gl-tone-info { border-left-color: #3b82f6; }
+.gl-tone-ok { border-left-color: #10b981; }
+
+.gl-section-title { font-size: 15px; font-weight: 700; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.gl-section-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    font-size: 12px;
+    color: #6b7280;
+}
+.gl-section-subtitle { font-size: 13px; color: #9ca3af; margin: 0 0 10px; font-style: italic; }
+.gl-section-empty { font-size: 14px; color: #9ca3af; margin: 6px 0 0; }
+.gl-section-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.gl-section-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 14px;
+    line-height: 1.55;
+}
+.gl-section-item:last-child { border-bottom: none; }
+.gl-section-item strong { color: #1c1c1e; }
+.gl-section-item span { color: #4b5563; }
+.gl-cite { font-size: 12px; color: #9ca3af; }
+
+.gl-result-actions { display: flex; gap: 12px; margin-top: 28px; }
+
+.gl-error {
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    margin: 16px 0 0;
+}
+
+.gl-notice { padding: 40px 0; }
+.gl-notice h1 { font-size: 24px; margin: 0 0 12px; }
+.gl-notice p { color: #4b5563; line-height: 1.6; }
+.gl-notice a { color: #8b5cf6; }

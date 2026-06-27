@@ -57,6 +57,20 @@ git ls-files 'api/' | grep -c '\.js$'
 History: this cap took the site down on 2026-06-20 when helpers in `api/utils/` pushed the
 count to 15; fixed by moving them to `lib/` (PR #4).
 
+## Content & Writing Conventions (site-wide)
+
+These apply to ALL learner-facing text: narratives, flashcards, fact/explore content, link
+text, UI copy.
+
+- **Spell out every acronym on first use.** Write the full term with the short form in brackets
+  the first time it appears, then use the short form — "ribonucleic acid (RNA)", then "RNA".
+  Hard rule, no exceptions. Encoded for narrative generation in `prompts/_shared-voice.md`.
+- **Plain English; define jargon on first use.** Assume the reader knows nothing. Define any
+  technical term inline the first time ("anaerobe — an organism that lives without oxygen").
+- **State facts directly; no LLM voice.** No metaphor-as-analysis, no "not just X but Y"
+  antithesis, no rule-of-three padding. See `prompts/_shared-voice.md` for the full ban list.
+- **British spelling, Oxford comma.**
+
 ## Data Model
 
 **Anchor ID Format:**
