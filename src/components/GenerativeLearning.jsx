@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { getLearnData } from '../data/learnData'
+import { useAuth } from '@clerk/react'
+import { useClerkEnabled } from '../hooks/useClerkAuth'
 import './generative.css'
 
 // The "learn" entry for an anchor: a choice between reading the guided narrative and writing your
@@ -64,6 +65,12 @@ function MarkReport({ result, onRevise, onRestart }) {
                     <span className="gl-coverage-num">{cov.covered}/{cov.total}</span>
                     <span className="gl-coverage-label">key concepts covered</span>
                 </div>
+                {typeof result.xpEarned === 'number' && (
+                    <div className="gl-coverage">
+                        <span className="gl-coverage-num">+{result.xpEarned} XP</span>
+                        <span className="gl-coverage-label">added to your mastery</span>
+                    </div>
+                )}
             </div>
 
             {result.mark?.rationale && <p className="gl-rationale">{result.mark.rationale}</p>}
@@ -118,38 +125,82 @@ function GenerativeLearning() {
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
     const breadth = searchParams.get('breadth') || 'A'
+    const clerkEnabled = useClerkEnabled()
+    const { isSignedIn, getToken } = useAuth()
 
-    const [stage, setStage] = useState('choice') // choice | study | write | marking | result
+    const [stage, setStage] = useState('choice') // choice | generating | study | write | marking | result
     const [text, setText] = useState('')
     const [result, setResult] = useState(null)
     const [error, setError] = useState(null)
     const [anchorInfo, setAnchorInfo] = useState(null)
+    const [data, setData] = useState(null) // study fact-cards for this anchor+breadth, from the DB
 
-    // Write-your-own is wired for anchors+breadths that have local study data (the learn registry).
-    const data = getLearnData(id, breadth)
-    const hasWriteData = !!data
-
-    // Fetch the anchor's title/scope so the choice screen works for ANY anchor. get-narrative
-    // returns the anchor metadata without triggering generation.
+    // Load the study fact-cards if they already exist for this anchor+breadth (cached in learn_content).
     useEffect(() => {
-        if (data) { setAnchorInfo({ title: data.title, scope: data.scope }); return }
+        let cancelled = false
+        setData(null)
+        fetch(`/api/learn?action=get&id=${id}&breadth=${breadth}`)
+            .then(r => r.json())
+            .then(d => {
+                if (cancelled || !d) return
+                if (d.exists) { setData(d); setAnchorInfo({ title: d.title, scope: d.scope }) }
+            })
+            .catch(() => { })
+        return () => { cancelled = true }
+    }, [id, breadth])
+
+    // Fall back to the anchor's title/scope for the choice screen when no study content exists yet.
+    // get-narrative returns the anchor metadata without triggering narrative generation.
+    useEffect(() => {
+        if (data || anchorInfo) return
         let cancelled = false
         fetch(`/api/get-narrative?id=${id}&breadth=${breadth}`)
             .then(r => r.json())
             .then(d => { if (!cancelled && d.anchor) setAnchorInfo({ title: d.anchor.title, scope: d.anchor.scope }) })
             .catch(() => { })
         return () => { cancelled = true }
-    }, [id, breadth, data])
+    }, [id, breadth, data, anchorInfo])
 
     const wordCount = text.trim().split(/\s+/).filter(Boolean).length
 
-    const submit = async () => {
+    // Start the write path. If the study cards are already cached, go straight to study; otherwise
+    // generate them on demand (research -> cards, ~1 min) behind a loading screen, then study.
+    const startWrite = async () => {
         setError(null)
-        setStage('marking')
+        if (data) { setStage('study'); return }
+        setStage('generating')
         try {
-            const res = await fetch('/api/mark', {
+            const res = await fetch('/api/learn?action=generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, breadth }),
+            })
+            const d = await res.json()
+            if (!res.ok || !d.success || !d.exists) throw new Error(d.error || 'Could not prepare this topic.')
+            setData(d)
+            setAnchorInfo({ title: d.title, scope: d.scope })
+            setStage('study')
+        } catch (err) {
+            setError(err.message)
+            setStage('choice')
+        }
+    }
+
+    const submit = async () => {
+        setError(null)
+        if (clerkEnabled && !isSignedIn) {
+            setError('Sign in to get your writing marked and earn XP.')
+            return
+        }
+        setStage('marking')
+        try {
+            const token = clerkEnabled ? await getToken() : null
+            const res = await fetch('/api/learn?action=mark', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify({ narrative: text, anchorId: id, breadth }),
             })
             const d = await res.json()
@@ -187,31 +238,30 @@ function GenerativeLearning() {
                             <span className="gl-choice-card-cta">Read →</span>
                         </button>
 
-                        {hasWriteData ? (
-                            <button
-                                type="button"
-                                className="gl-choice-card gl-choice-card-featured"
-                                onClick={() => setStage('study')}
-                            >
-                                <span className="gl-choice-badge">Earns more</span>
-                                <span className="gl-choice-card-title">Write your own</span>
-                                <span className="gl-choice-card-desc">
-                                    Study the facts, then write the history yourself and get it marked.
-                                    Harder, but you remember far more.
-                                </span>
-                                <span className="gl-choice-card-cta">Start →</span>
-                            </button>
-                        ) : (
-                            <div className="gl-choice-card gl-choice-card-disabled" aria-disabled="true">
-                                <span className="gl-choice-badge">Coming soon</span>
-                                <span className="gl-choice-card-title">Write your own</span>
-                                <span className="gl-choice-card-desc">
-                                    Study the facts, then write the history yourself and get it marked.
-                                    Not yet available for this topic.
-                                </span>
-                            </div>
-                        )}
+                        <button
+                            type="button"
+                            className="gl-choice-card gl-choice-card-featured"
+                            onClick={startWrite}
+                        >
+                            <span className="gl-choice-badge">Earns more</span>
+                            <span className="gl-choice-card-title">Write your own</span>
+                            <span className="gl-choice-card-desc">
+                                Study the facts, then write the history yourself and get it marked.
+                                Harder, but you remember far more.
+                            </span>
+                            <span className="gl-choice-card-cta">{data ? 'Start →' : 'Prepare & start →'}</span>
+                        </button>
                     </div>
+                    {error && <p className="gl-error">{error}</p>}
+                </div>
+            )}
+
+            {/* ---------- GENERATING ---------- */}
+            {stage === 'generating' && (
+                <div className="gl-marking">
+                    <div className="gl-spinner" />
+                    <p className="gl-marking-text">Preparing this topic…</p>
+                    <p className="gl-marking-note">Researching authoritative sources and writing your study facts. This takes about a minute.</p>
                 </div>
             )}
 

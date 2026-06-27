@@ -1,0 +1,28 @@
+# Nightly forgetting-curve decay for mastery scores.
+#
+# This replaces the old Vercel cron (api/cron-decay-scores.js), which was removed to keep the project
+# under Vercel's 12-serverless-function cap on the Hobby plan (the learn pipeline needs the slot for
+# api/learn.js). The job runs scripts/decay-scores.mjs directly against Neon; it never touches Vercel.
+#
+# Setup: add a repository secret named DATABASE_URL (the Neon connection string) under
+# Settings -> Secrets and variables -> Actions. Schedule is 04:00 UTC daily (was "0 4 * * *" on Vercel).
+name: Decay mastery scores
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  decay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - name: Run score decay
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/decay-scores.mjs

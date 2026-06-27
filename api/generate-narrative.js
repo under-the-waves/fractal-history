@@ -196,7 +196,6 @@ async function storeNarrative(anchorId, breadth, narrativeData) {
          DO UPDATE SET
              narrative = $3,
              key_concepts = $4,
-             questions = $5,
              estimated_read_time = $6
          RETURNING *`,
         [anchorId, breadth, narrativeData.narrative,

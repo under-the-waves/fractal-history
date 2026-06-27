@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { query } from '../lib/db.js';
+import { getLearnContent } from '../lib/learnContent.js';
 
 dotenv.config({ path: '.env.local' });
 
@@ -210,6 +211,28 @@ export function selectCores(questions, childTitles) {
         }
     }
 
+    // 1b. TITLE-ECHO GUARD. When the pool is sourced from the fact cards' headline + what-happened
+    // bullets only, a sub-topic named after a process/event (e.g. "Great Oxidation Event") tends to
+    // get a headline whose answer just restates that name — a circular core. Replace any sub-anchor
+    // core whose normalised answer echoes its own sub-anchor title with a non-echoing card from the
+    // same group. Runs BEFORE the trim/fill steps so the alternatives are still unused. (Validated in
+    // the flashcards-from-cards prototype.)
+    const normEcho = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const echoes = (title, answer) => {
+        const nt = normEcho(title), na = normEcho(answer);
+        if (!nt || !na) return false;
+        return nt.includes(na) || na.includes(nt);
+    };
+    for (let k = 0; k < coreIdx.length; k++) {
+        const q = questions[coreIdx[k]];
+        if (!q.group || !q.group.startsWith('sub:')) continue;
+        const title = q.group.replace(/^sub:/, '');
+        if (!echoes(title, q.answer)) continue;
+        const repl = questions.findIndex((c, i) =>
+            !used.has(i) && c.group === q.group && !echoes(title, c.answer));
+        if (repl !== -1) { used.delete(coreIdx[k]); used.add(repl); coreIdx[k] = repl; }
+    }
+
     // 2. too many sub-anchors -> drop catch-all / "rest of the world" ones first, keep 5
     if (coreIdx.length > 5) {
         const isCatchAll = t => /rest of (the )?world|elsewhere|other regions|the rest|remaining|catch-all/i.test(t);
@@ -231,45 +254,68 @@ export function selectCores(questions, childTitles) {
     return questions;
 }
 
+// Build a flashcard SOURCE digest from the fact cards: each sub-anchor's headline + what-happened
+// bullets ONLY (per the Learn pipeline design — NOT how-we-know, debates, or vignettes). The prelude
+// is included as background so "general" cards have material; cores are still drawn per sub-anchor.
+function buildCardsDigest(content) {
+    const block = (facts) => (facts || []).map(f => {
+        const lines = [];
+        if (f.headline) lines.push(f.headline);
+        (f.what || []).forEach(w => lines.push(w));
+        return lines.map(l => `- ${l}`).join('\n');
+    }).filter(Boolean).join('\n');
+
+    const parts = [];
+    if (content.prelude) parts.push(`## Background: ${content.prelude.title}\n${block(content.prelude.facts)}`);
+    (content.subAnchors || []).forEach(sa => { parts.push(`## ${sa.title}\n${block(sa.facts)}`); });
+    return `${content.title}\n\n${parts.join('\n\n')}`;
+}
+
 /**
- * Generate the candidate pool for a narrative, mark its 5 cores, store it, and return the questions.
- * Throws 'NARRATIVE_NOT_FOUND' if the narrative text does not exist yet. Reused by the handler and
- * by per-user core instantiation (instantiate-cores.js).
+ * Generate the candidate flashcard pool, mark its 5 cores, store it on the narratives row, and return
+ * the questions. SOURCE is the Learn fact cards (headline + what-happened) when they exist — so cards
+ * exist for write-your-own users who never read the narrative and test the verified facts — falling
+ * back to the narrative text otherwise. Throws 'NARRATIVE_NOT_FOUND' when neither source exists.
+ * Reused by the handler and by per-user core instantiation (instantiate-cores.js).
  */
 export async function generateAndStoreFlashcards(anchorId, breadth) {
-    const rows = await query(
-        'SELECT narrative FROM narratives WHERE anchor_id = $1 AND breadth = $2 LIMIT 1',
-        [anchorId, breadth]
-    );
-    if (!rows.length || !rows[0].narrative) {
-        throw new Error('NARRATIVE_NOT_FOUND');
-    }
-    const narrative = rows[0].narrative;
+    const content = await getLearnContent(anchorId, breadth);
 
-    // Get anchor and child info in parallel
-    const [anchorResult, children] = await Promise.all([
-        query('SELECT id, title, scope FROM anchors WHERE id = $1 LIMIT 1', [anchorId]),
-        query(
-            `SELECT a.title FROM anchors a
-             JOIN tree_positions tp ON a.id = tp.anchor_id
-             WHERE tp.parent_position_id = (
-                 SELECT position_id FROM tree_positions WHERE anchor_id = $1 LIMIT 1
-             )
-             AND tp.breadth = $2
-             ORDER BY tp.position ASC`,
+    let anchorTitle, children, sourceText;
+    const fromCards = !!(content && content.subAnchors && content.subAnchors.length);
+    if (fromCards) {
+        anchorTitle = content.title;
+        children = content.subAnchors.map(sa => ({ title: sa.title }));
+        sourceText = buildCardsDigest(content);
+    } else {
+        const rows = await query(
+            'SELECT narrative FROM narratives WHERE anchor_id = $1 AND breadth = $2 LIMIT 1',
             [anchorId, breadth]
-        )
-    ]);
-    const anchor = anchorResult[0];
+        );
+        if (!rows.length || !rows[0].narrative) {
+            throw new Error('NARRATIVE_NOT_FOUND');
+        }
+        sourceText = rows[0].narrative;
+        const [anchorResult, dbChildren] = await Promise.all([
+            query('SELECT id, title, scope FROM anchors WHERE id = $1 LIMIT 1', [anchorId]),
+            query(
+                `SELECT a.title FROM anchors a
+                 JOIN tree_positions tp ON a.id = tp.anchor_id
+                 WHERE tp.parent_position_id = (
+                     SELECT position_id FROM tree_positions WHERE anchor_id = $1 LIMIT 1
+                 )
+                 AND tp.breadth = $2
+                 ORDER BY tp.position ASC`,
+                [anchorId, breadth]
+            )
+        ]);
+        anchorTitle = anchorResult[0]?.title || anchorId;
+        children = dbChildren;
+    }
 
-    console.log(`Generating flashcards for ${anchorId} breadth ${breadth}`);
+    console.log(`Generating flashcards for ${anchorId} breadth ${breadth} (source: ${fromCards ? 'fact cards' : 'narrative'})`);
 
-    const prompt = buildFlashcardPrompt({
-        anchorTitle: anchor?.title || anchorId,
-        breadth,
-        children,
-        narrative
-    });
+    const prompt = buildFlashcardPrompt({ anchorTitle, breadth, children, narrative: sourceText });
 
     const completion = await getAnthropicClient().messages.create({
         model: prompt.model,
@@ -288,8 +334,13 @@ export async function generateAndStoreFlashcards(anchorId, breadth) {
     data.questions = normaliseQuestions(data.questions);
     selectCores(data.questions, children.map(c => c.title));
 
+    // Store the pool on the narratives row (cores/slots/scoring read it there). Create a placeholder
+    // row if none exists yet (a write-only anchor with no narrative), preserving any real narrative
+    // text on conflict — only the questions column is updated.
     await query(
-        'UPDATE narratives SET questions = $1 WHERE anchor_id = $2 AND breadth = $3',
+        `INSERT INTO narratives (anchor_id, breadth, narrative, questions)
+         VALUES ($2, $3, '', $1)
+         ON CONFLICT (anchor_id, breadth) DO UPDATE SET questions = EXCLUDED.questions`,
         [JSON.stringify(data.questions), anchorId, breadth]
     );
 
@@ -333,7 +384,7 @@ export default async function handler(req, res) {
 
     } catch (error) {
         if (error.message === 'NARRATIVE_NOT_FOUND') {
-            return res.status(404).json({ error: 'Narrative not found. Generate the narrative first.' });
+            return res.status(404).json({ error: 'No source content yet. Generate the topic (study cards) or the narrative first.' });
         }
         console.error('Error generating flashcards:', error);
         return res.status(500).json({
