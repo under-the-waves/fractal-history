@@ -303,8 +303,8 @@ export async function generateAndStoreFlashcards(anchorId, breadth) {
             query(
                 `SELECT a.title FROM anchors a
                  JOIN tree_positions tp ON a.id = tp.anchor_id
-                 WHERE tp.parent_position_id = (
-                     SELECT position_id FROM tree_positions WHERE anchor_id = $1 LIMIT 1
+                 WHERE tp.parent_position_id IN (
+                     SELECT position_id FROM tree_positions WHERE anchor_id = $1
                  )
                  AND tp.breadth = $2
                  ORDER BY tp.position ASC`,
