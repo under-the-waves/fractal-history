@@ -26,12 +26,18 @@ function useIsMobile(breakpoint = 768) {
     return isMobile;
 }
 
+// Abbreviate a score for a compact badge (e.g. 1.2k, 21k). Shared by the desktop SVG badge and the
+// mobile HTML pill so they read identically.
+function formatScore(score) {
+    return score >= 1000
+        ? (score / 1000).toFixed(score >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k'
+        : String(score);
+}
+
 // Small XP badge (a pill showing the node's score) drawn in a node's top-right corner. Only shown
 // for nodes the signed-in user has a score for. Large scores are abbreviated (e.g. 1.2k, 21k).
 function MasteryBadge({ score, nodeWidth }) {
-    const label = score >= 1000
-        ? (score / 1000).toFixed(score >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k'
-        : String(score);
+    const label = formatScore(score);
     const w = 14 + label.length * 6.5;
     const x = nodeWidth - w - 6;
     return (
@@ -933,6 +939,9 @@ function TreeVisualization() {
 
         return (
             <div className="tree-visualization mobile-tree-wrapper">
+                {/* Fetch the signed-in user's mastery scores on mobile too (the desktop branch has its
+                    own copy; without this, mobile never loads scores). */}
+                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, breadths }) => { setScores(scores); setBreadths(breadths); }} />}
                 {introOverlay}
                 {busyOverlay}
 
@@ -1012,7 +1021,14 @@ function TreeVisualization() {
                             className={showStart ? 'mobile-tree-current mobile-tree-current-root' : 'mobile-tree-current'}
                             style={{ borderTopColor: accentColor }}
                         >
-                            <h2 className="mobile-tree-title">{expandedAnchor.title}</h2>
+                            <h2 className="mobile-tree-title">
+                                {expandedAnchor.title}
+                                {scores[expandedAnchor.id] != null && (
+                                    <span className="mobile-score-pill" title="Your mastery score">
+                                        {formatScore(scores[expandedAnchor.id])} XP
+                                    </span>
+                                )}
+                            </h2>
                             {expandedAnchor.scope && (
                                 <p className="mobile-tree-scope">{expandedAnchor.scope}</p>
                             )}
@@ -1084,7 +1100,14 @@ function TreeVisualization() {
                                                 aria-hidden="true"
                                             ></span>
                                             <span className="mobile-child-body">
-                                                <span className="mobile-child-title">{child.anchor.title}</span>
+                                                <span className="mobile-child-title">
+                                                    {child.anchor.title}
+                                                    {scores[child.anchor.id] != null && (
+                                                        <span className="mobile-score-pill" title="Your mastery score">
+                                                            {formatScore(scores[child.anchor.id])} XP
+                                                        </span>
+                                                    )}
+                                                </span>
                                                 {child.anchor.scope && (
                                                     <span className="mobile-child-scope">{child.anchor.scope}</span>
                                                 )}
