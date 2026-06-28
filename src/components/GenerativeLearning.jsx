@@ -12,10 +12,13 @@ import './generative.css'
 
 const LAYERS = [
     { key: 'what', label: 'What happened' },
+    { key: 'why', label: 'Why it happened' },
     { key: 'how', label: 'How we know' },
     { key: 'debates', label: 'Debates' },
     { key: 'vignettes', label: 'Vignettes' },
 ]
+
+const WHY_DISCLAIMER = 'This is the mainstream explanation. Where the causes are genuinely debated, see the Debates layer for more nuance.'
 
 function FactCard({ fact }) {
     const [open, setOpen] = useState(null)
@@ -38,9 +41,12 @@ function FactCard({ fact }) {
                 ))}
             </div>
             {open && (
-                <ul className="gl-layer-body">
-                    {fact[open].map((b, i) => <li key={i}>{b}</li>)}
-                </ul>
+                <>
+                    {open === 'why' && <p className="gl-why-disclaimer">{WHY_DISCLAIMER}</p>}
+                    <ul className="gl-layer-body">
+                        {fact[open].map((b, i) => <li key={i}>{b}</li>)}
+                    </ul>
+                </>
             )}
         </div>
     )

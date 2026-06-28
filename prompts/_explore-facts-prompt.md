@@ -15,12 +15,16 @@ Mobilization" the core is HOW societies mobilised for total war — conscription
 the 1914 mobilisations — not just one or two famous battles.)
 
 Each fact card has:
-- `headline`: one plain sentence stating the card's single core point.
+- `headline`: ONE short plain sentence (~20 words max) stating the card's single core point — one
+  fact only, never two facts joined with "and". Do not put the date in the headline; it goes in `when`.
 - `when`: a short date or date range for this card, e.g. "About 2.4 billion years ago". Always include one.
 - four expandable layers, each a list (array) of short bullet points:
   - `what` — WHAT HAPPENED: the actual event or phenomenon itself, described concretely. This is NOT
     the experiment, discovery, or evidence that revealed it. (For "the origin of self-replicating
     molecules", describe a molecule starting to copy itself — not Miller's experiment.)
+  - `why` — WHY IT HAPPENED: the main cause(s) of the event, or for a scientific topic the mechanism
+    that produced it — the STANDARD, MAINSTREAM explanation a textbook would give. State the accepted
+    account plainly. Genuine scholarly disagreement about the causes belongs in `debates`, not here.
   - `how` — HOW WE KNOW: the EVIDENCE and SOURCES by which we know these facts, and the methods used.
     This is NOT more facts about what happened — every bullet must answer "how do we know this?". For
     science: physical evidence, measurements, dating methods (rock strata, isotopes, fossils, lab
@@ -43,8 +47,10 @@ HARD WRITING RULES (these are the point of this prompt — follow them exactly):
   terms that are genuinely needed, and define each in plain words the first time it appears.
 - Spell out EVERY acronym in full on first use, then use the short form: "ribonucleic acid (RNA)",
   then "RNA". No exceptions.
-- Keep it LIGHT: aim for 2–3 bullets per layer. Explaining a few things well beats listing many.
-  Each bullet is one or two sentences.
+- Keep it LIGHT. HARD LIMITS, follow exactly: at most 2 bullets per layer (the headline already
+  carries the main point, so often 1 is enough), and each bullet at most ~25 words, ONE sentence, with
+  no semicolon or dash splicing a second clause on. State the single point and stop. A reader skims
+  these; cut every word that is not essential and never pad to fill a layer.
 - State facts directly. No metaphors used as analysis. No antithesis constructions in any form:
   "not just X but Y", "not X; it was Y", "rather than X", "X, not Y". State the positive point on its
   own. No rule-of-three flourishes. No sentences whose only job is to announce that something mattered.
@@ -59,14 +65,14 @@ OUTPUT: return ONLY valid JSON in exactly this shape, and nothing else:
   "prelude": {
     "title": "Before this: <short scene-setting title>",
     "facts": [
-      { "headline": "...", "when": "...", "what": ["..."], "how": ["..."], "debates": ["..."], "vignettes": ["..."] }
+      { "headline": "...", "when": "...", "what": ["..."], "why": ["..."], "how": ["..."], "debates": ["..."], "vignettes": ["..."] }
     ]
   },
   "subAnchors": [
     {
       "title": "<exact sub-anchor title, copied verbatim from the list below>",
       "facts": [
-        { "headline": "...", "when": "...", "what": ["..."], "how": ["..."], "debates": ["..."], "vignettes": ["..."] }
+        { "headline": "...", "when": "...", "what": ["..."], "why": ["..."], "how": ["..."], "debates": ["..."], "vignettes": ["..."] }
       ]
     }
   ]

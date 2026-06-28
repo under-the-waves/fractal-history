@@ -254,14 +254,16 @@ export function selectCores(questions, childTitles) {
     return questions;
 }
 
-// Build a flashcard SOURCE digest from the fact cards: each sub-anchor's headline + what-happened
-// bullets ONLY (per the Learn pipeline design — NOT how-we-know, debates, or vignettes). The prelude
-// is included as background so "general" cards have material; cores are still drawn per sub-anchor.
+// Build a flashcard SOURCE digest from the fact cards: each sub-anchor's headline, what-happened and
+// why-it-happened bullets (so cards can test causes as well as events). The how-we-know, debates and
+// vignette layers are excluded. The prelude is included as background so "general" cards have
+// material; cores are still drawn per sub-anchor.
 function buildCardsDigest(content) {
     const block = (facts) => (facts || []).map(f => {
         const lines = [];
         if (f.headline) lines.push(f.headline);
         (f.what || []).forEach(w => lines.push(w));
+        (f.why || []).forEach(w => lines.push(w));
         return lines.map(l => `- ${l}`).join('\n');
     }).filter(Boolean).join('\n');
 

@@ -169,6 +169,19 @@ ul.gl-layer-body {
 .gl-layer-body li { margin: 0 0 7px; }
 .gl-layer-body li:last-child { margin-bottom: 0; }
 
+/* Static note at the top of the "Why it happened" layer: causes are the contested part of history. */
+.gl-why-disclaimer {
+    margin: 12px 0 0;
+    padding: 8px 12px;
+    background: #fff7ed;
+    border-left: 3px solid #f59e0b;
+    border-radius: 6px;
+    color: #92400e;
+    font-size: 12.5px;
+    font-style: italic;
+    line-height: 1.45;
+}
+
 /* Scene-setting card sits above the numbered sub-anchors */
 .gl-prelude { padding: 16px; background: #f6f7f9; border: 1px solid #eceef1; border-radius: 14px; }
 .gl-prelude .gl-fact { background: #fff; }

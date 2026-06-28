@@ -28,6 +28,11 @@ Distinguish four things carefully:
   penalise the learner for choosing a defensible side of an open debate.
 
 Critical rules:
+- **Causes are not facts.** The fact base may contain a "Mainstream causal account" section — the
+  standard explanation of WHY things happened. Only contradictions of the **Verified facts** (what
+  happened, dates, names, sequence, evidence) count as factual errors. If the learner gives a
+  different but defensible cause, treat it as an interpretation note, or leave it — never a factual
+  error. Reserve "missing concept" for missing events/sub-anchors, not for an unstated cause.
 - **Avoid false positives.** Marking a correct statement or a defensible interpretation as
   "wrong" is the worst failure. When unsure whether something is an error or a defensible
   reading, treat it as an interpretation note, not an error.
