@@ -3384,6 +3384,11 @@ button.orientation-axis-value:hover {
   vertical-align: middle;
 }
 
+/* Score has decayed below the user's best for this node — show it in amber as current/best. */
+.mobile-score-pill.decayed {
+  background: #c77d12;
+}
+
 .mobile-child-scope {
   font-size: 0.825rem;
   color: #666;

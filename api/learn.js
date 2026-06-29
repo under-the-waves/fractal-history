@@ -117,7 +117,7 @@ async function handleMark(req, res) {
     const score = Number(result?.mark?.score) || 0;
     const covered = Number(result?.coverage?.covered) || 0;
     const total = Number(result?.coverage?.total) || 0;
-    const { writeXp, nodeScore } = await recordWriteMark(userId, anchorId, breadth, score, covered, total);
+    const { writeXp, nodeScore, nextReviewDays, passed } = await recordWriteMark(userId, anchorId, breadth, score, covered, total);
 
-    return res.status(200).json({ success: true, ...result, xpEarned: writeXp, nodeScore });
+    return res.status(200).json({ success: true, ...result, xpEarned: writeXp, nodeScore, nextReviewDays, passed });
 }

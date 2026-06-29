@@ -34,15 +34,17 @@ function formatScore(score) {
         : String(score);
 }
 
-// Small XP badge (a pill showing the node's score) drawn in a node's top-right corner. Only shown
-// for nodes the signed-in user has a score for. Large scores are abbreviated (e.g. 1.2k, 21k).
-function MasteryBadge({ score, nodeWidth }) {
-    const label = formatScore(score);
+// Small XP badge (a pill showing the node's score) drawn in a node's top-right corner. Only shown for
+// nodes the signed-in user has a score for. When the score has decayed below the all-time peak, it
+// reads "current/best" in amber so the drop is legible; at the peak it reads just the score in green.
+function MasteryBadge({ score, peak, nodeWidth }) {
+    const decayed = peak > score;
+    const label = decayed ? `${formatScore(score)}/${formatScore(peak)}` : formatScore(score);
     const w = 14 + label.length * 6.5;
     const x = nodeWidth - w - 6;
     return (
         <g pointerEvents="none">
-            <rect x={x} y={8} width={w} height={16} rx={8} fill="#2e9e5b" />
+            <rect x={x} y={8} width={w} height={16} rx={8} fill={decayed ? '#c77d12' : '#2e9e5b'} />
             <text x={x + w / 2} y={16} textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="700" fill="white">
                 {label}
             </text>
@@ -62,7 +64,7 @@ function MasteryScoreLoader({ onLoaded }) {
                 const token = await auth.getToken();
                 const res = await fetch('/api/scores', { headers: { Authorization: `Bearer ${token}` } });
                 const data = await res.json();
-                if (!cancelled && data.success) onLoaded({ scores: data.scores || {}, breadths: data.breadths || {} });
+                if (!cancelled && data.success) onLoaded({ scores: data.scores || {}, peaks: data.peaks || {}, breadths: data.breadths || {} });
             } catch (err) {
                 console.error('Failed to load mastery scores:', err);
             }
@@ -76,6 +78,7 @@ function TreeVisualization() {
     const isMobile = useIsMobile();
     const clerkEnabled = useClerkEnabled();
     const [scores, setScores] = useState({});
+    const [peaks, setPeaks] = useState({});
     const [breadths, setBreadths] = useState({});
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -925,6 +928,21 @@ function TreeVisualization() {
 
     const visibleNodes = getVisibleNodes();
 
+    // Mobile XP pill: shows the node's mastery score, and "current/best" in amber when it has decayed
+    // below the all-time peak (the desktop tree uses the SVG MasteryBadge for the same thing).
+    const renderScorePill = (id) => {
+        if (scores[id] == null) return null;
+        const cur = scores[id];
+        const pk = peaks[id] ?? cur;
+        const decayed = pk > cur;
+        return (
+            <span className={`mobile-score-pill${decayed ? ' decayed' : ''}`}
+                title={decayed ? 'Current / your best — review to recover' : 'Your mastery score'}>
+                {decayed ? `${formatScore(cur)}/${formatScore(pk)}` : formatScore(cur)} XP
+            </span>
+        );
+    };
+
     if (isMobile) {
         const expandedNode = visibleNodes.find(n => n.type === 'expanded') || visibleNodes.find(n => n.type === 'root');
         const expandedAnchor = expandedNode?.anchor;
@@ -941,7 +959,7 @@ function TreeVisualization() {
             <div className="tree-visualization mobile-tree-wrapper">
                 {/* Fetch the signed-in user's mastery scores on mobile too (the desktop branch has its
                     own copy; without this, mobile never loads scores). */}
-                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, breadths }) => { setScores(scores); setBreadths(breadths); }} />}
+                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); }} />}
                 {introOverlay}
                 {busyOverlay}
 
@@ -1023,11 +1041,7 @@ function TreeVisualization() {
                         >
                             <h2 className="mobile-tree-title">
                                 {expandedAnchor.title}
-                                {scores[expandedAnchor.id] != null && (
-                                    <span className="mobile-score-pill" title="Your mastery score">
-                                        {formatScore(scores[expandedAnchor.id])} XP
-                                    </span>
-                                )}
+                                {renderScorePill(expandedAnchor.id)}
                             </h2>
                             {expandedAnchor.scope && (
                                 <p className="mobile-tree-scope">{expandedAnchor.scope}</p>
@@ -1102,11 +1116,7 @@ function TreeVisualization() {
                                             <span className="mobile-child-body">
                                                 <span className="mobile-child-title">
                                                     {child.anchor.title}
-                                                    {scores[child.anchor.id] != null && (
-                                                        <span className="mobile-score-pill" title="Your mastery score">
-                                                            {formatScore(scores[child.anchor.id])} XP
-                                                        </span>
-                                                    )}
+                                                    {renderScorePill(child.anchor.id)}
                                                 </span>
                                                 {child.anchor.scope && (
                                                     <span className="mobile-child-scope">{child.anchor.scope}</span>
@@ -1201,7 +1211,7 @@ function TreeVisualization() {
                     overflowX: 'auto'
                 }}
             >
-                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, breadths }) => { setScores(scores); setBreadths(breadths); }} />}
+                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); }} />}
                 <svg
                     viewBox={`0 0 ${svgWidth} ${svgHeight}`}
                     width="100%"
@@ -1277,7 +1287,7 @@ function TreeVisualization() {
 
                                 {/* Mastery XP badge (top-right) for nodes the user has a score for */}
                                 {scores[node.anchor.id] != null && (
-                                    <MasteryBadge score={scores[node.anchor.id]} nodeWidth={nodeWidth} />
+                                    <MasteryBadge score={scores[node.anchor.id]} peak={peaks[node.anchor.id] ?? scores[node.anchor.id]} nodeWidth={nodeWidth} />
                                 )}
 
                                 {/* Action buttons */}

@@ -79,6 +79,12 @@ function MarkReport({ result, onRevise, onRestart }) {
                 )}
             </div>
 
+            {typeof result.nextReviewDays === 'number' && (
+                <p className="gl-rewrite-note">
+                    These points fade over time. Rewrite this in about {result.nextReviewDays} day{result.nextReviewDays === 1 ? '' : 's'} to keep them{result.passed === false ? ' — and aim for 60+ next time to stretch the interval' : ''}.
+                </p>
+            )}
+
             {result.mark?.rationale && <p className="gl-rationale">{result.mark.rationale}</p>}
 
             <Section title="Factual errors" items={errors} tone="error" empty="No factual errors found."

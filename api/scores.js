@@ -19,11 +19,13 @@ export default async function handler(req, res) {
 
     try {
         const rows = await sql`
-            SELECT anchor_id, subtree_raw FROM user_topic_scores WHERE user_id = ${userId}
+            SELECT anchor_id, subtree_raw, subtree_peak FROM user_topic_scores WHERE user_id = ${userId}
         `;
         const scores = {};
+        const peaks = {};
         for (const r of rows) {
             scores[r.anchor_id] = Math.round(displayScore(Number(r.subtree_raw)));
+            peaks[r.anchor_id] = Math.round(displayScore(Number(r.subtree_peak)));
         }
         // Per-breadth own scores (0..B each) so the tree can show which breadths of a node are done.
         const rawBreadths = await computeBreadthBreakdown(userId);
@@ -32,7 +34,7 @@ export default async function handler(req, res) {
             breadths[anchorId] = {};
             for (const [b, v] of Object.entries(byBreadth)) breadths[anchorId][b] = Math.round(v);
         }
-        return res.status(200).json({ success: true, scores, breadths });
+        return res.status(200).json({ success: true, scores, peaks, breadths });
     } catch (error) {
         console.error('Error fetching scores:', error);
         return res.status(500).json({ error: 'Failed to fetch scores', details: error.message });

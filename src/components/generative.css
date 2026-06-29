@@ -169,6 +169,18 @@ ul.gl-layer-body {
 .gl-layer-body li { margin: 0 0 7px; }
 .gl-layer-body li:last-child { margin-bottom: 0; }
 
+/* Note under the mark scoreboard: write-your-own points decay and want refreshing on a schedule. */
+.gl-rewrite-note {
+    margin: 10px 0 0;
+    padding: 8px 12px;
+    background: #eef6ff;
+    border-left: 3px solid #3b82f6;
+    border-radius: 6px;
+    color: #1e3a5f;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
 /* Static note at the top of the "Why it happened" layer: causes are the contested part of history. */
 .gl-why-disclaimer {
     margin: 12px 0 0;
