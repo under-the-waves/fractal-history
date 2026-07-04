@@ -429,6 +429,8 @@ export default async function handler(req, res) {
             // Breadth B: existing parsing
             anchors = parseTemporalAnchorResponse(response, parentId);
             anchors = capTemporalAnchors(anchors, 5); // hard guarantee: never exceed 5 periods
+            // Hard guarantee: every B title ends with its date range (append from timeBoundaries if missing).
+            anchors = anchors.map(a => ({ ...a, title: ensureTitleRange(a.title, a.timeBoundaries) }));
             candidates = parseTemporalCandidates(response);
 
             try {
@@ -1396,6 +1398,27 @@ function parseAnchorResponse(response, parentId) {
 // — each B period covers a contiguous slice of time, so dropping one would leave a gap in
 // coverage. Instead we MERGE the finest-grained adjacent pair (the most over-divided slice)
 // repeatedly until `max` remain, which preserves complete, gap-free coverage.
+// Does a B title already carry a readable date range (so temporalCoordinate can parse a "when")?
+function titleHasDateRange(title) {
+    if (!title) return false;
+    const afterColon = title.includes(':') ? title.slice(title.lastIndexOf(':') + 1) : '';
+    if (/\d/.test(afterColon)) return true;
+    if (/\(([^)]*\d[^)]*)\)/.test(title)) return true;
+    return /[\d,]+\s*(?:BYA|MYA|KYA|BCE|BC|CE|AD)?\s*[-–—]+\s*(?:[\d,]+\s*(?:BYA|MYA|KYA|BCE|BC|CE|AD)?|present)/i.test(title);
+}
+
+// Every B title must end with its date range — the tree shows it and the coordinate parser reads a
+// "when" from it. The model returns timeBoundaries {start,end} separately and does not always put the
+// range in the title (and a merge in capTemporalAnchors drops it), so append it from the boundaries.
+function ensureTitleRange(title, tb) {
+    if (titleHasDateRange(title)) return title;
+    const start = tb && tb.start != null ? String(tb.start).trim() : '';
+    const end = tb && tb.end != null ? String(tb.end).trim() : '';
+    if (start && end) return `${title}: ${start} – ${end}`;
+    if (start) return `${title}: from ${start}`;
+    return title;
+}
+
 function capTemporalAnchors(anchors, max = 5) {
     if (!Array.isArray(anchors) || anchors.length <= max) return anchors;
 
