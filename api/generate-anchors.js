@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles, renderAnalyticalFrame, renderParentSignpost, renderParentLabel, temporalCoordinate, geographicCoordinate } from '../lib/promptLoader.js';
-import { query, getAncestorPath, findExistingEventAnchor, wouldCreateCycle } from '../lib/db.js';
+import { query, getAncestorPath, wouldCreateCycle, getGlobalConceptAnchors, normaliseConceptTitle } from '../lib/db.js';
 import { WORLD, getName, getLevel, getChildren, expandToCandidates, expandToCountries, resolveCountries } from '../lib/geography.js';
 import dotenv from 'dotenv';
 
@@ -501,21 +501,29 @@ export default async function handler(req, res) {
             return { anchorId, positionId, anchor };
         });
 
-        // ANCHOR REUSE: a generated child that is a bounded datable event already present elsewhere
-        // is SHARED rather than duplicated — we add a (non-canonical) position pointing at the
+        // ANCHOR REUSE: a generated A (analytical/concept) child that already exists elsewhere in the
+        // tree is SHARED rather than duplicated — we add a (non-canonical) position pointing at the
         // existing anchor instead of minting a new one, so the concept keeps one narrative and one
-        // score. Only breadth-A datable events are eligible; the cycle guard keeps the tree a DAG.
-        for (const r of anchorRows) {
-            r.reuseOf = null;
-            if (breadth === 'A' && r.anchor.isDatableEvent) {
-                const existingId = await findExistingEventAnchor(
-                    r.anchor.title, r.anchor.eventStart, r.anchor.eventEnd
-                );
+        // score. A concepts are path-independent: "Emergence of Life on Earth" is the same thing however
+        // you reach it. B/C anchors are parent-scoped coordinate slices (a time window / a place), so
+        // they are never reused this way. Matching is on the normalised concept title (formatting/word-
+        // order/stopword-insensitive); the cycle guard keeps the tree a DAG.
+        if (breadth === 'A') {
+            const conceptIndex = new Map();
+            for (const c of await getGlobalConceptAnchors()) {
+                const key = normaliseConceptTitle(c.title);
+                if (key && !conceptIndex.has(key)) conceptIndex.set(key, c.id);
+            }
+            for (const r of anchorRows) {
+                r.reuseOf = null;
+                const existingId = conceptIndex.get(normaliseConceptTitle(r.anchor.title));
                 if (existingId && existingId !== parentId && !(await wouldCreateCycle(existingId, parentPosId))) {
                     r.reuseOf = existingId;
-                    console.log(`Reusing existing anchor ${existingId} for datable event "${r.anchor.title}" (no new anchor minted)`);
+                    console.log(`Reusing existing A-concept anchor ${existingId} for "${r.anchor.title}" (no new anchor minted)`);
                 }
             }
+        } else {
+            for (const r of anchorRows) r.reuseOf = null;
         }
 
         // Mint anchors only for the non-reused (fresh) rows. region_codes is populated for geographic
