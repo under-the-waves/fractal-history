@@ -3542,6 +3542,56 @@ button.orientation-axis-value:hover {
   font-weight: 700;
 }
 
+/* Global rank badge: overall Level + band with a progress bar toward the next level. Sits at the
+   right of the desktop tree header and just under the mobile header. */
+.global-level {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 160px;
+  margin-left: auto;
+}
+
+.global-level-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.global-level-num {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #2c3e50;
+}
+
+.global-level-band {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: #b8860b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.global-level-bar {
+  height: 6px;
+  background: #e2e6ea;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.global-level-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2e9e5b, #27ae60);
+  border-radius: 3px;
+  transition: width 0.35s ease;
+}
+
+/* On mobile the badge sits full width just under the header. */
+.mobile-tree .global-level {
+  margin: 6px 14px 10px;
+  min-width: 0;
+}
+
 /* Tweak app container for the mobile tree */
 @media (max-width: 768px) {
   .mobile-tree-wrapper {

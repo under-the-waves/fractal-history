@@ -11,6 +11,7 @@ import {
 import WhyTheseAnchors from './WhyTheseAnchors';
 import OrientationPanel from './OrientationPanel';
 import { getRandomFact } from '../data/historyFacts';
+import { levelForScore, levelInfo } from '../../shared/levels';
 
 function useIsMobile(breakpoint = 768) {
     const [isMobile, setIsMobile] = useState(() => {
@@ -32,6 +33,25 @@ function formatScore(score) {
     return score >= 1000
         ? (score / 1000).toFixed(score >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k'
         : String(score);
+}
+
+// Global rank badge for the tree header: the user's overall Level + band (from the root anchor's peak,
+// which aggregates everything studied) with a progress bar toward the next level. Level 0 reads
+// "Unranked" and fills toward Initiate.
+function GlobalLevelBadge({ score }) {
+    const info = levelInfo(score || 0);
+    const ranked = info.level >= 1;
+    return (
+        <div className="global-level" title={`${info.toNext} XP to level ${info.level + 1}${info.nextBand && info.nextBand !== info.band ? ` (${info.nextBand})` : ''}`}>
+            <div className="global-level-head">
+                <span className="global-level-num">{ranked ? `Level ${info.level}` : 'Unranked'}</span>
+                {info.band && <span className="global-level-band">{info.band}</span>}
+            </div>
+            <div className="global-level-bar">
+                <div className="global-level-fill" style={{ width: `${Math.round(info.progress * 100)}%` }} />
+            </div>
+        </div>
+    );
 }
 
 // Auth-gated loader: fetches the signed-in user's per-node mastery scores once and lifts them up.
@@ -942,10 +962,12 @@ function TreeVisualization() {
         const cur = scores[id];
         const pk = peaks[id] ?? cur;
         const decayed = pk > cur;
+        const lvl = levelForScore(pk);
+        const scoreLabel = decayed ? `${formatScore(cur)}/${formatScore(pk)}` : formatScore(cur);
         return (
             <span className={`mobile-score-pill${decayed ? ' decayed' : ''}`}
                 title={decayed ? 'Current / your best — review to recover' : 'Your mastery score'}>
-                {decayed ? `${formatScore(cur)}/${formatScore(pk)}` : formatScore(cur)} XP
+                {lvl >= 1 ? `Lv ${lvl} · ${scoreLabel}` : scoreLabel}
             </span>
         );
     };
@@ -1024,6 +1046,8 @@ function TreeVisualization() {
                             <span className="mobile-legend-caret">{legendExpanded ? '▲' : '▼'}</span>
                         </button>
                     </header>
+
+                    {Object.keys(peaks).length > 0 && <GlobalLevelBadge score={peaks['0-ROOT'] ?? 0} />}
 
                     {legendExpanded && (
                         <div className="mobile-legend-panel">
@@ -1202,6 +1226,7 @@ function TreeVisualization() {
                 )}
                 <h1>Fractal History Tree</h1>
                 <span className="tree-subtitle">Click to expand. Toggle A/B/C for different perspectives.</span>
+                {Object.keys(peaks).length > 0 && <GlobalLevelBadge score={peaks['0-ROOT'] ?? 0} />}
 
                 {/* Collapsible legend */}
                 <div className="breadth-legend">
@@ -1333,7 +1358,9 @@ function TreeVisualization() {
                                     const cur = scores[node.anchor.id];
                                     const pk = peaks[node.anchor.id] ?? cur;
                                     const decayed = pk > cur;
-                                    const label = decayed ? `${formatScore(cur)}/${formatScore(pk)}` : formatScore(cur);
+                                    const lvl = levelForScore(pk);
+                                    const scoreLabel = decayed ? `${formatScore(cur)}/${formatScore(pk)}` : formatScore(cur);
+                                    const label = lvl >= 1 ? `Lv ${lvl} · ${scoreLabel}` : scoreLabel;
                                     const greenOnDark = colors.text === 'white' ? '#8fe0ad' : '#2e9e5b';
                                     return (
                                         <text
