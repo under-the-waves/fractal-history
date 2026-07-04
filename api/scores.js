@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { getAuthenticatedUser } from '../lib/auth.js';
-import { displayScore, computeBreadthBreakdown } from '../lib/scoring.js';
+import { displayScore, computeBreadthBreakdown, computeBreadthSubtreeBreakdown } from '../lib/scoring.js';
 
 const sql = neon(process.env.DATABASE_URL);
 
@@ -34,7 +34,26 @@ export default async function handler(req, res) {
             breadths[anchorId] = {};
             for (const [b, v] of Object.entries(byBreadth)) breadths[anchorId][b] = Math.round(v);
         }
-        return res.status(200).json({ success: true, scores, peaks, breadths });
+
+        // Per-breadth split of each node's TOTAL score, so the tree can show how much of the badge
+        // number came from the analytical (A), temporal (B), and geographic (C) pathways. Computed live,
+        // then apportioned against the stored integer total with largest-remainder rounding, so the three
+        // parts always sum EXACTLY to the badge — no "they don't add up" drift from mid-day decay.
+        const rawBreadthSub = await computeBreadthSubtreeBreakdown(userId);
+        const breadthScores = {};
+        for (const [anchorId, parts] of Object.entries(rawBreadthSub)) {
+            const total = scores[anchorId];
+            if (total == null) continue;
+            const sum = parts.A + parts.B + parts.C;
+            if (sum <= 0) continue;
+            const exact = { A: total * parts.A / sum, B: total * parts.B / sum, C: total * parts.C / sum };
+            const split = { A: Math.floor(exact.A), B: Math.floor(exact.B), C: Math.floor(exact.C) };
+            let remainder = total - (split.A + split.B + split.C);
+            const order = ['A', 'B', 'C'].sort((x, y) => (exact[y] - split[y]) - (exact[x] - split[x]));
+            for (let i = 0; i < remainder; i++) split[order[i]] += 1;
+            breadthScores[anchorId] = split;
+        }
+        return res.status(200).json({ success: true, scores, peaks, breadths, breadthScores });
     } catch (error) {
         console.error('Error fetching scores:', error);
         return res.status(500).json({ error: 'Failed to fetch scores', details: error.message });

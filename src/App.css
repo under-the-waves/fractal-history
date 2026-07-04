@@ -3424,6 +3424,174 @@ button.orientation-axis-value:hover {
   background: #f0f4f8;
 }
 
+/* Footer row of a child card: pathway tiles on the left, "Learn" on the right. Lets the user open a
+   child directly into any breadth on mobile, instead of always drilling into A. */
+.mobile-child-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 14px 12px;
+  flex-wrap: wrap;
+}
+
+/* Child-card footer overrides the standalone Learn button's margin (it now lives in the flex row). */
+.mobile-child-footer .mobile-child-read {
+  margin: 0;
+  align-self: center;
+}
+
+/* Per-pathway tiles: breadth letter + that pathway's share of the node's total XP. Tap to open the
+   pathway. The active pathway (focused card) fills with its colour; the underline shows own-mastery. */
+.mobile-breadth-tiles {
+  display: flex;
+  gap: 8px;
+}
+
+.mobile-breadth-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 56px;
+  min-height: 48px;
+  padding: 4px 8px 8px;
+  background: white;
+  border: 1.5px solid #d0d0d0;
+  border-radius: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.05s ease, background 0.15s ease;
+}
+
+.mobile-breadth-tile:active {
+  transform: scale(0.96);
+}
+
+.mbt-letter {
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.mbt-xp {
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.9;
+}
+
+/* "No score yet" dash — keeps the tile's letter/number layout identical to a scored tile. */
+.mbt-xp.muted {
+  opacity: 0.4;
+}
+
+/* Own-mastery underline pinned to the tile's bottom edge (track + coloured fill). */
+.mbt-underline {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background: #e2e6ea;
+}
+
+.mobile-breadth-tile.active .mbt-underline {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.mbt-underline-fill {
+  display: block;
+  height: 100%;
+}
+
+/* The focused-card tiles sit in the row that used to hold the Learn button; give them breathing room. */
+.mobile-tree-current .mobile-breadth-tiles {
+  margin-top: 2px;
+}
+
+/* On the dark root card, keep inactive tiles legible. */
+.mobile-tree-current-root .mobile-breadth-tile {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Prominent "Back" control in the desktop tree header — steps up one level. */
+.tree-back-btn {
+  background: #fff;
+  border: 1.5px solid #cbd6e2;
+  border-radius: 6px;
+  color: #2c3e50;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.tree-back-btn:hover {
+  background: #eef3f8;
+  border-color: #9fb3c8;
+}
+
+/* Mobile "Back" (one level up) sits before "Top" in the breadcrumb bar. */
+.mobile-breadcrumb-back {
+  color: #3498db;
+  font-weight: 700;
+}
+
+/* Global rank badge: overall Level + band with a progress bar toward the next level. Sits at the
+   right of the desktop tree header and just under the mobile header. */
+.global-level {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 160px;
+  margin-left: auto;
+}
+
+.global-level-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.global-level-num {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #2c3e50;
+}
+
+.global-level-band {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: #b8860b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.global-level-bar {
+  height: 6px;
+  background: #e2e6ea;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.global-level-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2e9e5b, #27ae60);
+  border-radius: 3px;
+  transition: width 0.35s ease;
+}
+
+/* On mobile the badge sits full width just under the header. */
+.mobile-tree .global-level {
+  margin: 6px 14px 10px;
+  min-width: 0;
+}
+
 /* Tweak app container for the mobile tree */
 @media (max-width: 768px) {
   .mobile-tree-wrapper {

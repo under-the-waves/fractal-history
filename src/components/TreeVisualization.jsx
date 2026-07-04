@@ -11,6 +11,7 @@ import {
 import WhyTheseAnchors from './WhyTheseAnchors';
 import OrientationPanel from './OrientationPanel';
 import { getRandomFact } from '../data/historyFacts';
+import { levelForScore, levelInfo } from '../../shared/levels';
 
 function useIsMobile(breakpoint = 768) {
     const [isMobile, setIsMobile] = useState(() => {
@@ -34,21 +35,22 @@ function formatScore(score) {
         : String(score);
 }
 
-// Small XP badge (a pill showing the node's score) drawn in a node's top-right corner. Only shown for
-// nodes the signed-in user has a score for. When the score has decayed below the all-time peak, it
-// reads "current/best" in amber so the drop is legible; at the peak it reads just the score in green.
-function MasteryBadge({ score, peak, nodeWidth }) {
-    const decayed = peak > score;
-    const label = decayed ? `${formatScore(score)}/${formatScore(peak)}` : formatScore(score);
-    const w = 14 + label.length * 6.5;
-    const x = nodeWidth - w - 6;
+// Global rank badge for the tree header: the user's overall Level + band (from the root anchor's peak,
+// which aggregates everything studied) with a progress bar toward the next level. Level 0 reads
+// "Unranked" and fills toward Initiate.
+function GlobalLevelBadge({ score }) {
+    const info = levelInfo(score || 0);
+    const ranked = info.level >= 1;
     return (
-        <g pointerEvents="none">
-            <rect x={x} y={8} width={w} height={16} rx={8} fill={decayed ? '#c77d12' : '#2e9e5b'} />
-            <text x={x + w / 2} y={16} textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="700" fill="white">
-                {label}
-            </text>
-        </g>
+        <div className="global-level" title={`${info.toNext} XP to level ${info.level + 1}${info.nextBand && info.nextBand !== info.band ? ` (${info.nextBand})` : ''}`}>
+            <div className="global-level-head">
+                <span className="global-level-num">{ranked ? `Level ${info.level}` : 'Unranked'}</span>
+                {info.band && <span className="global-level-band">{info.band}</span>}
+            </div>
+            <div className="global-level-bar">
+                <div className="global-level-fill" style={{ width: `${Math.round(info.progress * 100)}%` }} />
+            </div>
+        </div>
     );
 }
 
@@ -64,7 +66,7 @@ function MasteryScoreLoader({ onLoaded }) {
                 const token = await auth.getToken();
                 const res = await fetch('/api/scores', { headers: { Authorization: `Bearer ${token}` } });
                 const data = await res.json();
-                if (!cancelled && data.success) onLoaded({ scores: data.scores || {}, peaks: data.peaks || {}, breadths: data.breadths || {} });
+                if (!cancelled && data.success) onLoaded({ scores: data.scores || {}, peaks: data.peaks || {}, breadths: data.breadths || {}, breadthScores: data.breadthScores || {} });
             } catch (err) {
                 console.error('Failed to load mastery scores:', err);
             }
@@ -80,8 +82,9 @@ function TreeVisualization() {
     const [scores, setScores] = useState({});
     const [peaks, setPeaks] = useState({});
     const [breadths, setBreadths] = useState({});
+    const [breadthScores, setBreadthScores] = useState({});
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [activePath, setActivePath] = useState([]);
     const [breadthSelections, setBreadthSelections] = useState({});
     const containerRef = useRef(null);
@@ -272,12 +275,13 @@ function TreeVisualization() {
         }
     };
 
-    // Layout constants
-    const rowHeight = 160;
-    const nodeWidth = 200;
-    const nodeHeight = 100;
-    const horizontalSpacing = 40;
-    const containerWidth = 1200;
+    // Layout constants. Boxes are roomy enough to hold the title, total XP, three per-pathway score
+    // tiles, and a Learn action; the canvas is wide enough that up to 5 children still fit in a row.
+    const rowHeight = 215;
+    const nodeWidth = 230;
+    const nodeHeight = 155;
+    const horizontalSpacing = 30;
+    const containerWidth = 1300;
 
     // Load static tree data on mount (instant - no API call needed)
     useEffect(() => {
@@ -363,6 +367,15 @@ function TreeVisualization() {
         const indexInPath = activePath.indexOf(anchorId);
         const newPath = activePath.slice(0, indexInPath);
         setActivePath(newPath);
+    };
+
+    // Step up exactly one level in the tree. Drives the visible in-page "Back" controls on both
+    // platforms so a user drilled deep is never stranded without an obvious way out. The browser Back
+    // button does the same thing via the activePath<->URL sync; this is the on-screen equivalent.
+    const goBack = () => {
+        if (activePath.length === 0) return;
+        setActivePath(activePath.slice(0, -1));
+        setSidebarData(null);
     };
 
     const handleBreadthToggle = (anchorId, newBreadth) => {
@@ -630,13 +643,27 @@ function TreeVisualization() {
         }
     };
 
-    // Deep-link: when the URL carries ?path=id0,id1,...,target, expand to that node.
-    const openedPathRef = useRef(null);
+    // Two-way sync between the drill state (activePath) and the URL's ?path=, so the browser BACK
+    // button steps back up the tree instead of leaving the site. Drilling in mutates activePath only;
+    // without this, no history entry is ever pushed, so BACK skips the whole tree session.
+    //
+    // Direction 1 — state -> URL: whenever activePath changes because the user drilled/collapsed, push a
+    // new history entry carrying the new path. Guarded on equality so a change that merely reflects the
+    // URL (direction 2 below) never pushes a duplicate entry.
     useEffect(() => {
-        const pathParam = searchParams.get('path');
-        if (!pathParam) return;
-        if (openedPathRef.current === pathParam) return;
-        openedPathRef.current = pathParam;
+        const desired = activePath.join(',');
+        const current = searchParams.get('path') || '';
+        if (desired === current) return;
+        setSearchParams(activePath.length ? { path: desired } : {}, { replace: false });
+    }, [activePath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Direction 2 — URL -> state: fires on first load (deep link from a narrative) and on browser
+    // BACK/FORWARD, which change the URL without touching activePath. Reconcile the tree to the URL only
+    // when they differ, so a push we just made in direction 1 is a no-op here (no reload loop).
+    useEffect(() => {
+        const pathParam = searchParams.get('path') || '';
+        if (pathParam === activePath.join(',')) return;
+        if (!pathParam) { setActivePath([]); setSidebarData(null); return; }
         const ids = pathParam.split(',').map(s => s.trim()).filter(Boolean);
         if (ids.length > 0) openPath(ids);
     }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -792,7 +819,7 @@ function TreeVisualization() {
         };
     };
 
-    const svgWidth = 1200;
+    const svgWidth = 1300;
     const svgHeight = 60 + 8 * rowHeight;
 
     const wrapText = (text, maxChars = 22) => {
@@ -935,13 +962,49 @@ function TreeVisualization() {
         const cur = scores[id];
         const pk = peaks[id] ?? cur;
         const decayed = pk > cur;
+        const lvl = levelForScore(pk);
+        const scoreLabel = decayed ? `${formatScore(cur)}/${formatScore(pk)}` : formatScore(cur);
         return (
             <span className={`mobile-score-pill${decayed ? ' decayed' : ''}`}
                 title={decayed ? 'Current / your best — review to recover' : 'Your mastery score'}>
-                {decayed ? `${formatScore(cur)}/${formatScore(pk)}` : formatScore(cur)} XP
+                {lvl >= 1 ? `Lv ${lvl} · ${scoreLabel}` : scoreLabel}
             </span>
         );
     };
+
+    // Three per-pathway tiles for a node (mobile). Each tile shows the breadth letter and that pathway's
+    // share of the node's total XP; tapping opens the pathway. A thin underline shows how much of the
+    // node's OWN cards are mastered in that breadth (green complete, amber partial). `active: true` fills
+    // the currently-selected pathway (used on the focused card); children pass `active: false`.
+    const renderBreadthTiles = (anchor, { active }) => (
+        <div className="mobile-breadth-tiles" role="group" aria-label={`Open ${anchor.title} by pathway`}>
+            {['A', 'B', 'C'].map(b => {
+                const color = getBreadthColor(b);
+                const isActive = active && b === getActiveBreadth(anchor.id);
+                const pathXp = breadthScores[anchor.id]?.[b];
+                const bOwn = breadths[anchor.id]?.[b] || 0;
+                const frac = Math.min(1, bOwn / 19);
+                return (
+                    <button
+                        key={b}
+                        className={`mobile-breadth-tile${isActive ? ' active' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); handleBreadthSelect(anchor, b); }}
+                        style={isActive ? { background: color, borderColor: color, color: '#fff' } : { borderColor: color, color }}
+                        aria-label={`Open ${b} pathway`}
+                    >
+                        <span className="mbt-letter">{b}</span>
+                        <span className={`mbt-xp${pathXp == null ? ' muted' : ''}`}>{pathXp != null ? formatScore(pathXp) : '–'}</span>
+                        {bOwn > 0 && (
+                            <span className="mbt-underline" aria-hidden="true">
+                                <span className="mbt-underline-fill"
+                                    style={{ width: `${frac * 100}%`, background: bOwn >= 19 ? '#2e9e5b' : '#e0a030' }}></span>
+                            </span>
+                        )}
+                    </button>
+                );
+            })}
+        </div>
+    );
 
     if (isMobile) {
         const expandedNode = visibleNodes.find(n => n.type === 'expanded') || visibleNodes.find(n => n.type === 'root');
@@ -959,7 +1022,7 @@ function TreeVisualization() {
             <div className="tree-visualization mobile-tree-wrapper">
                 {/* Fetch the signed-in user's mastery scores on mobile too (the desktop branch has its
                     own copy; without this, mobile never loads scores). */}
-                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); }} />}
+                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths, breadthScores }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); setBreadthScores(breadthScores); }} />}
                 {introOverlay}
                 {busyOverlay}
 
@@ -984,6 +1047,8 @@ function TreeVisualization() {
                         </button>
                     </header>
 
+                    {Object.keys(peaks).length > 0 && <GlobalLevelBadge score={peaks['0-ROOT'] ?? 0} />}
+
                     {legendExpanded && (
                         <div className="mobile-legend-panel">
                             <div className="legend-item">
@@ -1004,13 +1069,19 @@ function TreeVisualization() {
                     {activePath.length > 0 && (
                         <nav className="mobile-tree-breadcrumbs" aria-label="Path">
                             <button
+                                className="mobile-breadcrumb-btn mobile-breadcrumb-back"
+                                onClick={goBack}
+                            >
+                                ← Back
+                            </button>
+                            <button
                                 className="mobile-breadcrumb-btn mobile-breadcrumb-home"
                                 onClick={() => {
                                     setActivePath([]);
                                     setSidebarData(null);
                                 }}
                             >
-                                ← Top
+                                Top
                             </button>
                             {ancestors.map(ancestor => (
                                 <span key={ancestor.id} className="mobile-breadcrumb-segment">
@@ -1056,26 +1127,7 @@ function TreeVisualization() {
                                 </button>
                             ) : (
                                 <>
-                                    <div className="mobile-breadth-row" role="group" aria-label="Choose breadth">
-                                        <span className="mobile-breadth-label">Breadth</span>
-                                        <div className="mobile-breadth-btns">
-                                            {['A', 'B', 'C'].map(b => {
-                                                const isActive = b === activeBreadth;
-                                                const color = getBreadthColor(b);
-                                                return (
-                                                    <button
-                                                        key={b}
-                                                        className={`mobile-breadth-btn${isActive ? ' active' : ''}`}
-                                                        onClick={() => handleBreadthSelect(expandedAnchor, b)}
-                                                        style={isActive ? { background: color, borderColor: color, color: 'white' } : undefined}
-                                                        aria-pressed={isActive}
-                                                    >
-                                                        {b}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
+                                    {renderBreadthTiles(expandedAnchor, { active: true })}
 
                                     <button
                                         className="mobile-primary-btn"
@@ -1124,16 +1176,19 @@ function TreeVisualization() {
                                             </span>
                                             <span className="mobile-child-chevron" aria-hidden="true">›</span>
                                         </button>
-                                        <button
-                                            className="mobile-child-read"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigate(`/learn/${child.anchor.id}?breadth=${getActiveBreadth(child.anchor.id)}`);
-                                            }}
-                                            aria-label={`Learn ${child.anchor.title}`}
-                                        >
-                                            Learn →
-                                        </button>
+                                        <div className="mobile-child-footer">
+                                            {renderBreadthTiles(child.anchor, { active: false })}
+                                            <button
+                                                className="mobile-child-read"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate(`/learn/${child.anchor.id}?breadth=${getActiveBreadth(child.anchor.id)}`);
+                                                }}
+                                                aria-label={`Learn ${child.anchor.title}`}
+                                            >
+                                                Learn →
+                                            </button>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>
@@ -1164,8 +1219,14 @@ function TreeVisualization() {
 
             {/* Frozen header */}
             <div className="tree-header">
+                {activePath.length > 0 && (
+                    <button className="tree-back-btn" onClick={goBack} title="Go up one level (or use your browser's Back button)">
+                        ← Back
+                    </button>
+                )}
                 <h1>Fractal History Tree</h1>
                 <span className="tree-subtitle">Click to expand. Toggle A/B/C for different perspectives.</span>
+                {Object.keys(peaks).length > 0 && <GlobalLevelBadge score={peaks['0-ROOT'] ?? 0} />}
 
                 {/* Collapsible legend */}
                 <div className="breadth-legend">
@@ -1211,7 +1272,7 @@ function TreeVisualization() {
                     overflowX: 'auto'
                 }}
             >
-                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); }} />}
+                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths, breadthScores }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); setBreadthScores(breadthScores); }} />}
                 <svg
                     viewBox={`0 0 ${svgWidth} ${svgHeight}`}
                     width="100%"
@@ -1224,7 +1285,12 @@ function TreeVisualization() {
                         const opacity = calculateOpacity(node);
                         const colors = calculateColor(node);
                         const hasChildren = getChildren(node.anchor.id, 'A').length > 0;
-                        const lines = wrapText(node.anchor.title);
+                        // Cap the title at two lines inside the box (fuller title shows in the breadcrumb
+                        // and orientation panel); a longer title gets its second line truncated with an ellipsis.
+                        const rawLines = wrapText(node.anchor.title);
+                        const lines = rawLines.length <= 2
+                            ? rawLines
+                            : [rawLines[0], (rawLines.slice(1).join(' ')).slice(0, 20).trimEnd() + '…'];
 
                         const isInPath = activePath.includes(node.id);
 
@@ -1271,135 +1337,151 @@ function TreeVisualization() {
                                 {/* Title text */}
                                 <text
                                     x={nodeWidth / 2}
-                                    y={22}
+                                    y={28}
                                     textAnchor="middle"
                                     fill={colors.text}
-                                    fontSize="12"
-                                    fontWeight={colors.fill === '#555555' ? 'bold' : 'normal'}
+                                    fontSize="15"
+                                    fontWeight={colors.fill === '#555555' ? 'bold' : '600'}
                                     style={{ transition: 'fill 0.15s ease' }}
                                 >
                                     {lines.map((line, i) => (
-                                        <tspan key={i} x={nodeWidth / 2} dy={i === 0 ? 0 : '1.1em'}>
+                                        <tspan key={i} x={nodeWidth / 2} dy={i === 0 ? 0 : '1.15em'}>
                                             {line}
                                         </tspan>
                                     ))}
                                 </text>
 
-                                {/* Mastery XP badge (top-right) for nodes the user has a score for */}
-                                {scores[node.anchor.id] != null && (
-                                    <MasteryBadge score={scores[node.anchor.id]} peak={peaks[node.anchor.id] ?? scores[node.anchor.id]} nodeWidth={nodeWidth} />
+                                {/* Cumulative score for the anchor (own + everything rolled up), on its own
+                                    line under the title. Reads "current/best" in amber when it has decayed
+                                    below the peak. The three pathway tiles below break this number down. */}
+                                {scores[node.anchor.id] != null && (() => {
+                                    const cur = scores[node.anchor.id];
+                                    const pk = peaks[node.anchor.id] ?? cur;
+                                    const decayed = pk > cur;
+                                    const lvl = levelForScore(pk);
+                                    const scoreLabel = decayed ? `${formatScore(cur)}/${formatScore(pk)}` : formatScore(cur);
+                                    const label = lvl >= 1 ? `Lv ${lvl} · ${scoreLabel}` : scoreLabel;
+                                    const greenOnDark = colors.text === 'white' ? '#8fe0ad' : '#2e9e5b';
+                                    return (
+                                        <text
+                                            x={nodeWidth / 2}
+                                            y={64}
+                                            textAnchor="middle"
+                                            fill={decayed ? '#e0a030' : greenOnDark}
+                                            fontSize="14"
+                                            fontWeight="800"
+                                        >
+                                            {label}
+                                        </text>
+                                    );
+                                })()}
+
+                                {/* Action area: three per-pathway tiles + a Learn bar. Hidden only on the
+                                    not-yet-clicked ROOT. */}
+                                {(node.type !== 'root' || activePath.length > 0) && (
+                                    <>
+                                        {/* Pathway tiles: breadth letter + that pathway's share of the total XP.
+                                            Tap to open the pathway. The active pathway (on an in-path node) fills
+                                            with its colour. A thin underline shows how much of THIS node's own
+                                            cards are mastered in that breadth (green when complete, amber while
+                                            partial) — the pathway XP and the own-mastery cue are different things. */}
+                                        {['A', 'B', 'C'].map((breadth, index) => {
+                                            const activeBreadth = getActiveBreadth(node.id);
+                                            const shouldShowColor = breadth === activeBreadth && isInPath;
+                                            const breadthColor = getBreadthColor(breadth);
+                                            const pad = 12, gap = 8;
+                                            const tileW = (nodeWidth - 2 * pad - 2 * gap) / 3;
+                                            const tileX = pad + index * (tileW + gap);
+                                            const tileY = 74;
+                                            const tileH = 46;
+                                            const onDark = colors.fill === '#555555';
+                                            const pathXp = breadthScores[node.anchor.id]?.[breadth];
+                                            const bOwn = breadths[node.anchor.id]?.[breadth] || 0;
+                                            const frac = Math.min(1, bOwn / 19);
+                                            // Muted "no score yet" colour for the dash, so an unstudied tile
+                                            // keeps the same letter/number layout as a scored one.
+                                            const mutedNum = onDark ? 'rgba(255,255,255,0.4)' : '#b3bac2';
+                                            return (
+                                                <g
+                                                    key={breadth}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleBreadthSelect(node.anchor, breadth);
+                                                    }}
+                                                    style={{ cursor: 'pointer' }}
+                                                >
+                                                    <rect
+                                                        x={tileX}
+                                                        y={tileY}
+                                                        width={tileW}
+                                                        height={tileH}
+                                                        rx="6"
+                                                        fill={shouldShowColor ? breadthColor : (onDark ? 'rgba(255,255,255,0.10)' : 'white')}
+                                                        stroke={shouldShowColor ? breadthColor : '#cbd2d9'}
+                                                        strokeWidth="1.5"
+                                                        style={{ transition: 'all 0.2s ease' }}
+                                                    />
+                                                    {/* Letter is ALWAYS at the same height, whether or not a
+                                                        number sits below it, so tiles read consistently. */}
+                                                    <text
+                                                        x={tileX + tileW / 2}
+                                                        y={tileY + 19}
+                                                        textAnchor="middle"
+                                                        fill={shouldShowColor ? 'white' : breadthColor}
+                                                        fontSize="18"
+                                                        fontWeight="800"
+                                                        pointerEvents="none"
+                                                    >
+                                                        {breadth}
+                                                    </text>
+                                                    <text
+                                                        x={tileX + tileW / 2}
+                                                        y={tileY + 35}
+                                                        textAnchor="middle"
+                                                        fill={pathXp != null ? (shouldShowColor ? 'white' : colors.text) : mutedNum}
+                                                        fontSize="13"
+                                                        fontWeight="700"
+                                                        pointerEvents="none"
+                                                    >
+                                                        {pathXp != null ? formatScore(pathXp) : '–'}
+                                                    </text>
+                                                    {bOwn > 0 && (
+                                                        <>
+                                                            <rect x={tileX + 5} y={tileY + tileH - 6} width={tileW - 10} height={3.5} rx="1.75"
+                                                                fill={shouldShowColor ? 'rgba(255,255,255,0.35)' : '#e2e6ea'} pointerEvents="none" />
+                                                            <rect x={tileX + 5} y={tileY + tileH - 6} width={(tileW - 10) * frac} height={3.5} rx="1.75"
+                                                                fill={bOwn >= 19 ? '#2e9e5b' : '#e0a030'} pointerEvents="none" />
+                                                        </>
+                                                    )}
+                                                </g>
+                                            );
+                                        })}
+
+                                        {/* Learn bar (full width) */}
+                                        <g onClick={() => navigate(`/learn/${node.anchor.id}?breadth=${getActiveBreadth(node.id)}`)} style={{ cursor: 'pointer' }}>
+                                            <rect
+                                                x={12}
+                                                y={nodeHeight - 29}
+                                                width={nodeWidth - 24}
+                                                height={23}
+                                                rx="5"
+                                                fill={colors.fill === '#555555' ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.08)'}
+                                                stroke={colors.fill === '#555555' ? 'white' : '#8a929b'}
+                                                strokeWidth="1.5"
+                                            />
+                                            <text
+                                                x={nodeWidth / 2}
+                                                y={nodeHeight - 13}
+                                                textAnchor="middle"
+                                                fill={colors.text}
+                                                fontSize="14"
+                                                fontWeight="bold"
+                                            >
+                                                Learn →
+                                            </text>
+                                        </g>
+                                    </>
                                 )}
-
-                                {/* Action buttons */}
-                                <g>
-                                    {/* Show buttons on all nodes except unclicked ROOT */}
-                                    {(node.type !== 'root' || activePath.length > 0) && (
-                                        <>
-                                            {/* Always show breadth toggle buttons (A, B, C) */}
-                                            <g>
-                                                {/* "Breadth" label */}
-                                                <text
-                                                    x={nodeWidth / 4 + 5}
-                                                    y={nodeHeight - 34}
-                                                    textAnchor="middle"
-                                                    fill={colors.text}
-                                                    fontSize="10"
-                                                    fontWeight="bold"
-                                                >
-                                                    Breadth
-                                                </text>
-
-                                                {/* Breadth buttons */}
-                                                {['A', 'B', 'C'].map((breadth, index) => {
-                                                    const activeBreadth = getActiveBreadth(node.id);
-                                                    const isActive = breadth === activeBreadth;
-                                                    const buttonWidth = (nodeWidth / 2 - 15) / 3 - 2;
-                                                    const buttonX = 10 + index * (buttonWidth + 2);
-                                                    const breadthColor = getBreadthColor(breadth);
-
-                                                    // Only show color if this breadth is active AND node is expanded (in path)
-                                                    const shouldShowColor = isActive && isInPath;
-
-                                                    return (
-                                                        <g
-                                                            key={breadth}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleBreadthSelect(node.anchor, breadth);
-                                                            }}
-                                                        >
-                                                            <rect
-                                                                x={buttonX}
-                                                                y={nodeHeight - 22}
-                                                                width={buttonWidth}
-                                                                height={16}
-                                                                fill={shouldShowColor ? breadthColor : '#e8e8e8'}
-                                                                stroke={shouldShowColor ? breadthColor : '#555'}
-                                                                strokeWidth="1"
-                                                                opacity={1}
-                                                                rx="2"
-                                                                style={{
-                                                                    cursor: 'pointer',
-                                                                    transition: 'all 0.2s ease'
-                                                                }}
-                                                            />
-                                                            <text
-                                                                x={buttonX + buttonWidth / 2}
-                                                                y={nodeHeight - 22 + 12}
-                                                                textAnchor="middle"
-                                                                fill={shouldShowColor ? 'white' : '#333'}
-                                                                fontSize="11"
-                                                                fontWeight="600"
-                                                                pointerEvents="none"
-                                                            >
-                                                                {breadth}
-                                                            </text>
-                                                            {/* Completion dot: green = breadth mastered, amber = in progress */}
-                                                            {(() => {
-                                                                const bOwn = breadths[node.anchor.id]?.[breadth] || 0;
-                                                                if (bOwn <= 0) return null;
-                                                                return (
-                                                                    <circle
-                                                                        cx={buttonX + buttonWidth - 2.5}
-                                                                        cy={nodeHeight - 22 + 2.5}
-                                                                        r={2.6}
-                                                                        fill={bOwn >= 19 ? '#2e9e5b' : '#e0a030'}
-                                                                        stroke="white"
-                                                                        strokeWidth="0.6"
-                                                                        pointerEvents="none"
-                                                                    />
-                                                                );
-                                                            })()}
-                                                        </g>
-                                                    );
-                                                })}
-                                            </g>
-
-                                            {/* Right button: Learn */}
-                                            <g onClick={() => navigate(`/learn/${node.anchor.id}?breadth=${getActiveBreadth(node.id)}`)} style={{ cursor: 'pointer' }}>
-                                                <rect
-                                                    x={nodeWidth / 2 + 5}
-                                                    y={nodeHeight - 28}
-                                                    width={nodeWidth / 2 - 15}
-                                                    height={22}
-                                                    fill={colors.fill === '#555555' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
-                                                    stroke={colors.fill === '#555555' ? 'white' : '#666'}
-                                                    strokeWidth="1"
-                                                />
-                                                <text
-                                                    x={3 * nodeWidth / 4}
-                                                    y={nodeHeight - 13}
-                                                    textAnchor="middle"
-                                                    fill={colors.text}
-                                                    fontSize="10"
-                                                    fontWeight="bold"
-                                                >
-                                                    Learn →
-                                                </text>
-                                            </g>
-                                        </>
-                                    )}
-                                </g>
                             </g>
                         );
                     })}
