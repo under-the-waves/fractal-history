@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { getAuthenticatedUser } from '../lib/auth.js';
 import { displayScore, computeBreadthBreakdown, computeBreadthSubtreeBreakdown } from '../lib/scoring.js';
+import { bankMastery, computeStats, evaluateAchievements, getUnlocked } from '../lib/achievements.js';
 
 const sql = neon(process.env.DATABASE_URL);
 
@@ -53,7 +54,20 @@ export default async function handler(req, res) {
             for (let i = 0; i < remainder; i++) split[order[i]] += 1;
             breadthScores[anchorId] = split;
         }
-        return res.status(200).json({ success: true, scores, peaks, breadths, breadthScores });
+        // Achievements: bank any currently-mastered narratives, then evaluate so a user who earned
+        // something before this feature existed (or between sessions) has it unlocked on load. Returns
+        // the full unlocked list plus the stats the Achievements page needs for progress hints.
+        let achievements = { unlocked: [], stats: null };
+        try {
+            await bankMastery(userId);
+            const stats = await computeStats(userId);
+            await evaluateAchievements(userId, stats);
+            achievements = { unlocked: await getUnlocked(userId), stats };
+        } catch (achErr) {
+            console.error('Achievement evaluation failed (non-fatal):', achErr);
+        }
+
+        return res.status(200).json({ success: true, scores, peaks, breadths, breadthScores, achievements });
     } catch (error) {
         console.error('Error fetching scores:', error);
         return res.status(500).json({ error: 'Failed to fetch scores', details: error.message });

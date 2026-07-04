@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
+import { useToasts } from './AchievementToasts'
 import './generative.css'
 
 // The "learn" entry for an anchor: a choice between reading the guided narrative and writing your
@@ -139,6 +140,7 @@ function GenerativeLearning() {
     const breadth = searchParams.get('breadth') || 'A'
     const clerkEnabled = useClerkEnabled()
     const { isSignedIn, getToken } = useAuth()
+    const toasts = useToasts()
 
     const [stage, setStage] = useState('choice') // choice | generating | study | write | marking | result
     const [text, setText] = useState('')
@@ -229,6 +231,8 @@ function GenerativeLearning() {
             if (!res.ok || !d.success) throw new Error(d.error || 'Marking failed.')
             setResult(d)
             setStage('result')
+            if (d.achievements?.length) toasts?.achievements(d.achievements)
+            if (d.levelUps?.length) toasts?.levelUps(d.levelUps)
         } catch (err) {
             setError(err.message)
             setStage('write')

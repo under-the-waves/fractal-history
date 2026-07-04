@@ -6,6 +6,8 @@ import GenerativeLearning from './components/GenerativeLearning'
 import TreeVisualization from './components/TreeVisualization.jsx'
 import AboutPage from './components/AboutPage'
 import FlashcardsPage from './components/FlashcardsPage'
+import AchievementsPage from './components/AchievementsPage'
+import { ToastProvider } from './components/AchievementToasts'
 import './App.css'
 
 function AppContent() {
@@ -23,6 +25,11 @@ function AppContent() {
         {clerkEnabled && (
           <Show when="signed-in">
             <button className={location.pathname === '/flashcards' ? 'active' : ''} onClick={() => navigate('/flashcards')}>Flashcards</button>
+          </Show>
+        )}
+        {clerkEnabled && (
+          <Show when="signed-in">
+            <button className={location.pathname === '/achievements' ? 'active' : ''} onClick={() => navigate('/achievements')}>Achievements</button>
           </Show>
         )}
         <button className={location.pathname === '/about' ? 'active' : ''} onClick={() => navigate('/about')}>About</button>
@@ -46,6 +53,7 @@ function AppContent() {
         <Route path="/narrative/:id" element={<NarrativeReading />} />
         <Route path="/learn/:id" element={<GenerativeLearning />} />
         <Route path="/flashcards" element={<FlashcardsPage />} />
+        <Route path="/achievements" element={<AchievementsPage />} />
         <Route path="/about" element={<AboutPage onBack={() => navigate('/')} />} />
       </Routes>
     </div>
@@ -55,7 +63,9 @@ function AppContent() {
 function App() {
   return (
     <Router>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </Router>
   )
 }

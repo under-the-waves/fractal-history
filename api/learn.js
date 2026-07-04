@@ -17,6 +17,10 @@ import { getAuthenticatedUser } from '../lib/auth.js';
 import { getLearnContent, generateLearnContent } from '../lib/learnContent.js';
 import { markNarrative } from '../lib/marking.js';
 import { recordWriteMark } from '../lib/scoring.js';
+import { bankMastery, recordActivityDay, evaluateAchievements, levelSnapshot } from '../lib/achievements.js';
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.DATABASE_URL);
 
 dotenv.config({ path: '.env.local' });
 
@@ -117,7 +121,25 @@ async function handleMark(req, res) {
     const score = Number(result?.mark?.score) || 0;
     const covered = Number(result?.coverage?.covered) || 0;
     const total = Number(result?.coverage?.total) || 0;
+    const before = await levelSnapshot(userId, anchorId);
     const { writeXp, nodeScore, nextReviewDays, passed } = await recordWriteMark(userId, anchorId, breadth, score, covered, total);
 
-    return res.status(200).json({ success: true, ...result, xpEarned: writeXp, nodeScore, nextReviewDays, passed });
+    // Writing is study activity too — track it, bank any mastery, and surface achievements/level-ups.
+    let achievements = [];
+    let levelUps = [];
+    try {
+        await recordActivityDay(userId);
+        await bankMastery(userId);
+        achievements = await evaluateAchievements(userId);
+        const after = await levelSnapshot(userId, anchorId);
+        if (after.node > before.node) {
+            const t = await sql`SELECT title FROM anchors WHERE id = ${anchorId}`;
+            levelUps.push({ scope: 'node', level: after.node, title: t[0]?.title || 'This topic' });
+        }
+        if (after.global > before.global) levelUps.push({ scope: 'global', level: after.global });
+    } catch (achErr) {
+        console.error('Achievement/level check failed (non-fatal):', achErr);
+    }
+
+    return res.status(200).json({ success: true, ...result, xpEarned: writeXp, nodeScore, nextReviewDays, passed, achievements, levelUps });
 }

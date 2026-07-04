@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth, RedirectToSignIn } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
 import { Link } from 'react-router-dom'
+import { useToasts } from './AchievementToasts'
 
 const RATING_BUTTONS = [
     { label: 'Again', rating: 0, className: 'rating-again' },
@@ -62,6 +63,7 @@ function StudyMode({ auth, onSwitchToBrowse }) {
     const [sessionStats, setSessionStats] = useState({ total: 0, again: 0, hard: 0, good: 0, easy: 0 })
     const [sessionComplete, setSessionComplete] = useState(false)
     const [stats, setStats] = useState(null)
+    const toasts = useToasts()
 
     const fetchReviewCards = useCallback(async () => {
         try {
@@ -114,7 +116,7 @@ function StudyMode({ auth, onSwitchToBrowse }) {
 
         try {
             const token = await auth.getToken()
-            await fetch('/api/flashcards', {
+            const res = await fetch('/api/flashcards', {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -122,6 +124,11 @@ function StudyMode({ auth, onSwitchToBrowse }) {
                 },
                 body: JSON.stringify({ id: card.id, rating })
             })
+            const data = await res.json().catch(() => null)
+            if (data?.success) {
+                if (data.achievements?.length) toasts?.achievements(data.achievements)
+                if (data.levelUps?.length) toasts?.levelUps(data.levelUps)
+            }
 
             setSessionStats(prev => ({
                 ...prev,
