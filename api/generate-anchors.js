@@ -61,6 +61,60 @@ async function getSiblingAnchors(parentId, breadth) {
     `, [parentId, breadth]);
 }
 
+// Adjudicate a title-collision: is the concept being generated under `newParentId` the SAME topic at
+// the SAME effective scope as the existing `candidateId`, so the two can be one shared anchor? An
+// anchor's meaning is shaped by its ancestry — a temporal or geographic ancestor only makes them
+// different if it actually narrows the concept to a sub-part. Deliberately conservative: any
+// uncertainty, or an LLM/API failure, returns false so we mint a fresh anchor rather than risk a wrong
+// merge. Only reached on the rare normalised-title collision, so the cost is negligible.
+async function sameConceptAndScope(title, newParentId, candidateId) {
+    try {
+        const [parentPath, candidatePath] = await Promise.all([
+            getAncestorPath(newParentId),
+            getAncestorPath(candidateId),
+        ]);
+        const fmt = (chain) => chain.map(a => a.title).join(' > ');
+        const prompt = `Two anchors in a history knowledge tree share a title. Decide whether they are the SAME topic (one shared anchor) or DIFFERENT.
+
+Concept: "${title}"
+
+Placement A: ${fmt(parentPath)} > ${title}
+Placement B: ${fmt(candidatePath)}
+
+Judge ONLY whether the ancestry of either placement RESTRICTS the concept to a proper sub-part of itself:
+- A geographic ancestor (a specific place) restricts it only if the concept normally happened in more places than that ancestor covers.
+- A temporal ancestor (a specific date range) restricts it only if the concept normally spanned more time than that ancestor's window.
+- Analytical/thematic ancestors — anything that is not a specific date range or a specific place — NEVER restrict the concept's time or geography; ignore them.
+- A broad date range or place that fully contains the concept does NOT restrict it. A placement directly under the root, with no date or place ancestor, spans the concept's full extent. Neither counts as narrowing.
+It makes no difference that one placement is framed geographically and the other temporally, nor that one is deeper in the tree than the other.
+
+Answer SAME if both placements encompass the concept's full normal extent in time and place.
+Answer DIFFERENT only if one placement clearly narrows the concept to part of its time span or part of its geography.
+
+Examples:
+- "Black Death" under "Medieval World: 500-1500 CE" vs under "Eurasia": SAME (both fully contain the whole Black Death; neither narrows it).
+- "Great Oxidation Event" under "Emergence of Life on Earth" vs directly under "Deep Time": SAME (an analytical parent does not restrict its dates or geography).
+- "Emergence of Life on Earth" directly under the root vs under "Deep Time: 13.8 BYA - 3 MYA": SAME (the window contains the whole event).
+- "Silk Road Trade Networks" under "Western Eurasia" vs under "Eurasia": DIFFERENT (Western Eurasia excludes the eastern half the Silk Road spanned).
+- "Black Death" under "Early Outbreak: 1347-1348" vs the whole Black Death: DIFFERENT (restricted to the onset years).
+- "Black Death" under "Germany" vs the whole Black Death: DIFFERENT (restricted to one country).
+
+When unsure, answer DIFFERENT. Reason in one or two sentences, then end with a final line exactly in the form:
+VERDICT: SAME   or   VERDICT: DIFFERENT`;
+        const completion = await getAnthropicClient().messages.create({
+            model: 'claude-opus-4-8',
+            max_tokens: 300,
+            messages: [{ role: 'user', content: prompt }],
+        });
+        const text = (completion.content[0]?.text || '').toUpperCase();
+        const m = text.match(/VERDICT:\s*(SAME|DIFFERENT)/);
+        return m ? m[1] === 'SAME' : false; // no clear verdict -> don't merge
+    } catch (e) {
+        console.error('Concept adjudication failed; not reusing (minting fresh):', e.message);
+        return false;
+    }
+}
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -506,8 +560,11 @@ export default async function handler(req, res) {
         // existing anchor instead of minting a new one, so the concept keeps one narrative and one
         // score. A concepts are path-independent: "Emergence of Life on Earth" is the same thing however
         // you reach it. B/C anchors are parent-scoped coordinate slices (a time window / a place), so
-        // they are never reused this way. Matching is on the normalised concept title (formatting/word-
-        // order/stopword-insensitive); the cycle guard keeps the tree a DAG.
+        // they are never reused this way. Matching is a two-step gate: (1) a cheap normalised-title
+        // prefilter (formatting/word-order/stopword-insensitive), then (2) an LLM adjudication that
+        // checks the two placements really are the same topic at the same effective scope — so a title
+        // collision where a temporal/geographic ancestor narrows one of them (the Black Death onset vs
+        // the whole Black Death) is NOT merged. The cycle guard keeps the tree a DAG.
         if (breadth === 'A') {
             const conceptIndex = new Map();
             for (const c of await getGlobalConceptAnchors()) {
@@ -517,7 +574,8 @@ export default async function handler(req, res) {
             for (const r of anchorRows) {
                 r.reuseOf = null;
                 const existingId = conceptIndex.get(normaliseConceptTitle(r.anchor.title));
-                if (existingId && existingId !== parentId && !(await wouldCreateCycle(existingId, parentPosId))) {
+                if (existingId && existingId !== parentId && !(await wouldCreateCycle(existingId, parentPosId))
+                    && await sameConceptAndScope(r.anchor.title, parentId, existingId)) {
                     r.reuseOf = existingId;
                     console.log(`Reusing existing A-concept anchor ${existingId} for "${r.anchor.title}" (no new anchor minted)`);
                 }
