@@ -6,13 +6,14 @@ TOPIC (context only): {{anchorTitle}}
 SCOPE (context only): {{anchorScope}}
 
 THIS SECTION: {{sectionHeading}}
+WHAT THIS SECTION IS: {{sectionSubject}}
 {{sectionGuidance}}
 
-COVER THE TITLE, NOT JUST THE SCOPE TEXT: this section's cards must cover the CORE MEANING of its
-title — the most foundational facts a learner must know about it. Do not fixate on a narrow detail
-because the wording or your sources happen to emphasise it. (E.g. for "Total War Mobilization" the
-core is HOW societies mobilised — conscription, war economies, the 1914 mobilisations — not just one
-or two famous battles.)
+WHAT TO COVER: {{coverageRule}}
+Do not fixate on a narrow detail because the wording or your sources happen to emphasise it. (E.g. for
+a section named "Total War Mobilization" the core is HOW societies mobilised — conscription, war
+economies, the 1914 mobilisations — not one or two famous battles. For a section that is a TIME WINDOW,
+cover the whole world in that window, not only whatever theme the section's name suggests.)
 
 Each fact card has:
 - `headline`: ONE short plain sentence (~20 words max) stating the card's single core point — one
