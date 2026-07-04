@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { getAuthenticatedUser } from '../lib/auth.js';
 import { applyReviewDelta } from '../lib/scoring.js';
+import { bankMastery, recordActivityDay, evaluateAchievements, levelSnapshot } from '../lib/achievements.js';
 
 const sql = neon(process.env.DATABASE_URL);
 
@@ -267,12 +268,29 @@ async function handlePatch(req, res, userId) {
             RETURNING id, ease_factor, interval_days, repetitions, next_review_date, last_reviewed_at
         `;
 
-        // Reviewing a scored card changes its retention, so update the mastery score up the tree.
+        // Reviewing a scored card changes its retention, so update the mastery score up the tree, then
+        // check for newly-unlocked achievements and level-ups to surface as toasts.
+        let achievements = [];
+        let levelUps = [];
         if (card.is_core || card.is_personal_slot) {
+            const before = await levelSnapshot(userId, card.anchor_id);
             await applyReviewDelta(userId, card.anchor_id);
+            try {
+                await recordActivityDay(userId);
+                await bankMastery(userId);
+                achievements = await evaluateAchievements(userId);
+                const after = await levelSnapshot(userId, card.anchor_id);
+                if (after.node > before.node) {
+                    const t = await sql`SELECT title FROM anchors WHERE id = ${card.anchor_id}`;
+                    levelUps.push({ scope: 'node', level: after.node, title: t[0]?.title || 'This topic' });
+                }
+                if (after.global > before.global) levelUps.push({ scope: 'global', level: after.global });
+            } catch (achErr) {
+                console.error('Achievement/level check failed (non-fatal):', achErr);
+            }
         }
 
-        return res.status(200).json({ success: true, flashcard: updated[0] });
+        return res.status(200).json({ success: true, flashcard: updated[0], achievements, levelUps });
     } catch (error) {
         console.error('Error reviewing flashcard:', error);
         return res.status(500).json({ error: 'Failed to review flashcard' });
