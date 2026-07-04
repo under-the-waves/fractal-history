@@ -52,6 +52,35 @@ function MasteryBadge({ score, peak, nodeWidth }) {
     );
 }
 
+// Splits a node's total XP across the three pathways it can be reached through — A (analytical),
+// B (temporal), C (geographic) — under its total. The three parts are apportioned server-side to sum
+// EXACTLY to the total, so the numbers always add up. Shown for the focused node on both platforms,
+// only when the signed-in user has a score for it.
+function ScoreBreakdown({ id, scores, breadthScores }) {
+    if (scores?.[id] == null) return null;
+    const parts = breadthScores?.[id];
+    if (!parts) return null;
+    const axes = [
+        { key: 'A', label: 'Analytical' },
+        { key: 'B', label: 'Temporal' },
+        { key: 'C', label: 'Geographic' },
+    ];
+    return (
+        <div className="score-breakdown"
+            title="How your total XP for this topic splits across the analytical, temporal, and geographic pathways">
+            <span className="score-breakdown-total">{formatScore(scores[id])} XP total</span>
+            <span className="score-breakdown-parts">
+                {axes.map(a => (
+                    <span key={a.key} className="score-breakdown-part" style={{ color: getBreadthColor(a.key) }}>
+                        <b>{a.key}</b>&nbsp;{formatScore(parts[a.key] || 0)}
+                        <span className="score-breakdown-axis"> {a.label}</span>
+                    </span>
+                ))}
+            </span>
+        </div>
+    );
+}
+
 // Auth-gated loader: fetches the signed-in user's per-node mastery scores once and lifts them up.
 // Rendered only when Clerk is enabled, so useAuth is always inside ClerkProvider. Renders nothing.
 function MasteryScoreLoader({ onLoaded }) {
@@ -64,7 +93,7 @@ function MasteryScoreLoader({ onLoaded }) {
                 const token = await auth.getToken();
                 const res = await fetch('/api/scores', { headers: { Authorization: `Bearer ${token}` } });
                 const data = await res.json();
-                if (!cancelled && data.success) onLoaded({ scores: data.scores || {}, peaks: data.peaks || {}, breadths: data.breadths || {} });
+                if (!cancelled && data.success) onLoaded({ scores: data.scores || {}, peaks: data.peaks || {}, breadths: data.breadths || {}, breadthScores: data.breadthScores || {} });
             } catch (err) {
                 console.error('Failed to load mastery scores:', err);
             }
@@ -80,8 +109,9 @@ function TreeVisualization() {
     const [scores, setScores] = useState({});
     const [peaks, setPeaks] = useState({});
     const [breadths, setBreadths] = useState({});
+    const [breadthScores, setBreadthScores] = useState({});
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [activePath, setActivePath] = useState([]);
     const [breadthSelections, setBreadthSelections] = useState({});
     const containerRef = useRef(null);
@@ -365,6 +395,15 @@ function TreeVisualization() {
         setActivePath(newPath);
     };
 
+    // Step up exactly one level in the tree. Drives the visible in-page "Back" controls on both
+    // platforms so a user drilled deep is never stranded without an obvious way out. The browser Back
+    // button does the same thing via the activePath<->URL sync; this is the on-screen equivalent.
+    const goBack = () => {
+        if (activePath.length === 0) return;
+        setActivePath(activePath.slice(0, -1));
+        setSidebarData(null);
+    };
+
     const handleBreadthToggle = (anchorId, newBreadth) => {
         setBreadthSelections({
             ...breadthSelections,
@@ -630,13 +669,27 @@ function TreeVisualization() {
         }
     };
 
-    // Deep-link: when the URL carries ?path=id0,id1,...,target, expand to that node.
-    const openedPathRef = useRef(null);
+    // Two-way sync between the drill state (activePath) and the URL's ?path=, so the browser BACK
+    // button steps back up the tree instead of leaving the site. Drilling in mutates activePath only;
+    // without this, no history entry is ever pushed, so BACK skips the whole tree session.
+    //
+    // Direction 1 — state -> URL: whenever activePath changes because the user drilled/collapsed, push a
+    // new history entry carrying the new path. Guarded on equality so a change that merely reflects the
+    // URL (direction 2 below) never pushes a duplicate entry.
     useEffect(() => {
-        const pathParam = searchParams.get('path');
-        if (!pathParam) return;
-        if (openedPathRef.current === pathParam) return;
-        openedPathRef.current = pathParam;
+        const desired = activePath.join(',');
+        const current = searchParams.get('path') || '';
+        if (desired === current) return;
+        setSearchParams(activePath.length ? { path: desired } : {}, { replace: false });
+    }, [activePath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Direction 2 — URL -> state: fires on first load (deep link from a narrative) and on browser
+    // BACK/FORWARD, which change the URL without touching activePath. Reconcile the tree to the URL only
+    // when they differ, so a push we just made in direction 1 is a no-op here (no reload loop).
+    useEffect(() => {
+        const pathParam = searchParams.get('path') || '';
+        if (pathParam === activePath.join(',')) return;
+        if (!pathParam) { setActivePath([]); setSidebarData(null); return; }
         const ids = pathParam.split(',').map(s => s.trim()).filter(Boolean);
         if (ids.length > 0) openPath(ids);
     }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -959,7 +1012,7 @@ function TreeVisualization() {
             <div className="tree-visualization mobile-tree-wrapper">
                 {/* Fetch the signed-in user's mastery scores on mobile too (the desktop branch has its
                     own copy; without this, mobile never loads scores). */}
-                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); }} />}
+                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths, breadthScores }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); setBreadthScores(breadthScores); }} />}
                 {introOverlay}
                 {busyOverlay}
 
@@ -1004,13 +1057,19 @@ function TreeVisualization() {
                     {activePath.length > 0 && (
                         <nav className="mobile-tree-breadcrumbs" aria-label="Path">
                             <button
+                                className="mobile-breadcrumb-btn mobile-breadcrumb-back"
+                                onClick={goBack}
+                            >
+                                ← Back
+                            </button>
+                            <button
                                 className="mobile-breadcrumb-btn mobile-breadcrumb-home"
                                 onClick={() => {
                                     setActivePath([]);
                                     setSidebarData(null);
                                 }}
                             >
-                                ← Top
+                                Top
                             </button>
                             {ancestors.map(ancestor => (
                                 <span key={ancestor.id} className="mobile-breadcrumb-segment">
@@ -1046,6 +1105,8 @@ function TreeVisualization() {
                             {expandedAnchor.scope && (
                                 <p className="mobile-tree-scope">{expandedAnchor.scope}</p>
                             )}
+
+                            <ScoreBreakdown id={expandedAnchor.id} scores={scores} breadthScores={breadthScores} />
 
                             {showStart ? (
                                 <button
@@ -1124,16 +1185,40 @@ function TreeVisualization() {
                                             </span>
                                             <span className="mobile-child-chevron" aria-hidden="true">›</span>
                                         </button>
-                                        <button
-                                            className="mobile-child-read"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigate(`/learn/${child.anchor.id}?breadth=${getActiveBreadth(child.anchor.id)}`);
-                                            }}
-                                            aria-label={`Learn ${child.anchor.title}`}
-                                        >
-                                            Learn →
-                                        </button>
+                                        <div className="mobile-child-footer">
+                                            <div className="mobile-child-breadths" role="group"
+                                                aria-label={`Open ${child.anchor.title} by pathway`}>
+                                                <span className="mobile-child-breadths-label">Open:</span>
+                                                {['A', 'B', 'C'].map(b => {
+                                                    const color = getBreadthColor(b);
+                                                    return (
+                                                        <button
+                                                            key={b}
+                                                            className="mobile-child-breadth-btn"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleBreadthSelect(child.anchor, b);
+                                                            }}
+                                                            style={{ borderColor: color, color }}
+                                                            aria-label={`Open ${b} pathway`}
+                                                            title={`Open the ${b} pathway`}
+                                                        >
+                                                            {b}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            <button
+                                                className="mobile-child-read"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate(`/learn/${child.anchor.id}?breadth=${getActiveBreadth(child.anchor.id)}`);
+                                                }}
+                                                aria-label={`Learn ${child.anchor.title}`}
+                                            >
+                                                Learn →
+                                            </button>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>
@@ -1164,6 +1249,11 @@ function TreeVisualization() {
 
             {/* Frozen header */}
             <div className="tree-header">
+                {activePath.length > 0 && (
+                    <button className="tree-back-btn" onClick={goBack} title="Go up one level (or use your browser's Back button)">
+                        ← Back
+                    </button>
+                )}
                 <h1>Fractal History Tree</h1>
                 <span className="tree-subtitle">Click to expand. Toggle A/B/C for different perspectives.</span>
 
@@ -1202,6 +1292,10 @@ function TreeVisualization() {
                 />
             )}
 
+            {activePath.length > 0 && (
+                <ScoreBreakdown id={activePath[activePath.length - 1]} scores={scores} breadthScores={breadthScores} />
+            )}
+
             <div
                 className="tree-container"
                 ref={containerRef}
@@ -1211,7 +1305,7 @@ function TreeVisualization() {
                     overflowX: 'auto'
                 }}
             >
-                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); }} />}
+                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths, breadthScores }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); setBreadthScores(breadthScores); }} />}
                 <svg
                     viewBox={`0 0 ${svgWidth} ${svgHeight}`}
                     width="100%"
