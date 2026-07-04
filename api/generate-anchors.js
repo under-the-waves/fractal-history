@@ -932,6 +932,26 @@ B-anchors represent **chronological divisions** of a topic. They answer: "How do
 
 ---
 
+## Naming Rule: the title describes the WHOLE period, not one theme
+
+A period's title is a signpost that helps the learner remember the span and see why the boundary
+falls there. The study content for a period is generated from its COORDINATES (the time window) plus
+the analytical frame above — never from the title's wording. So the title must describe the period at
+that SAME scope, and must not promise something narrower than the content will cover.
+
+- **When there is no analytical frame** (the frame above says to cover everything in the window): the
+  title must NOT single out one subject. Do not name a pure era after farming, trade, war, religion,
+  technology, or any single thread. Use a neutral, memorable period name or a plain descriptor of the
+  whole span — e.g. "Post-Classical / Medieval World: 500 – 1500 CE", NOT "Medieval Agricultural
+  Systems: 500 – 1500 CE".
+- **When there is an analytical frame** (the sub-periods are ABOUT some theme): the title may reflect
+  that theme, because the content does too — e.g. under an "Agricultural Revolution" frame,
+  "Settled Farming Villages: 6,000 – 4,000 BCE" is appropriate.
+
+Always end the title with its date range.
+
+---
+
 ## Selection Process: Three Candidate Schemes
 
 You must consider **exactly 3 different ways** to subdivide this topic chronologically. Each scheme must use **3 to 5 sub-periods — never more than 5.**
