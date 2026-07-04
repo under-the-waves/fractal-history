@@ -429,6 +429,8 @@ export default async function handler(req, res) {
             // Breadth B: existing parsing
             anchors = parseTemporalAnchorResponse(response, parentId);
             anchors = capTemporalAnchors(anchors, 5); // hard guarantee: never exceed 5 periods
+            // Hard guarantee: every B title ends with its date range (append from timeBoundaries if missing).
+            anchors = anchors.map(a => ({ ...a, title: ensureTitleRange(a.title, a.timeBoundaries) }));
             candidates = parseTemporalCandidates(response);
 
             try {
@@ -932,6 +934,26 @@ B-anchors represent **chronological divisions** of a topic. They answer: "How do
 
 ---
 
+## Naming Rule: the title describes the WHOLE period, not one theme
+
+A period's title is a signpost that helps the learner remember the span and see why the boundary
+falls there. The study content for a period is generated from its COORDINATES (the time window) plus
+the analytical frame above — never from the title's wording. So the title must describe the period at
+that SAME scope, and must not promise something narrower than the content will cover.
+
+- **When there is no analytical frame** (the frame above says to cover everything in the window): the
+  title must NOT single out one subject. Do not name a pure era after farming, trade, war, religion,
+  technology, or any single thread. Use a neutral, memorable period name or a plain descriptor of the
+  whole span — e.g. "Post-Classical / Medieval World: 500 – 1500 CE", NOT "Medieval Agricultural
+  Systems: 500 – 1500 CE".
+- **When there is an analytical frame** (the sub-periods are ABOUT some theme): the title may reflect
+  that theme, because the content does too — e.g. under an "Agricultural Revolution" frame,
+  "Settled Farming Villages: 6,000 – 4,000 BCE" is appropriate.
+
+Always end the title with its date range.
+
+---
+
 ## Selection Process: Three Candidate Schemes
 
 You must consider **exactly 3 different ways** to subdivide this topic chronologically. Each scheme must use **3 to 5 sub-periods — never more than 5.**
@@ -1376,6 +1398,27 @@ function parseAnchorResponse(response, parentId) {
 // — each B period covers a contiguous slice of time, so dropping one would leave a gap in
 // coverage. Instead we MERGE the finest-grained adjacent pair (the most over-divided slice)
 // repeatedly until `max` remain, which preserves complete, gap-free coverage.
+// Does a B title already carry a readable date range (so temporalCoordinate can parse a "when")?
+function titleHasDateRange(title) {
+    if (!title) return false;
+    const afterColon = title.includes(':') ? title.slice(title.lastIndexOf(':') + 1) : '';
+    if (/\d/.test(afterColon)) return true;
+    if (/\(([^)]*\d[^)]*)\)/.test(title)) return true;
+    return /[\d,]+\s*(?:BYA|MYA|KYA|BCE|BC|CE|AD)?\s*[-–—]+\s*(?:[\d,]+\s*(?:BYA|MYA|KYA|BCE|BC|CE|AD)?|present)/i.test(title);
+}
+
+// Every B title must end with its date range — the tree shows it and the coordinate parser reads a
+// "when" from it. The model returns timeBoundaries {start,end} separately and does not always put the
+// range in the title (and a merge in capTemporalAnchors drops it), so append it from the boundaries.
+function ensureTitleRange(title, tb) {
+    if (titleHasDateRange(title)) return title;
+    const start = tb && tb.start != null ? String(tb.start).trim() : '';
+    const end = tb && tb.end != null ? String(tb.end).trim() : '';
+    if (start && end) return `${title}: ${start} – ${end}`;
+    if (start) return `${title}: from ${start}`;
+    return title;
+}
+
 function capTemporalAnchors(anchors, max = 5) {
     if (!Array.isArray(anchors) || anchors.length <= max) return anchors;
 
