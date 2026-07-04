@@ -102,8 +102,10 @@ Examples:
 When unsure, answer DIFFERENT. Reason in one or two sentences, then end with a final line exactly in the form:
 VERDICT: SAME   or   VERDICT: DIFFERENT`;
         const completion = await getAnthropicClient().messages.create({
-            model: 'claude-opus-4-8',
+            model: 'claude-sonnet-5',
             max_tokens: 300,
+            thinking: { type: 'disabled' }, // Sonnet 5 runs adaptive thinking by default; keep the
+            // reason-then-verdict text terse and within the token budget.
             messages: [{ role: 'user', content: prompt }],
         });
         const text = (completion.content[0]?.text || '').toUpperCase();
