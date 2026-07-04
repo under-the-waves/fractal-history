@@ -3484,6 +3484,11 @@ button.orientation-axis-value:hover {
   opacity: 0.9;
 }
 
+/* "No score yet" dash — keeps the tile's letter/number layout identical to a scored tile. */
+.mbt-xp.muted {
+  opacity: 0.4;
+}
+
 /* Own-mastery underline pinned to the tile's bottom edge (track + coloured fill). */
 .mbt-underline {
   position: absolute;

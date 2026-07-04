@@ -257,9 +257,9 @@ function TreeVisualization() {
 
     // Layout constants. Boxes are roomy enough to hold the title, total XP, three per-pathway score
     // tiles, and a Learn action; the canvas is wide enough that up to 5 children still fit in a row.
-    const rowHeight = 205;
+    const rowHeight = 215;
     const nodeWidth = 230;
-    const nodeHeight = 145;
+    const nodeHeight = 155;
     const horizontalSpacing = 30;
     const containerWidth = 1300;
 
@@ -971,7 +971,7 @@ function TreeVisualization() {
                         aria-label={`Open ${b} pathway`}
                     >
                         <span className="mbt-letter">{b}</span>
-                        {pathXp != null && <span className="mbt-xp">{formatScore(pathXp)}</span>}
+                        <span className={`mbt-xp${pathXp == null ? ' muted' : ''}`}>{pathXp != null ? formatScore(pathXp) : '–'}</span>
                         {bOwn > 0 && (
                             <span className="mbt-underline" aria-hidden="true">
                                 <span className="mbt-underline-fill"
@@ -1326,6 +1326,29 @@ function TreeVisualization() {
                                     ))}
                                 </text>
 
+                                {/* Cumulative score for the anchor (own + everything rolled up), on its own
+                                    line under the title. Reads "current/best" in amber when it has decayed
+                                    below the peak. The three pathway tiles below break this number down. */}
+                                {scores[node.anchor.id] != null && (() => {
+                                    const cur = scores[node.anchor.id];
+                                    const pk = peaks[node.anchor.id] ?? cur;
+                                    const decayed = pk > cur;
+                                    const label = decayed ? `${formatScore(cur)}/${formatScore(pk)}` : formatScore(cur);
+                                    const greenOnDark = colors.text === 'white' ? '#8fe0ad' : '#2e9e5b';
+                                    return (
+                                        <text
+                                            x={nodeWidth / 2}
+                                            y={64}
+                                            textAnchor="middle"
+                                            fill={decayed ? '#e0a030' : greenOnDark}
+                                            fontSize="14"
+                                            fontWeight="800"
+                                        >
+                                            {label}
+                                        </text>
+                                    );
+                                })()}
+
                                 {/* Action area: three per-pathway tiles + a Learn bar. Hidden only on the
                                     not-yet-clicked ROOT. */}
                                 {(node.type !== 'root' || activePath.length > 0) && (
@@ -1342,12 +1365,15 @@ function TreeVisualization() {
                                             const pad = 12, gap = 8;
                                             const tileW = (nodeWidth - 2 * pad - 2 * gap) / 3;
                                             const tileX = pad + index * (tileW + gap);
-                                            const tileY = 60;
-                                            const tileH = 48;
+                                            const tileY = 74;
+                                            const tileH = 46;
                                             const onDark = colors.fill === '#555555';
                                             const pathXp = breadthScores[node.anchor.id]?.[breadth];
                                             const bOwn = breadths[node.anchor.id]?.[breadth] || 0;
                                             const frac = Math.min(1, bOwn / 19);
+                                            // Muted "no score yet" colour for the dash, so an unstudied tile
+                                            // keeps the same letter/number layout as a scored one.
+                                            const mutedNum = onDark ? 'rgba(255,255,255,0.4)' : '#b3bac2';
                                             return (
                                                 <g
                                                     key={breadth}
@@ -1368,9 +1394,11 @@ function TreeVisualization() {
                                                         strokeWidth="1.5"
                                                         style={{ transition: 'all 0.2s ease' }}
                                                     />
+                                                    {/* Letter is ALWAYS at the same height, whether or not a
+                                                        number sits below it, so tiles read consistently. */}
                                                     <text
                                                         x={tileX + tileW / 2}
-                                                        y={pathXp != null ? tileY + 22 : tileY + 30}
+                                                        y={tileY + 19}
                                                         textAnchor="middle"
                                                         fill={shouldShowColor ? 'white' : breadthColor}
                                                         fontSize="18"
@@ -1379,24 +1407,22 @@ function TreeVisualization() {
                                                     >
                                                         {breadth}
                                                     </text>
-                                                    {pathXp != null && (
-                                                        <text
-                                                            x={tileX + tileW / 2}
-                                                            y={tileY + 39}
-                                                            textAnchor="middle"
-                                                            fill={shouldShowColor ? 'white' : colors.text}
-                                                            fontSize="13"
-                                                            fontWeight="700"
-                                                            pointerEvents="none"
-                                                        >
-                                                            {formatScore(pathXp)}
-                                                        </text>
-                                                    )}
+                                                    <text
+                                                        x={tileX + tileW / 2}
+                                                        y={tileY + 35}
+                                                        textAnchor="middle"
+                                                        fill={pathXp != null ? (shouldShowColor ? 'white' : colors.text) : mutedNum}
+                                                        fontSize="13"
+                                                        fontWeight="700"
+                                                        pointerEvents="none"
+                                                    >
+                                                        {pathXp != null ? formatScore(pathXp) : '–'}
+                                                    </text>
                                                     {bOwn > 0 && (
                                                         <>
-                                                            <rect x={tileX + 5} y={tileY + tileH - 7} width={tileW - 10} height={3.5} rx="1.75"
+                                                            <rect x={tileX + 5} y={tileY + tileH - 6} width={tileW - 10} height={3.5} rx="1.75"
                                                                 fill={shouldShowColor ? 'rgba(255,255,255,0.35)' : '#e2e6ea'} pointerEvents="none" />
-                                                            <rect x={tileX + 5} y={tileY + tileH - 7} width={(tileW - 10) * frac} height={3.5} rx="1.75"
+                                                            <rect x={tileX + 5} y={tileY + tileH - 6} width={(tileW - 10) * frac} height={3.5} rx="1.75"
                                                                 fill={bOwn >= 19 ? '#2e9e5b' : '#e0a030'} pointerEvents="none" />
                                                         </>
                                                     )}
@@ -1408,9 +1434,9 @@ function TreeVisualization() {
                                         <g onClick={() => navigate(`/learn/${node.anchor.id}?breadth=${getActiveBreadth(node.id)}`)} style={{ cursor: 'pointer' }}>
                                             <rect
                                                 x={12}
-                                                y={nodeHeight - 30}
+                                                y={nodeHeight - 29}
                                                 width={nodeWidth - 24}
-                                                height={24}
+                                                height={23}
                                                 rx="5"
                                                 fill={colors.fill === '#555555' ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.08)'}
                                                 stroke={colors.fill === '#555555' ? 'white' : '#8a929b'}
@@ -1418,7 +1444,7 @@ function TreeVisualization() {
                                             />
                                             <text
                                                 x={nodeWidth / 2}
-                                                y={nodeHeight - 14}
+                                                y={nodeHeight - 13}
                                                 textAnchor="middle"
                                                 fill={colors.text}
                                                 fontSize="14"
