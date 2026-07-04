@@ -257,9 +257,9 @@ function TreeVisualization() {
 
     // Layout constants. Boxes are roomy enough to hold the title, total XP, three per-pathway score
     // tiles, and a Learn action; the canvas is wide enough that up to 5 children still fit in a row.
-    const rowHeight = 200;
+    const rowHeight = 205;
     const nodeWidth = 230;
-    const nodeHeight = 140;
+    const nodeHeight = 145;
     const horizontalSpacing = 30;
     const containerWidth = 1300;
 
@@ -971,7 +971,7 @@ function TreeVisualization() {
                         aria-label={`Open ${b} pathway`}
                     >
                         <span className="mbt-letter">{b}</span>
-                        {pathXp != null && <span className="mbt-xp">{formatScore(pathXp)} XP</span>}
+                        {pathXp != null && <span className="mbt-xp">{formatScore(pathXp)}</span>}
                         {bOwn > 0 && (
                             <span className="mbt-underline" aria-hidden="true">
                                 <span className="mbt-underline-fill"
@@ -1260,7 +1260,12 @@ function TreeVisualization() {
                         const opacity = calculateOpacity(node);
                         const colors = calculateColor(node);
                         const hasChildren = getChildren(node.anchor.id, 'A').length > 0;
-                        const lines = wrapText(node.anchor.title);
+                        // Cap the title at two lines inside the box (fuller title shows in the breadcrumb
+                        // and orientation panel); a longer title gets its second line truncated with an ellipsis.
+                        const rawLines = wrapText(node.anchor.title);
+                        const lines = rawLines.length <= 2
+                            ? rawLines
+                            : [rawLines[0], (rawLines.slice(1).join(' ')).slice(0, 20).trimEnd() + '…'];
 
                         const isInPath = activePath.includes(node.id);
 
@@ -1307,41 +1312,19 @@ function TreeVisualization() {
                                 {/* Title text */}
                                 <text
                                     x={nodeWidth / 2}
-                                    y={22}
+                                    y={28}
                                     textAnchor="middle"
                                     fill={colors.text}
-                                    fontSize="12"
-                                    fontWeight={colors.fill === '#555555' ? 'bold' : 'normal'}
+                                    fontSize="15"
+                                    fontWeight={colors.fill === '#555555' ? 'bold' : '600'}
                                     style={{ transition: 'fill 0.15s ease' }}
                                 >
                                     {lines.map((line, i) => (
-                                        <tspan key={i} x={nodeWidth / 2} dy={i === 0 ? 0 : '1.1em'}>
+                                        <tspan key={i} x={nodeWidth / 2} dy={i === 0 ? 0 : '1.15em'}>
                                             {line}
                                         </tspan>
                                     ))}
                                 </text>
-
-                                {/* Total mastery XP, on its own line under the title so it never overlaps it.
-                                    Reads "current/best" in amber when the score has decayed below the peak. */}
-                                {scores[node.anchor.id] != null && (() => {
-                                    const cur = scores[node.anchor.id];
-                                    const pk = peaks[node.anchor.id] ?? cur;
-                                    const decayed = pk > cur;
-                                    const label = decayed ? `${formatScore(cur)}/${formatScore(pk)} XP` : `${formatScore(cur)} XP`;
-                                    const greenOnDark = colors.text === 'white' ? '#8fe0ad' : '#2e9e5b';
-                                    return (
-                                        <text
-                                            x={nodeWidth / 2}
-                                            y={62}
-                                            textAnchor="middle"
-                                            fill={decayed ? '#e0a030' : greenOnDark}
-                                            fontSize="11"
-                                            fontWeight="700"
-                                        >
-                                            {label}
-                                        </text>
-                                    );
-                                })()}
 
                                 {/* Action area: three per-pathway tiles + a Learn bar. Hidden only on the
                                     not-yet-clicked ROOT. */}
@@ -1359,8 +1342,8 @@ function TreeVisualization() {
                                             const pad = 12, gap = 8;
                                             const tileW = (nodeWidth - 2 * pad - 2 * gap) / 3;
                                             const tileX = pad + index * (tileW + gap);
-                                            const tileY = nodeHeight - 60;
-                                            const tileH = 40;
+                                            const tileY = 60;
+                                            const tileH = 48;
                                             const onDark = colors.fill === '#555555';
                                             const pathXp = breadthScores[node.anchor.id]?.[breadth];
                                             const bOwn = breadths[node.anchor.id]?.[breadth] || 0;
@@ -1379,18 +1362,18 @@ function TreeVisualization() {
                                                         y={tileY}
                                                         width={tileW}
                                                         height={tileH}
-                                                        rx="5"
+                                                        rx="6"
                                                         fill={shouldShowColor ? breadthColor : (onDark ? 'rgba(255,255,255,0.10)' : 'white')}
                                                         stroke={shouldShowColor ? breadthColor : '#cbd2d9'}
-                                                        strokeWidth="1"
+                                                        strokeWidth="1.5"
                                                         style={{ transition: 'all 0.2s ease' }}
                                                     />
                                                     <text
                                                         x={tileX + tileW / 2}
-                                                        y={pathXp != null ? tileY + 16 : tileY + 24}
+                                                        y={pathXp != null ? tileY + 22 : tileY + 30}
                                                         textAnchor="middle"
                                                         fill={shouldShowColor ? 'white' : breadthColor}
-                                                        fontSize="12"
+                                                        fontSize="18"
                                                         fontWeight="800"
                                                         pointerEvents="none"
                                                     >
@@ -1399,10 +1382,10 @@ function TreeVisualization() {
                                                     {pathXp != null && (
                                                         <text
                                                             x={tileX + tileW / 2}
-                                                            y={tileY + 30}
+                                                            y={tileY + 39}
                                                             textAnchor="middle"
                                                             fill={shouldShowColor ? 'white' : colors.text}
-                                                            fontSize="10"
+                                                            fontSize="13"
                                                             fontWeight="700"
                                                             pointerEvents="none"
                                                         >
@@ -1411,9 +1394,9 @@ function TreeVisualization() {
                                                     )}
                                                     {bOwn > 0 && (
                                                         <>
-                                                            <rect x={tileX + 4} y={tileY + tileH - 6} width={tileW - 8} height={3} rx="1.5"
+                                                            <rect x={tileX + 5} y={tileY + tileH - 7} width={tileW - 10} height={3.5} rx="1.75"
                                                                 fill={shouldShowColor ? 'rgba(255,255,255,0.35)' : '#e2e6ea'} pointerEvents="none" />
-                                                            <rect x={tileX + 4} y={tileY + tileH - 6} width={(tileW - 8) * frac} height={3} rx="1.5"
+                                                            <rect x={tileX + 5} y={tileY + tileH - 7} width={(tileW - 10) * frac} height={3.5} rx="1.75"
                                                                 fill={bOwn >= 19 ? '#2e9e5b' : '#e0a030'} pointerEvents="none" />
                                                         </>
                                                     )}
@@ -1425,20 +1408,20 @@ function TreeVisualization() {
                                         <g onClick={() => navigate(`/learn/${node.anchor.id}?breadth=${getActiveBreadth(node.id)}`)} style={{ cursor: 'pointer' }}>
                                             <rect
                                                 x={12}
-                                                y={nodeHeight - 17}
+                                                y={nodeHeight - 30}
                                                 width={nodeWidth - 24}
-                                                height={14}
-                                                rx="3"
-                                                fill={colors.fill === '#555555' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)'}
+                                                height={24}
+                                                rx="5"
+                                                fill={colors.fill === '#555555' ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.08)'}
                                                 stroke={colors.fill === '#555555' ? 'white' : '#8a929b'}
-                                                strokeWidth="1"
+                                                strokeWidth="1.5"
                                             />
                                             <text
                                                 x={nodeWidth / 2}
-                                                y={nodeHeight - 7}
+                                                y={nodeHeight - 14}
                                                 textAnchor="middle"
                                                 fill={colors.text}
-                                                fontSize="9"
+                                                fontSize="14"
                                                 fontWeight="bold"
                                             >
                                                 Learn →
