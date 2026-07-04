@@ -3424,8 +3424,8 @@ button.orientation-axis-value:hover {
   background: #f0f4f8;
 }
 
-/* Footer row of a child card: pathway (A/B/C) buttons on the left, "Learn" on the right. Lets the
-   user open a child directly into any breadth on mobile, instead of always drilling into A. */
+/* Footer row of a child card: pathway tiles on the left, "Learn" on the right. Lets the user open a
+   child directly into any breadth on mobile, instead of always drilling into A. */
 .mobile-child-footer {
   display: flex;
   align-items: center;
@@ -3435,85 +3435,82 @@ button.orientation-axis-value:hover {
   flex-wrap: wrap;
 }
 
-.mobile-child-breadths {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.mobile-child-breadths-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #999;
-  margin-right: 2px;
-}
-
-.mobile-child-breadth-btn {
-  min-width: 40px;
-  min-height: 40px;
-  background: white;
-  border: 1.5px solid #d0d0d0;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 800;
-  cursor: pointer;
-  transition: transform 0.05s ease, background 0.15s ease;
-}
-
-.mobile-child-breadth-btn:active {
-  transform: scale(0.94);
-  background: #f4f7fa;
-}
-
 /* Child-card footer overrides the standalone Learn button's margin (it now lives in the flex row). */
 .mobile-child-footer .mobile-child-read {
   margin: 0;
   align-self: center;
 }
 
-/* Per-pathway split of a node's total XP (A analytical / B temporal / C geographic). The three parts
-   are apportioned server-side to sum exactly to the total, so they always add up. */
-.score-breakdown {
+/* Per-pathway tiles: breadth letter + that pathway's share of the node's total XP. Tap to open the
+   pathway. The active pathway (focused card) fills with its colour; the underline shows own-mastery. */
+.mobile-breadth-tiles {
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  font-size: 0.85rem;
+  gap: 8px;
 }
 
-.score-breakdown-total {
-  font-weight: 700;
-  color: #2e9e5b;
+.mobile-breadth-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 56px;
+  min-height: 48px;
+  padding: 4px 8px 8px;
+  background: white;
+  border: 1.5px solid #d0d0d0;
+  border-radius: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.05s ease, background 0.15s ease;
 }
 
-.score-breakdown-parts {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
+.mobile-breadth-tile:active {
+  transform: scale(0.96);
 }
 
-.score-breakdown-part {
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.score-breakdown-part b {
+.mbt-letter {
+  font-size: 1.05rem;
   font-weight: 800;
+  line-height: 1;
 }
 
-.score-breakdown-axis {
-  color: #888;
-  font-weight: 500;
+.mbt-xp {
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.9;
 }
 
-/* On the dark root card, lighten the neutral text so the breakdown stays legible. */
-.mobile-tree-current-root .score-breakdown-total {
-  color: #8fe0ad;
+/* Own-mastery underline pinned to the tile's bottom edge (track + coloured fill). */
+.mbt-underline {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background: #e2e6ea;
 }
-.mobile-tree-current-root .score-breakdown-axis {
-  color: rgba(245, 230, 208, 0.7);
+
+.mobile-breadth-tile.active .mbt-underline {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.mbt-underline-fill {
+  display: block;
+  height: 100%;
+}
+
+/* The focused-card tiles sit in the row that used to hold the Learn button; give them breathing room. */
+.mobile-tree-current .mobile-breadth-tiles {
+  margin-top: 2px;
+}
+
+/* On the dark root card, keep inactive tiles legible. */
+.mobile-tree-current-root .mobile-breadth-tile {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* Prominent "Back" control in the desktop tree header — steps up one level. */

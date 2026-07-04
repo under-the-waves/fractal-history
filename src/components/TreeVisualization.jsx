@@ -34,53 +34,6 @@ function formatScore(score) {
         : String(score);
 }
 
-// Small XP badge (a pill showing the node's score) drawn in a node's top-right corner. Only shown for
-// nodes the signed-in user has a score for. When the score has decayed below the all-time peak, it
-// reads "current/best" in amber so the drop is legible; at the peak it reads just the score in green.
-function MasteryBadge({ score, peak, nodeWidth }) {
-    const decayed = peak > score;
-    const label = decayed ? `${formatScore(score)}/${formatScore(peak)}` : formatScore(score);
-    const w = 14 + label.length * 6.5;
-    const x = nodeWidth - w - 6;
-    return (
-        <g pointerEvents="none">
-            <rect x={x} y={8} width={w} height={16} rx={8} fill={decayed ? '#c77d12' : '#2e9e5b'} />
-            <text x={x + w / 2} y={16} textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="700" fill="white">
-                {label}
-            </text>
-        </g>
-    );
-}
-
-// Splits a node's total XP across the three pathways it can be reached through — A (analytical),
-// B (temporal), C (geographic) — under its total. The three parts are apportioned server-side to sum
-// EXACTLY to the total, so the numbers always add up. Shown for the focused node on both platforms,
-// only when the signed-in user has a score for it.
-function ScoreBreakdown({ id, scores, breadthScores }) {
-    if (scores?.[id] == null) return null;
-    const parts = breadthScores?.[id];
-    if (!parts) return null;
-    const axes = [
-        { key: 'A', label: 'Analytical' },
-        { key: 'B', label: 'Temporal' },
-        { key: 'C', label: 'Geographic' },
-    ];
-    return (
-        <div className="score-breakdown"
-            title="How your total XP for this topic splits across the analytical, temporal, and geographic pathways">
-            <span className="score-breakdown-total">{formatScore(scores[id])} XP total</span>
-            <span className="score-breakdown-parts">
-                {axes.map(a => (
-                    <span key={a.key} className="score-breakdown-part" style={{ color: getBreadthColor(a.key) }}>
-                        <b>{a.key}</b>&nbsp;{formatScore(parts[a.key] || 0)}
-                        <span className="score-breakdown-axis"> {a.label}</span>
-                    </span>
-                ))}
-            </span>
-        </div>
-    );
-}
-
 // Auth-gated loader: fetches the signed-in user's per-node mastery scores once and lifts them up.
 // Rendered only when Clerk is enabled, so useAuth is always inside ClerkProvider. Renders nothing.
 function MasteryScoreLoader({ onLoaded }) {
@@ -302,12 +255,13 @@ function TreeVisualization() {
         }
     };
 
-    // Layout constants
-    const rowHeight = 160;
-    const nodeWidth = 200;
-    const nodeHeight = 100;
-    const horizontalSpacing = 40;
-    const containerWidth = 1200;
+    // Layout constants. Boxes are roomy enough to hold the title, total XP, three per-pathway score
+    // tiles, and a Learn action; the canvas is wide enough that up to 5 children still fit in a row.
+    const rowHeight = 200;
+    const nodeWidth = 230;
+    const nodeHeight = 140;
+    const horizontalSpacing = 30;
+    const containerWidth = 1300;
 
     // Load static tree data on mount (instant - no API call needed)
     useEffect(() => {
@@ -845,7 +799,7 @@ function TreeVisualization() {
         };
     };
 
-    const svgWidth = 1200;
+    const svgWidth = 1300;
     const svgHeight = 60 + 8 * rowHeight;
 
     const wrapText = (text, maxChars = 22) => {
@@ -996,6 +950,40 @@ function TreeVisualization() {
         );
     };
 
+    // Three per-pathway tiles for a node (mobile). Each tile shows the breadth letter and that pathway's
+    // share of the node's total XP; tapping opens the pathway. A thin underline shows how much of the
+    // node's OWN cards are mastered in that breadth (green complete, amber partial). `active: true` fills
+    // the currently-selected pathway (used on the focused card); children pass `active: false`.
+    const renderBreadthTiles = (anchor, { active }) => (
+        <div className="mobile-breadth-tiles" role="group" aria-label={`Open ${anchor.title} by pathway`}>
+            {['A', 'B', 'C'].map(b => {
+                const color = getBreadthColor(b);
+                const isActive = active && b === getActiveBreadth(anchor.id);
+                const pathXp = breadthScores[anchor.id]?.[b];
+                const bOwn = breadths[anchor.id]?.[b] || 0;
+                const frac = Math.min(1, bOwn / 19);
+                return (
+                    <button
+                        key={b}
+                        className={`mobile-breadth-tile${isActive ? ' active' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); handleBreadthSelect(anchor, b); }}
+                        style={isActive ? { background: color, borderColor: color, color: '#fff' } : { borderColor: color, color }}
+                        aria-label={`Open ${b} pathway`}
+                    >
+                        <span className="mbt-letter">{b}</span>
+                        {pathXp != null && <span className="mbt-xp">{formatScore(pathXp)} XP</span>}
+                        {bOwn > 0 && (
+                            <span className="mbt-underline" aria-hidden="true">
+                                <span className="mbt-underline-fill"
+                                    style={{ width: `${frac * 100}%`, background: bOwn >= 19 ? '#2e9e5b' : '#e0a030' }}></span>
+                            </span>
+                        )}
+                    </button>
+                );
+            })}
+        </div>
+    );
+
     if (isMobile) {
         const expandedNode = visibleNodes.find(n => n.type === 'expanded') || visibleNodes.find(n => n.type === 'root');
         const expandedAnchor = expandedNode?.anchor;
@@ -1106,8 +1094,6 @@ function TreeVisualization() {
                                 <p className="mobile-tree-scope">{expandedAnchor.scope}</p>
                             )}
 
-                            <ScoreBreakdown id={expandedAnchor.id} scores={scores} breadthScores={breadthScores} />
-
                             {showStart ? (
                                 <button
                                     className="mobile-primary-btn"
@@ -1117,26 +1103,7 @@ function TreeVisualization() {
                                 </button>
                             ) : (
                                 <>
-                                    <div className="mobile-breadth-row" role="group" aria-label="Choose breadth">
-                                        <span className="mobile-breadth-label">Breadth</span>
-                                        <div className="mobile-breadth-btns">
-                                            {['A', 'B', 'C'].map(b => {
-                                                const isActive = b === activeBreadth;
-                                                const color = getBreadthColor(b);
-                                                return (
-                                                    <button
-                                                        key={b}
-                                                        className={`mobile-breadth-btn${isActive ? ' active' : ''}`}
-                                                        onClick={() => handleBreadthSelect(expandedAnchor, b)}
-                                                        style={isActive ? { background: color, borderColor: color, color: 'white' } : undefined}
-                                                        aria-pressed={isActive}
-                                                    >
-                                                        {b}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
+                                    {renderBreadthTiles(expandedAnchor, { active: true })}
 
                                     <button
                                         className="mobile-primary-btn"
@@ -1186,28 +1153,7 @@ function TreeVisualization() {
                                             <span className="mobile-child-chevron" aria-hidden="true">›</span>
                                         </button>
                                         <div className="mobile-child-footer">
-                                            <div className="mobile-child-breadths" role="group"
-                                                aria-label={`Open ${child.anchor.title} by pathway`}>
-                                                <span className="mobile-child-breadths-label">Open:</span>
-                                                {['A', 'B', 'C'].map(b => {
-                                                    const color = getBreadthColor(b);
-                                                    return (
-                                                        <button
-                                                            key={b}
-                                                            className="mobile-child-breadth-btn"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleBreadthSelect(child.anchor, b);
-                                                            }}
-                                                            style={{ borderColor: color, color }}
-                                                            aria-label={`Open ${b} pathway`}
-                                                            title={`Open the ${b} pathway`}
-                                                        >
-                                                            {b}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
+                                            {renderBreadthTiles(child.anchor, { active: false })}
                                             <button
                                                 className="mobile-child-read"
                                                 onClick={(e) => {
@@ -1290,10 +1236,6 @@ function TreeVisualization() {
                     currentId={activePath[activePath.length - 1]}
                     onNavigate={navigateToAncestor}
                 />
-            )}
-
-            {activePath.length > 0 && (
-                <ScoreBreakdown id={activePath[activePath.length - 1]} scores={scores} breadthScores={breadthScores} />
             )}
 
             <div
@@ -1379,121 +1321,131 @@ function TreeVisualization() {
                                     ))}
                                 </text>
 
-                                {/* Mastery XP badge (top-right) for nodes the user has a score for */}
-                                {scores[node.anchor.id] != null && (
-                                    <MasteryBadge score={scores[node.anchor.id]} peak={peaks[node.anchor.id] ?? scores[node.anchor.id]} nodeWidth={nodeWidth} />
-                                )}
+                                {/* Total mastery XP, on its own line under the title so it never overlaps it.
+                                    Reads "current/best" in amber when the score has decayed below the peak. */}
+                                {scores[node.anchor.id] != null && (() => {
+                                    const cur = scores[node.anchor.id];
+                                    const pk = peaks[node.anchor.id] ?? cur;
+                                    const decayed = pk > cur;
+                                    const label = decayed ? `${formatScore(cur)}/${formatScore(pk)} XP` : `${formatScore(cur)} XP`;
+                                    const greenOnDark = colors.text === 'white' ? '#8fe0ad' : '#2e9e5b';
+                                    return (
+                                        <text
+                                            x={nodeWidth / 2}
+                                            y={62}
+                                            textAnchor="middle"
+                                            fill={decayed ? '#e0a030' : greenOnDark}
+                                            fontSize="11"
+                                            fontWeight="700"
+                                        >
+                                            {label}
+                                        </text>
+                                    );
+                                })()}
 
-                                {/* Action buttons */}
-                                <g>
-                                    {/* Show buttons on all nodes except unclicked ROOT */}
-                                    {(node.type !== 'root' || activePath.length > 0) && (
-                                        <>
-                                            {/* Always show breadth toggle buttons (A, B, C) */}
-                                            <g>
-                                                {/* "Breadth" label */}
-                                                <text
-                                                    x={nodeWidth / 4 + 5}
-                                                    y={nodeHeight - 34}
-                                                    textAnchor="middle"
-                                                    fill={colors.text}
-                                                    fontSize="10"
-                                                    fontWeight="bold"
+                                {/* Action area: three per-pathway tiles + a Learn bar. Hidden only on the
+                                    not-yet-clicked ROOT. */}
+                                {(node.type !== 'root' || activePath.length > 0) && (
+                                    <>
+                                        {/* Pathway tiles: breadth letter + that pathway's share of the total XP.
+                                            Tap to open the pathway. The active pathway (on an in-path node) fills
+                                            with its colour. A thin underline shows how much of THIS node's own
+                                            cards are mastered in that breadth (green when complete, amber while
+                                            partial) — the pathway XP and the own-mastery cue are different things. */}
+                                        {['A', 'B', 'C'].map((breadth, index) => {
+                                            const activeBreadth = getActiveBreadth(node.id);
+                                            const shouldShowColor = breadth === activeBreadth && isInPath;
+                                            const breadthColor = getBreadthColor(breadth);
+                                            const pad = 12, gap = 8;
+                                            const tileW = (nodeWidth - 2 * pad - 2 * gap) / 3;
+                                            const tileX = pad + index * (tileW + gap);
+                                            const tileY = nodeHeight - 60;
+                                            const tileH = 40;
+                                            const onDark = colors.fill === '#555555';
+                                            const pathXp = breadthScores[node.anchor.id]?.[breadth];
+                                            const bOwn = breadths[node.anchor.id]?.[breadth] || 0;
+                                            const frac = Math.min(1, bOwn / 19);
+                                            return (
+                                                <g
+                                                    key={breadth}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleBreadthSelect(node.anchor, breadth);
+                                                    }}
+                                                    style={{ cursor: 'pointer' }}
                                                 >
-                                                    Breadth
-                                                </text>
-
-                                                {/* Breadth buttons */}
-                                                {['A', 'B', 'C'].map((breadth, index) => {
-                                                    const activeBreadth = getActiveBreadth(node.id);
-                                                    const isActive = breadth === activeBreadth;
-                                                    const buttonWidth = (nodeWidth / 2 - 15) / 3 - 2;
-                                                    const buttonX = 10 + index * (buttonWidth + 2);
-                                                    const breadthColor = getBreadthColor(breadth);
-
-                                                    // Only show color if this breadth is active AND node is expanded (in path)
-                                                    const shouldShowColor = isActive && isInPath;
-
-                                                    return (
-                                                        <g
-                                                            key={breadth}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleBreadthSelect(node.anchor, breadth);
-                                                            }}
+                                                    <rect
+                                                        x={tileX}
+                                                        y={tileY}
+                                                        width={tileW}
+                                                        height={tileH}
+                                                        rx="5"
+                                                        fill={shouldShowColor ? breadthColor : (onDark ? 'rgba(255,255,255,0.10)' : 'white')}
+                                                        stroke={shouldShowColor ? breadthColor : '#cbd2d9'}
+                                                        strokeWidth="1"
+                                                        style={{ transition: 'all 0.2s ease' }}
+                                                    />
+                                                    <text
+                                                        x={tileX + tileW / 2}
+                                                        y={pathXp != null ? tileY + 16 : tileY + 24}
+                                                        textAnchor="middle"
+                                                        fill={shouldShowColor ? 'white' : breadthColor}
+                                                        fontSize="12"
+                                                        fontWeight="800"
+                                                        pointerEvents="none"
+                                                    >
+                                                        {breadth}
+                                                    </text>
+                                                    {pathXp != null && (
+                                                        <text
+                                                            x={tileX + tileW / 2}
+                                                            y={tileY + 30}
+                                                            textAnchor="middle"
+                                                            fill={shouldShowColor ? 'white' : colors.text}
+                                                            fontSize="10"
+                                                            fontWeight="700"
+                                                            pointerEvents="none"
                                                         >
-                                                            <rect
-                                                                x={buttonX}
-                                                                y={nodeHeight - 22}
-                                                                width={buttonWidth}
-                                                                height={16}
-                                                                fill={shouldShowColor ? breadthColor : '#e8e8e8'}
-                                                                stroke={shouldShowColor ? breadthColor : '#555'}
-                                                                strokeWidth="1"
-                                                                opacity={1}
-                                                                rx="2"
-                                                                style={{
-                                                                    cursor: 'pointer',
-                                                                    transition: 'all 0.2s ease'
-                                                                }}
-                                                            />
-                                                            <text
-                                                                x={buttonX + buttonWidth / 2}
-                                                                y={nodeHeight - 22 + 12}
-                                                                textAnchor="middle"
-                                                                fill={shouldShowColor ? 'white' : '#333'}
-                                                                fontSize="11"
-                                                                fontWeight="600"
-                                                                pointerEvents="none"
-                                                            >
-                                                                {breadth}
-                                                            </text>
-                                                            {/* Completion dot: green = breadth mastered, amber = in progress */}
-                                                            {(() => {
-                                                                const bOwn = breadths[node.anchor.id]?.[breadth] || 0;
-                                                                if (bOwn <= 0) return null;
-                                                                return (
-                                                                    <circle
-                                                                        cx={buttonX + buttonWidth - 2.5}
-                                                                        cy={nodeHeight - 22 + 2.5}
-                                                                        r={2.6}
-                                                                        fill={bOwn >= 19 ? '#2e9e5b' : '#e0a030'}
-                                                                        stroke="white"
-                                                                        strokeWidth="0.6"
-                                                                        pointerEvents="none"
-                                                                    />
-                                                                );
-                                                            })()}
-                                                        </g>
-                                                    );
-                                                })}
-                                            </g>
+                                                            {formatScore(pathXp)}
+                                                        </text>
+                                                    )}
+                                                    {bOwn > 0 && (
+                                                        <>
+                                                            <rect x={tileX + 4} y={tileY + tileH - 6} width={tileW - 8} height={3} rx="1.5"
+                                                                fill={shouldShowColor ? 'rgba(255,255,255,0.35)' : '#e2e6ea'} pointerEvents="none" />
+                                                            <rect x={tileX + 4} y={tileY + tileH - 6} width={(tileW - 8) * frac} height={3} rx="1.5"
+                                                                fill={bOwn >= 19 ? '#2e9e5b' : '#e0a030'} pointerEvents="none" />
+                                                        </>
+                                                    )}
+                                                </g>
+                                            );
+                                        })}
 
-                                            {/* Right button: Learn */}
-                                            <g onClick={() => navigate(`/learn/${node.anchor.id}?breadth=${getActiveBreadth(node.id)}`)} style={{ cursor: 'pointer' }}>
-                                                <rect
-                                                    x={nodeWidth / 2 + 5}
-                                                    y={nodeHeight - 28}
-                                                    width={nodeWidth / 2 - 15}
-                                                    height={22}
-                                                    fill={colors.fill === '#555555' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
-                                                    stroke={colors.fill === '#555555' ? 'white' : '#666'}
-                                                    strokeWidth="1"
-                                                />
-                                                <text
-                                                    x={3 * nodeWidth / 4}
-                                                    y={nodeHeight - 13}
-                                                    textAnchor="middle"
-                                                    fill={colors.text}
-                                                    fontSize="10"
-                                                    fontWeight="bold"
-                                                >
-                                                    Learn →
-                                                </text>
-                                            </g>
-                                        </>
-                                    )}
-                                </g>
+                                        {/* Learn bar (full width) */}
+                                        <g onClick={() => navigate(`/learn/${node.anchor.id}?breadth=${getActiveBreadth(node.id)}`)} style={{ cursor: 'pointer' }}>
+                                            <rect
+                                                x={12}
+                                                y={nodeHeight - 17}
+                                                width={nodeWidth - 24}
+                                                height={14}
+                                                rx="3"
+                                                fill={colors.fill === '#555555' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)'}
+                                                stroke={colors.fill === '#555555' ? 'white' : '#8a929b'}
+                                                strokeWidth="1"
+                                            />
+                                            <text
+                                                x={nodeWidth / 2}
+                                                y={nodeHeight - 7}
+                                                textAnchor="middle"
+                                                fill={colors.text}
+                                                fontSize="9"
+                                                fontWeight="bold"
+                                            >
+                                                Learn →
+                                            </text>
+                                        </g>
+                                    </>
+                                )}
                             </g>
                         );
                     })}
