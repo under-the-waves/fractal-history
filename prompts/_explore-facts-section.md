@@ -19,6 +19,10 @@ Each fact card has:
 - `headline`: ONE short plain sentence (~20 words max) stating the card's single core point — one
   fact only, never two facts joined with "and". Do not put the date in the headline; it goes in `when`.
 - `when`: a short date or date range for this card, e.g. "About 2.4 billion years ago". Always include one.
+- `sources`: an array of the 1–2 source URLs from the EVIDENCE below that most directly support this
+  card's headline and `what` bullets. Copy each URL exactly as it appears in the evidence (the text after
+  "source:"). Include ONLY URLs that actually appear in the evidence; if none apply, use an empty array
+  `[]`. Never invent, guess, or shorten a URL.
 - four expandable layers, each a list (array) of short bullet points:
   - `what` — WHAT HAPPENED: the actual event or phenomenon itself, described concretely. This is NOT
     the experiment, discovery, or evidence that revealed it.
@@ -66,7 +70,7 @@ OUTPUT: return ONLY valid JSON in exactly this shape, and nothing else:
 {
   "title": {{titleRule}},
   "facts": [
-    { "headline": "...", "when": "...", "what": ["..."], "why": ["..."], "how": ["..."], "debates": ["..."], "vignettes": ["..."] }
+    { "headline": "...", "when": "...", "sources": ["..."], "what": ["..."], "why": ["..."], "how": ["..."], "debates": ["..."], "vignettes": ["..."] }
   ]
 }
 Every layer that has no content must be an empty array `[]`. Output only the JSON.

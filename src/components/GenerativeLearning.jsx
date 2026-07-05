@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
 import { useToasts } from './AchievementToasts'
 import './generative.css'
 
-// The "learn" entry for an anchor: a choice between reading the guided narrative and writing your
-// own. Works for ANY anchor — "Read" always points at the existing /narrative/:id page. The
-// write-your-own flow (study -> write -> mark) is only wired for anchors that have local study data
-// (the prototype anchor, Emergence of Life); for others it shows as coming soon.
-// "Read the guided narrative" reuses the existing /narrative/:id page.
+// The "learn" flow for an anchor. Linear, write-first (settled with the user 2026-07-05, see
+// project knowledge/Learn_Flow_Reorder_Spec.md):
+//   start -> study the fact cards -> write the history from memory -> mark -> save flashcards
+//   -> choice: rewrite, or read the guided narrative (the terminal reveal).
+// The narrative is deliberately LAST: producing an account from partial knowledge is what builds
+// retention, so the polished narrative is the reveal, not the scaffold. The write path is only wired
+// for anchors that have study data (generated on demand); "just read it" stays available as an escape.
 
 const LAYERS = [
     { key: 'what', label: 'What happened' },
@@ -21,13 +23,50 @@ const LAYERS = [
 
 const WHY_DISCLAIMER = 'This is the mainstream explanation. Where the causes are genuinely debated, see the Debates layer for more nuance.'
 
+// A source URL -> a short human label (its domain), for the citation popovers. Falls back to the raw
+// string if the URL will not parse.
+function sourceLabel(url) {
+    try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url }
+}
+
+// Normalise a title/label for loose matching (missing-concept titles vs flashcard group labels).
+const normLabel = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+
 function FactCard({ fact }) {
     const [open, setOpen] = useState(null)
+    const [showSrc, setShowSrc] = useState(false)
+    const sources = Array.isArray(fact.sources) ? fact.sources.filter(Boolean) : []
     // Only show a layer tab when that layer actually has content (bullets).
     const available = LAYERS.filter(l => Array.isArray(fact[l.key]) && fact[l.key].length > 0)
     return (
         <div className="gl-fact">
-            <p className="gl-fact-headline">{fact.headline}</p>
+            <p className="gl-fact-headline">
+                {fact.headline}
+                {sources.length > 0 && (
+                    <sup className="gl-cite-sup">
+                        <button
+                            type="button"
+                            className={`gl-cite-btn ${showSrc ? 'active' : ''}`}
+                            onClick={() => setShowSrc(v => !v)}
+                            aria-label={`${sources.length} source${sources.length > 1 ? 's' : ''}`}
+                        >
+                            {sources.length}
+                        </button>
+                    </sup>
+                )}
+            </p>
+            {showSrc && sources.length > 0 && (
+                <div className="gl-cite-pop">
+                    <p className="gl-cite-pop-title">Source{sources.length > 1 ? 's' : ''}</p>
+                    <ul>
+                        {sources.map((u, i) => (
+                            <li key={i}>
+                                <a href={u} target="_blank" rel="noopener noreferrer">{sourceLabel(u)}</a>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
             {fact.when && <p className="gl-fact-when">{fact.when}</p>}
             <div className="gl-layer-tabs">
                 {available.map(l => (
@@ -53,7 +92,7 @@ function FactCard({ fact }) {
     )
 }
 
-function MarkReport({ result, onRevise, onRestart }) {
+function MarkReport({ result, onContinue, onRestart }) {
     const errors = result.factualErrors || []
     const misconceptions = result.misconceptions || []
     const missing = result.missingConcepts || []
@@ -104,8 +143,8 @@ function MarkReport({ result, onRevise, onRestart }) {
                 render={n => (<><strong>“{n.quote}”</strong><span>{n.note}</span></>)} />
 
             <div className="gl-result-actions">
-                <button type="button" className="gl-btn gl-btn-primary" onClick={onRevise}>
-                    Edit and resubmit
+                <button type="button" className="gl-btn gl-btn-primary" onClick={onContinue}>
+                    Save your flashcards →
                 </button>
                 <button type="button" className="gl-btn gl-btn-ghost" onClick={onRestart}>
                     Start over
@@ -133,16 +172,196 @@ function Section({ title, subtitle, items, tone, empty, render }) {
     )
 }
 
+// Turn a flashcard group key into a human label. "sub:Title" -> "Title".
+function flashcardGroupLabel(key) {
+    if (key === 'general') return 'Across the topic'
+    if (key.startsWith('sub:')) return key.slice(4)
+    return key
+}
+
+// Cluster candidate cards by group, preserving first-appearance order, pushing "general" last.
+function groupFlashcards(cards) {
+    const groups = []
+    const byKey = new Map()
+    cards.forEach((card, index) => {
+        const key = card.group || 'general'
+        if (!byKey.has(key)) {
+            const entry = { key, label: flashcardGroupLabel(key), cards: [] }
+            byKey.set(key, entry)
+            groups.push(entry)
+        }
+        byKey.get(key).cards.push({ ...card, index })
+    })
+    return groups.sort((a, b) => (a.key === 'general' ? 1 : 0) - (b.key === 'general' ? 1 : 0))
+}
+
+// The post-mark flashcards step: the 5 auto cores plus the pool the learner picks from (up to 3). The
+// cards that the mark flagged as MISSING from their write are floated to the top and badged, so saving
+// is aimed at the gaps the write just exposed. Reveal an answer to self-test in place. Reuses the
+// existing flashcard machinery (instantiate-cores, /api/flashcards slots + set-slot).
+function FlashcardDeck({ anchorId, breadth, missing, clerkEnabled, auth }) {
+    const [data, setData] = useState(null)
+    const [preparing, setPreparing] = useState(true)
+    const [busy, setBusy] = useState(null)
+    const [error, setError] = useState(null)
+    const [revealed, setRevealed] = useState(new Set())
+
+    const signedIn = !clerkEnabled || auth.isSignedIn
+    const missingSet = new Set((missing || []).map(normLabel))
+
+    const load = useCallback(async () => {
+        try {
+            const token = clerkEnabled ? await auth.getToken() : null
+            const res = await fetch(`/api/flashcards?mode=slots&anchorId=${anchorId}&breadth=${breadth}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            })
+            const d = await res.json()
+            if (d.success) setData(d)
+        } catch (err) {
+            console.error('Failed to load flashcards:', err)
+        }
+    }, [anchorId, breadth, clerkEnabled, auth])
+
+    // On mount: ensure this topic's pool + 5 cores exist and are added to the user's deck (generates
+    // the pool from the fact cards on first call), then load the slots panel.
+    useEffect(() => {
+        let cancelled = false
+        const run = async () => {
+            if (!signedIn) { setPreparing(false); return }
+            try {
+                const token = clerkEnabled ? await auth.getToken() : null
+                await fetch(`/api/instantiate-cores?id=${anchorId}&breadth=${breadth}`, {
+                    method: 'POST',
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                })
+            } catch (err) {
+                console.error('Failed to prepare flashcards:', err)
+            }
+            if (!cancelled) { await load(); setPreparing(false) }
+        }
+        run()
+        return () => { cancelled = true }
+    }, [anchorId, breadth, signedIn, clerkEnabled, auth, load])
+
+    const toggle = async (card, enabled) => {
+        setBusy(card.question)
+        setError(null)
+        try {
+            const token = clerkEnabled ? await auth.getToken() : null
+            const res = await fetch('/api/flashcards', {
+                method: 'POST',
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'set-slot', anchorId, breadth, question: card.question, answer: card.answer, enabled }),
+            })
+            const d = await res.json()
+            if (!d.success) setError(d.error || 'Could not update pick')
+            await load()
+        } catch {
+            setError('Could not update pick')
+        } finally {
+            setBusy(null)
+        }
+    }
+
+    const reveal = (key) => setRevealed(prev => new Set([...prev, key]))
+    const answer = (key, text) => revealed.has(key)
+        ? <p className="gl-fc-a">{text}</p>
+        : <button type="button" className="gl-fc-reveal" onClick={() => reveal(key)}>Show answer</button>
+
+    if (!signedIn) {
+        return (
+            <div className="gl-fc-signin">
+                <p>Sign in to save these to your spaced-repetition deck.</p>
+                <SignInButton mode="modal">
+                    <button type="button" className="gl-btn gl-btn-primary">Sign in</button>
+                </SignInButton>
+            </div>
+        )
+    }
+
+    if (preparing || !data) return <p className="gl-fc-hint">Preparing your flashcards…</p>
+    if ((data.cores?.length || 0) === 0 && (data.available?.length || 0) === 0) {
+        return <p className="gl-fc-hint">Flashcards aren’t ready for this topic yet.</p>
+    }
+
+    const atMax = data.used >= data.max
+    const availableGroups = groupFlashcards(data.available)
+        .sort((a, b) => (missingSet.has(normLabel(b.label)) ? 1 : 0) - (missingSet.has(normLabel(a.label)) ? 1 : 0))
+
+    return (
+        <div className="gl-fc">
+            <p className="gl-fc-intro">
+                Your {data.cores.length} core cards are saved automatically. Add up to {data.max} more —
+                the ones you skipped in your write are marked below. Reveal any card to test yourself now.
+            </p>
+
+            <p className="gl-fc-sub">Core cards · saved</p>
+            <ul className="gl-fc-list">
+                {data.cores.map((c, i) => {
+                    const k = `core-${i}`
+                    return (
+                        <li key={k} className="gl-fc-item gl-fc-core">
+                            <span className="gl-fc-badge">Core</span>
+                            <div className="gl-fc-text">
+                                <p className="gl-fc-q">{c.question}</p>
+                                {answer(k, c.answer)}
+                            </div>
+                        </li>
+                    )
+                })}
+            </ul>
+
+            <p className="gl-fc-sub">Your picks · {data.used}/{data.max}</p>
+            {error && <p className="gl-error">{error}</p>}
+            {availableGroups.map(group => {
+                const isGap = missingSet.has(normLabel(group.label))
+                return (
+                    <div key={group.key} className="gl-fc-group">
+                        <h4 className="gl-fc-group-label">
+                            {group.label}
+                            {isGap && <span className="gl-fc-gap">you skipped this</span>}
+                        </h4>
+                        <ul className="gl-fc-list">
+                            {group.cards.map(c => {
+                                const k = `slot-${c.index}`
+                                return (
+                                    <li key={k} className={`gl-fc-item ${c.selected ? 'selected' : ''}`}>
+                                        <button
+                                            type="button"
+                                            className={`gl-fc-toggle ${c.selected ? 'selected' : ''}`}
+                                            disabled={busy === c.question || (!c.selected && atMax)}
+                                            onClick={() => toggle(c, !c.selected)}
+                                        >
+                                            {c.selected ? 'Remove' : (atMax ? 'Full' : 'Add')}
+                                        </button>
+                                        <div className="gl-fc-text">
+                                            <p className="gl-fc-q">{c.question}</p>
+                                            {answer(k, c.answer)}
+                                        </div>
+                                    </li>
+                                )
+                            })}
+                        </ul>
+                    </div>
+                )
+            })}
+
+            <Link to="/flashcards" className="gl-fc-deck-link">Study your full deck →</Link>
+        </div>
+    )
+}
+
 function GenerativeLearning() {
     const { id } = useParams()
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
     const breadth = searchParams.get('breadth') || 'A'
     const clerkEnabled = useClerkEnabled()
-    const { isSignedIn, getToken } = useAuth()
+    const auth = useAuth()
+    const { isSignedIn, getToken } = auth
     const toasts = useToasts()
 
-    const [stage, setStage] = useState('choice') // choice | generating | study | write | marking | result
+    const [stage, setStage] = useState('start') // start | generating | study | write | marking | result | flashcards
     const [text, setText] = useState('')
     const [result, setResult] = useState(null)
     const [error, setError] = useState(null)
@@ -163,8 +382,7 @@ function GenerativeLearning() {
         return () => { cancelled = true }
     }, [id, breadth])
 
-    // Fall back to the anchor's title/scope for the choice screen when no study content exists yet.
-    // get-narrative returns the anchor metadata without triggering narrative generation.
+    // Fall back to the anchor's title/scope for the start screen when no study content exists yet.
     useEffect(() => {
         if (data || anchorInfo) return
         let cancelled = false
@@ -176,15 +394,15 @@ function GenerativeLearning() {
     }, [id, breadth, data, anchorInfo])
 
     const wordCount = text.trim().split(/\s+/).filter(Boolean).length
+    const missingTitles = (result?.missingConcepts || []).map(m => m.subAnchor)
 
-    // Start the write path. Requires sign-in: generation costs API spend and marking is per-user, so the
-    // whole write-your-own path is gated (the choice card shows a sign-in button when logged out — this
-    // is a backstop). If the study cards are already cached, go straight to study; otherwise generate
-    // them on demand (research -> cards, ~1 min) behind a loading screen, then study.
+    // Start the write path. Requires sign-in: generation costs API spend and marking is per-user. If the
+    // study cards are already cached, go straight to study; otherwise generate them on demand behind a
+    // loading screen (research -> cards, ~1 min), then study.
     const startWrite = async () => {
         setError(null)
         if (clerkEnabled && !isSignedIn) {
-            setError('Please sign in to write your own.')
+            setError('Please sign in to start.')
             return
         }
         if (data) { setStage('study'); return }
@@ -206,7 +424,7 @@ function GenerativeLearning() {
             setStage('study')
         } catch (err) {
             setError(err.message)
-            setStage('choice')
+            setStage('start')
         }
     }
 
@@ -243,58 +461,38 @@ function GenerativeLearning() {
         <div className="gl-page">
             <div className="gl-back-bar"><Link to="/" className="gl-back">← Back to the tree</Link></div>
 
-            {/* ---------- CHOICE ---------- */}
-            {stage === 'choice' && (
-                <div className="gl-choice">
-                    <p className="gl-eyebrow">New topic</p>
+            {/* ---------- START ---------- */}
+            {stage === 'start' && (
+                <div className="gl-start">
+                    <p className="gl-eyebrow">Learn this topic</p>
                     <h1 className="gl-title">{anchorInfo?.title || 'Loading…'}</h1>
                     {anchorInfo?.scope && <p className="gl-scope">{anchorInfo.scope}</p>}
-                    <p className="gl-choice-prompt">How do you want to learn it?</p>
 
-                    <div className="gl-choice-cards">
-                        <button
-                            type="button"
-                            className="gl-choice-card"
-                            onClick={() => navigate(`/narrative/${id}?breadth=${breadth}`)}
-                        >
-                            <span className="gl-choice-card-title">Read the guided narrative</span>
-                            <span className="gl-choice-card-desc">
-                                A ready-made history, written for you. The quickest way in.
-                            </span>
-                            <span className="gl-choice-card-cta">Read →</span>
-                        </button>
-
+                    <div className="gl-start-card">
+                        <p className="gl-start-lead">Write it yourself, then check your work.</p>
+                        <ol className="gl-start-steps">
+                            <li>Study the key facts.</li>
+                            <li>Write the history from memory and get it marked.</li>
+                            <li>Save flashcards, then read the guided narrative to compare.</li>
+                        </ol>
                         {clerkEnabled && !isSignedIn ? (
-                            // Logged out: the whole write-your-own path is gated (generation costs API
-                            // spend and marking is per-user). Clicking opens the Clerk sign-in modal;
-                            // once signed in this card re-renders to the start button below.
                             <SignInButton mode="modal">
-                                <button type="button" className="gl-choice-card gl-choice-card-featured">
-                                    <span className="gl-choice-badge">Earns more</span>
-                                    <span className="gl-choice-card-title">Write your own</span>
-                                    <span className="gl-choice-card-desc">
-                                        Study the facts, then write the history yourself and get it marked.
-                                        Harder, but you remember far more.
-                                    </span>
-                                    <span className="gl-choice-card-cta">Sign in to start →</span>
-                                </button>
+                                <button type="button" className="gl-btn gl-btn-primary gl-btn-lg">Sign in to start →</button>
                             </SignInButton>
                         ) : (
-                            <button
-                                type="button"
-                                className="gl-choice-card gl-choice-card-featured"
-                                onClick={startWrite}
-                            >
-                                <span className="gl-choice-badge">Earns more</span>
-                                <span className="gl-choice-card-title">Write your own</span>
-                                <span className="gl-choice-card-desc">
-                                    Study the facts, then write the history yourself and get it marked.
-                                    Harder, but you remember far more.
-                                </span>
-                                <span className="gl-choice-card-cta">{data ? 'Start →' : 'Prepare & start →'}</span>
+                            <button type="button" className="gl-btn gl-btn-primary gl-btn-lg" onClick={startWrite}>
+                                {data ? 'Start →' : 'Prepare & start →'}
                             </button>
                         )}
                     </div>
+
+                    <button
+                        type="button"
+                        className="gl-escape"
+                        onClick={() => navigate(`/narrative/${id}?breadth=${breadth}`)}
+                    >
+                        Prefer to just read it? Read the guided narrative →
+                    </button>
                     {error && <p className="gl-error">{error}</p>}
                 </div>
             )}
@@ -309,14 +507,14 @@ function GenerativeLearning() {
             )}
 
             {/* ---------- STUDY ---------- */}
-            {stage === 'study' && (
+            {stage === 'study' && data && (
                 <div className="gl-study">
-                    <p className="gl-eyebrow">Step 1 of 2 · Study</p>
+                    <p className="gl-eyebrow">Step 1 · Study</p>
                     <h1 className="gl-title">{data.title}</h1>
                     <p className="gl-instruction">
-                        Read through the facts and open the layers that interest you. When you click
-                        <strong> I’m ready to write</strong>, the facts disappear and you write the history
-                        from memory.
+                        Read through the facts and open the layers that interest you. The small number after a
+                        fact shows its sources — tap it for the links. When you click
+                        <strong> I’m ready to write</strong>, the facts disappear and you write from memory.
                     </p>
 
                     {data.prelude && (
@@ -335,8 +533,19 @@ function GenerativeLearning() {
                         </section>
                     ))}
 
+                    {Array.isArray(data.sources) && data.sources.length > 0 && (
+                        <details className="gl-sources">
+                            <summary>All sources ({data.sources.length})</summary>
+                            <ul>
+                                {data.sources.map((u, i) => (
+                                    <li key={i}><a href={u} target="_blank" rel="noopener noreferrer">{sourceLabel(u)}</a></li>
+                                ))}
+                            </ul>
+                        </details>
+                    )}
+
                     <div className="gl-study-footer">
-                        <button type="button" className="gl-btn gl-btn-ghost" onClick={() => setStage('choice')}>
+                        <button type="button" className="gl-btn gl-btn-ghost" onClick={() => setStage('start')}>
                             ← Back
                         </button>
                         <button type="button" className="gl-btn gl-btn-primary" onClick={() => setStage('write')}>
@@ -347,9 +556,9 @@ function GenerativeLearning() {
             )}
 
             {/* ---------- WRITE ---------- */}
-            {stage === 'write' && (
+            {stage === 'write' && data && (
                 <div className="gl-write">
-                    <p className="gl-eyebrow">Step 2 of 2 · Write</p>
+                    <p className="gl-eyebrow">Step 2 · Write</p>
                     <h1 className="gl-title">{data.title}</h1>
                     <p className="gl-instruction">
                         Write the history of this topic in your own words, from memory. You get full marks
@@ -374,8 +583,8 @@ function GenerativeLearning() {
                     {error && <p className="gl-error">{error}</p>}
 
                     <div className="gl-study-footer">
-                        <button type="button" className="gl-btn gl-btn-ghost" onClick={() => { setText(''); setStage('study') }}>
-                            ← Start over
+                        <button type="button" className="gl-btn gl-btn-ghost" onClick={() => setStage('study')}>
+                            ← Study the facts again
                         </button>
                         <button
                             type="button"
@@ -406,9 +615,45 @@ function GenerativeLearning() {
                     <h1 className="gl-title">{data.title}</h1>
                     <MarkReport
                         result={result}
-                        onRevise={() => setStage('write')}
-                        onRestart={() => { setText(''); setResult(null); setStage('choice') }}
+                        onContinue={() => setStage('flashcards')}
+                        onRestart={() => { setText(''); setResult(null); setStage('start') }}
                     />
+                </div>
+            )}
+
+            {/* ---------- FLASHCARDS ---------- */}
+            {stage === 'flashcards' && data && (
+                <div className="gl-flashcards-stage">
+                    <p className="gl-eyebrow">Step 3 · Keep it</p>
+                    <h1 className="gl-title">{data.title}</h1>
+                    <p className="gl-instruction">
+                        Save the facts you want to keep. They go into your spaced-repetition deck and come
+                        back over the next few days, which is what makes them stick.
+                    </p>
+
+                    <FlashcardDeck
+                        anchorId={id}
+                        breadth={breadth}
+                        missing={missingTitles}
+                        clerkEnabled={clerkEnabled}
+                        auth={auth}
+                    />
+
+                    <div className="gl-study-footer gl-flashcards-footer">
+                        <button type="button" className="gl-btn gl-btn-ghost" onClick={() => setStage('write')}>
+                            ← Rewrite from memory
+                        </button>
+                        <button
+                            type="button"
+                            className="gl-btn gl-btn-primary"
+                            onClick={() => navigate(`/narrative/${id}?breadth=${breadth}`)}
+                        >
+                            Read the narrative →
+                        </button>
+                    </div>
+                    <p className="gl-reveal-note">
+                        Reading the narrative is the reveal — do your rewrites first if you want to keep testing yourself.
+                    </p>
                 </div>
             )}
         </div>
