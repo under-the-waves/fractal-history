@@ -45,15 +45,20 @@ export function buildFlashcardPrompt({ anchorTitle, breadth, children, narrative
     const breadthLabel = { A: 'analytical', B: 'temporal', C: 'geographic' }[breadth] || 'analytical';
     const breadthGuidance = breadthGuidanceFor(breadth);
     const headlineRule = HEADLINE_RULES[breadth] || HEADLINE_RULES.A;
+    // What the non-sub-topic ("general") cards should draw on. For temporal cards these must stay on
+    // the timeline too, otherwise they drift back to framing/concept answers.
+    const generalFocus = breadth === 'B'
+        ? "the big-picture chronology -- the overall sequence across the whole topic, its earliest, latest, and longest-spanning developments, and how the periods order relative to one another (these are still TEMPORAL cards: test when or in what order, not framing or thematic significance)"
+        : "the opening hook, framing, connections between sub-topics, and overall significance";
 
     const subtopicInstruction = numSubtopics > 0
         ? `Create a candidate pool the learner will choose from:
 - For EACH of the ${numSubtopics} sub-topics above, write exactly ${perSubtopic} cards, each testing a different aspect of that sub-topic. Tag each with "group": "sub:<exact sub-topic title>".
 ${headlineRule}
   Tag ONLY the headline card with "headline": true; the other ${perSubtopic - 1} cards must NOT carry that tag and should test genuinely different aspects.
-- Then write ${generalCount} more cards drawn from the rest of the narrative -- the opening hook, framing, connections between sub-topics, and overall significance -- that are not tied to any single sub-topic. Do NOT repeat a fact already tested by a sub-topic card. Tag each of these with "group": "general", and list them with the single most essential, canonical one FIRST (it may be chosen as a core card).
+- Then write ${generalCount} more cards drawn from the rest of the narrative -- ${generalFocus} -- that are not tied to any single sub-topic. Do NOT repeat a fact already tested by a sub-topic card. Tag each of these with "group": "general", and list them with the single most essential, canonical one FIRST (it may be chosen as a core card).
 Aim for roughly ${totalTarget} cards total.`
-        : `Create a candidate pool of about ${generalCount} cards drawn from across the whole narrative -- the opening hook, the key facts, and the overall significance. Tag each with "group": "general", and list them with the most essential, canonical ones FIRST (the first cards may be chosen as core cards).`;
+        : `Create a candidate pool of about ${generalCount} cards drawn from across the whole narrative -- ${generalFocus}. Tag each with "group": "general", and list them with the most essential, canonical ones FIRST (the first cards may be chosen as core cards).`;
 
     const content = `Generate a pool of candidate flashcard questions for this historical narrative. The learner will pick the ones they want to study, so offer varied angles rather than a single question per topic.
 
