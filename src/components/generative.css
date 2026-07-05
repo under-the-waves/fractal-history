@@ -347,3 +347,181 @@ ul.gl-layer-body {
 .gl-notice h1 { font-size: 24px; margin: 0 0 12px; }
 .gl-notice p { color: #4b5563; line-height: 1.6; }
 .gl-notice a { color: #8b5cf6; }
+
+/* ---------- Start ---------- */
+.gl-start-card {
+    padding: 28px;
+    border: 1px solid #ddd6fe;
+    border-radius: 16px;
+    background: #faf8ff;
+    margin: 8px 0 20px;
+}
+.gl-start-lead { font-size: 19px; font-weight: 700; margin: 0 0 14px; }
+.gl-start-steps {
+    margin: 0 0 22px;
+    padding-left: 22px;
+    color: #4b5563;
+    font-size: 15px;
+    line-height: 1.9;
+}
+.gl-btn-lg { padding: 13px 26px; font-size: 16px; }
+.gl-escape {
+    display: inline-block;
+    background: none;
+    border: none;
+    padding: 4px 0;
+    color: #8b5cf6;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.gl-escape:hover { color: #6d28d9; text-decoration: underline; }
+
+/* ---------- Fact-card source citations ---------- */
+.gl-cite-sup { line-height: 0; margin-left: 3px; }
+.gl-cite-btn {
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border: 1px solid #ddd6fe;
+    border-radius: 999px;
+    background: #ede9fe;
+    color: #6d28d9;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    vertical-align: super;
+}
+.gl-cite-btn:hover, .gl-cite-btn.active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+.gl-cite-pop {
+    margin: 8px 0 10px;
+    padding: 10px 14px;
+    background: #faf8ff;
+    border: 1px solid #ede9fe;
+    border-radius: 8px;
+}
+.gl-cite-pop-title {
+    margin: 0 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #7c3aed;
+}
+.gl-cite-pop ul { margin: 0; padding-left: 18px; }
+.gl-cite-pop li { font-size: 13px; line-height: 1.6; word-break: break-word; }
+.gl-cite-pop a { color: #6d28d9; }
+
+/* All-sources fallback list at the foot of the study screen */
+.gl-sources { margin: 8px 0 4px; font-size: 14px; }
+.gl-sources summary { cursor: pointer; color: #6b7280; font-weight: 600; }
+.gl-sources summary:hover { color: #1c1c1e; }
+.gl-sources ul { margin: 10px 0 0; padding-left: 20px; }
+.gl-sources li { line-height: 1.7; word-break: break-word; }
+.gl-sources a { color: #6d28d9; }
+
+/* ---------- Flashcards stage ---------- */
+.gl-fc-intro { color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0 0 20px; }
+.gl-fc-hint, .gl-fc-signin { color: #6b7280; font-size: 15px; padding: 20px 0; }
+.gl-fc-signin { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.gl-fc-sub {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 12px;
+    font-weight: 700;
+    color: #8b5cf6;
+    margin: 22px 0 10px;
+}
+.gl-fc-group { margin: 0 0 16px; }
+.gl-fc-group-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0 0 8px;
+}
+.gl-fc-gap {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #1e3a5f;
+    background: #dbeafe;
+    border-radius: 999px;
+    padding: 2px 8px;
+}
+.gl-fc-list { list-style: none; margin: 0; padding: 0; }
+.gl-fc-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #eceef1;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    background: #fff;
+}
+.gl-fc-item.selected { border-color: #c4b5fd; background: #faf8ff; }
+.gl-fc-core { background: #f6f7f9; }
+.gl-fc-badge {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6d28d9;
+    background: #ede9fe;
+    border-radius: 999px;
+    padding: 3px 9px;
+    margin-top: 2px;
+}
+.gl-fc-toggle {
+    flex-shrink: 0;
+    min-width: 68px;
+    border: 1px solid #c4b5fd;
+    background: #fff;
+    color: #6d28d9;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s;
+}
+.gl-fc-toggle:hover:not(:disabled) { background: #ede9fe; }
+.gl-fc-toggle.selected { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+.gl-fc-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+.gl-fc-text { flex: 1; }
+.gl-fc-q { font-size: 14px; font-weight: 600; margin: 0 0 6px; line-height: 1.45; }
+.gl-fc-a {
+    font-size: 14px;
+    color: #059669;
+    font-weight: 600;
+    margin: 0;
+    padding: 6px 10px;
+    background: #ecfdf5;
+    border-radius: 6px;
+}
+.gl-fc-reveal {
+    border: none;
+    background: none;
+    padding: 0;
+    color: #8b5cf6;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.gl-fc-reveal:hover { text-decoration: underline; }
+.gl-fc-deck-link {
+    display: inline-block;
+    margin-top: 12px;
+    color: #8b5cf6;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+}
+.gl-fc-deck-link:hover { text-decoration: underline; }
+
+.gl-flashcards-footer { margin-top: 32px; }
+.gl-reveal-note { margin: 12px 0 0; font-size: 12.5px; color: #9ca3af; text-align: center; line-height: 1.5; }
