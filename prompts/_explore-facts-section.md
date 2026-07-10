@@ -23,9 +23,37 @@ Each fact card has:
   card's headline and `what` bullets. Copy each URL exactly as it appears in the evidence (the text after
   "source:"). Include ONLY URLs that actually appear in the evidence; if none apply, use an empty array
   `[]`. Never invent, guess, or shorten a URL.
-- four expandable layers, each a list (array) of short bullet points:
+- several expandable layers. Except for `like` (a string), each is a list (array) of short bullet points:
   - `what` — WHAT HAPPENED: the actual event or phenomenon itself, described concretely. This is NOT
     the experiment, discovery, or evidence that revealed it.
+  - `like` — WHAT IT WAS LIKE (a STRING of plain prose, not a list): what this scene or period was
+    actually like to be in. Where there are people, name a vantage point ("For a front-line soldier",
+    "For a typical farmer") and state plainly what that experience involved. Where there are none (deep
+    time, geology, pre-human life), describe the physical scene instead: sky, air, land, sea,
+    temperature, sound. The timescale may be a moment or a whole lifetime, whichever fits.
+    WRITE IT FLAT. This layer FAILS if it reads like an essay. State facts as plain sentences and stop.
+    Let the facts supply the vividness, never the wording. Explain any term a general reader would not
+    know. Specific bans, no exceptions:
+      * NO evaluative adjectives (intense, brutal, deafening, harsh, grim, relentless). If a sentence
+        leans on an adjective to carry it, the fact is too vague — put a concrete fact there instead.
+      * NO antithesis: never "not X but Y", "rather than X", "X, not Y", "not just X". State it
+        positively ("the machine set the pace", NOT "the pace was set by the machine rather than the worker").
+      * NO scene-setting openers: never begin "Picture…", "Imagine…", "Think of…". Open on the vantage
+        point or a plain fact.
+      * NO imputing thoughts, feelings or attitudes the evidence does not record (not "buyers who paid
+        no attention to how it was made"). State what was, not what people supposedly felt about it.
+      * NO closing line reaching for significance. End on a plain fact.
+      * Use spaced en dashes ( – ), never em dashes or double hyphens.
+    Use `""` (empty string) only when the sub-topic is purely abstract and there is genuinely no scene
+    to describe.
+    GOOD example (a 1915–16 trench): "Soldiers lived in waterlogged trenches, often ankle-deep in
+    water, among rats and lice. The air smelled of mud, latrines, and unburied dead. Long stretches of
+    boredom were broken by sudden shelling. In winter, feet kept in permanently wet boots developed
+    trench foot, where the skin swelled and rotted and could turn gangrenous."
+    BAD example (breaks the bans, do NOT write like this): "Picture a soldier in the trenches.
+    Conditions were relentlessly brutal — not a life but an ordeal. Men suffered in ways the generals
+    safe behind the lines could never imagine." (scene-setting opener; evaluative adjectives;
+    antithesis; imputed attitude; em dash.)
   - `why` — WHY IT HAPPENED: the main cause(s) of the event, or for a scientific topic the mechanism
     that produced it — the STANDARD, MAINSTREAM explanation a textbook would give. State the accepted
     account plainly. Genuine scholarly disagreement about the causes belongs in `debates`, not here.
@@ -45,7 +73,7 @@ Each fact card has:
     stands alone — never general context or more facts. Include one or two wherever good ones exist;
     leave the array empty only if you genuinely cannot find one. Never invent one.
 
-Produce ONE or TWO fact cards for this section (not more).
+{{cardCountRule}}
 
 HARD WRITING RULES (these are the point of this prompt — follow them exactly):
 - Plain English, whole sentences. Write for someone who knows nothing about the topic.
@@ -70,10 +98,11 @@ OUTPUT: return ONLY valid JSON in exactly this shape, and nothing else:
 {
   "title": {{titleRule}},
   "facts": [
-    { "headline": "...", "when": "...", "sources": ["..."], "what": ["..."], "why": ["..."], "how": ["..."], "debates": ["..."], "vignettes": ["..."] }
+    { "headline": "...", "when": "...", "sources": ["..."], "what": ["..."], "like": "...", "why": ["..."], "how": ["..."], "debates": ["..."], "vignettes": ["..."] }
   ]
 }
-Every layer that has no content must be an empty array `[]`. Output only the JSON.
+Every list layer that has no content must be an empty array `[]`. `like` is a plain STRING; when there
+is no scene to describe, use an empty string `""`. Output only the JSON.
 
 ---
 EVIDENCE for this section:
