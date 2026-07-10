@@ -43,6 +43,9 @@ Each fact card has:
       * NO imputing thoughts, feelings or attitudes the evidence does not record (not "buyers who paid
         no attention to how it was made"). State what was, not what people supposedly felt about it.
       * NO closing line reaching for significance. End on a plain fact.
+      * NO personifying inanimate things. A cell, molecule, planet, machine or gas does not try, want,
+        seek, choose, decide, refuse, struggle, know or feel. State what physically happened (write "the
+        cell kept it after that", NOT "a power source it could not shed even if it tried").
       * Use spaced en dashes ( – ), never em dashes or double hyphens.
     Use `""` (empty string) only when the sub-topic is purely abstract and there is genuinely no scene
     to describe.
