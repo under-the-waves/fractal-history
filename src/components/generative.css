@@ -169,6 +169,9 @@ ul.gl-layer-body {
 .gl-layer-body li { margin: 0 0 7px; }
 .gl-layer-body li:last-child { margin-bottom: 0; }
 
+/* The `like` ("what it was like") layer is a single prose paragraph, not a bullet list. */
+p.gl-layer-prose { padding-left: 16px; list-style: none; }
+
 /* Note under the mark scoreboard: write-your-own points decay and want refreshing on a schedule. */
 .gl-rewrite-note {
     margin: 10px 0 0;

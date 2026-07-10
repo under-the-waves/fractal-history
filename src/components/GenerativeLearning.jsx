@@ -15,11 +15,17 @@ import './generative.css'
 
 const LAYERS = [
     { key: 'what', label: 'What happened' },
+    { key: 'like', label: 'What it was like' },
     { key: 'why', label: 'Why it happened' },
     { key: 'how', label: 'How we know' },
     { key: 'debates', label: 'Debates' },
     { key: 'vignettes', label: 'Vignettes' },
 ]
+
+// A layer has content if it's a non-empty array (bullet layers) or a non-empty string (`like`, prose).
+function layerHasContent(v) {
+    return typeof v === 'string' ? v.trim().length > 0 : Array.isArray(v) && v.length > 0
+}
 
 const WHY_DISCLAIMER = 'This is the mainstream explanation. Where the causes are genuinely debated, see the Debates layer for more nuance.'
 
@@ -36,8 +42,8 @@ function FactCard({ fact }) {
     const [open, setOpen] = useState(null)
     const [showSrc, setShowSrc] = useState(false)
     const sources = Array.isArray(fact.sources) ? fact.sources.filter(Boolean) : []
-    // Only show a layer tab when that layer actually has content (bullets).
-    const available = LAYERS.filter(l => Array.isArray(fact[l.key]) && fact[l.key].length > 0)
+    // Only show a layer tab when that layer actually has content (bullets, or prose for `like`).
+    const available = LAYERS.filter(l => layerHasContent(fact[l.key]))
     return (
         <div className="gl-fact">
             <p className="gl-fact-headline">
@@ -83,9 +89,13 @@ function FactCard({ fact }) {
             {open && (
                 <>
                     {open === 'why' && <p className="gl-why-disclaimer">{WHY_DISCLAIMER}</p>}
-                    <ul className="gl-layer-body">
-                        {fact[open].map((b, i) => <li key={i}>{b}</li>)}
-                    </ul>
+                    {open === 'like' ? (
+                        <p className="gl-layer-body gl-layer-prose">{fact.like}</p>
+                    ) : (
+                        <ul className="gl-layer-body">
+                            {fact[open].map((b, i) => <li key={i}>{b}</li>)}
+                        </ul>
+                    )}
                 </>
             )}
         </div>
