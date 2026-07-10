@@ -68,6 +68,8 @@ The text inside the `<strong>` tags should read as part of the sentence. Only th
 
 {{childAnchors}}
 
+{{factBase}}
+
 ---
 
 ## Opening Hook: THIS IS NON-NEGOTIABLE

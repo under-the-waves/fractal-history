@@ -1,6 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 import dotenv from 'dotenv';
 import { factCheckNarrative } from '../lib/factCheck.js';
+import { getLearnContent } from '../lib/learnContent.js';
+import { citeFromFactBase } from '../lib/narrativeGrounding.js';
 
 dotenv.config({ path: '.env.local' });
 
@@ -45,9 +47,15 @@ export default async function handler(req, res) {
         `;
         const anchor = anchors[0];
 
-        const result = await factCheckNarrative(
-            narrative.narrative, anchor.title, anchor.scope, breadth
-        );
+        // Prefer citing the study fact base (one LLM call, no web search) when it exists — it holds the
+        // same research-derived sources the study cards use, so the narrative cites the same set and
+        // cannot contradict them. Fall back to the full web re-search only for anchors with no fact base
+        // (the "just read it" escape hatch). Retires the duplicate ~64-search citation path for the
+        // common flow. See: project knowledge/Learn_Flow_Reorder_Spec.md (Phase 2).
+        const learnContent = await getLearnContent(anchorId, breadth);
+        const result = learnContent
+            ? await citeFromFactBase(narrative.narrative, learnContent)
+            : await factCheckNarrative(narrative.narrative, anchor.title, anchor.scope, breadth);
 
         if (!result) {
             return res.status(500).json({ error: 'Failed to parse fact-check results' });
