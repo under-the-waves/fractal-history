@@ -2,9 +2,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
-import { factCheckNarrative } from '../lib/factCheck.js';
 import { linkChildAnchors } from '../lib/linkChildAnchors.js';
 import { query, getAncestorPath } from '../lib/db.js';
+import { getLearnContent } from '../lib/learnContent.js';
+import { buildNarrativeGrounding } from '../lib/narrativeGrounding.js';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -155,6 +156,7 @@ function populatePromptTemplate(template, data) {
         .replace(/\{\{prerequisites\}\}/g, data.prerequisites)
         .replace(/\{\{childAnchors\}\}/g, data.childAnchors)
         .replace(/\{\{scienceMode\}\}/g, () => data.scienceMode || '')
+        .replace(/\{\{factBase\}\}/g, () => data.factBase || '')
         .replace(/\{\{sharedVoice\}\}/g, () => data.sharedVoice)
         .replace(/\{\{sharedBans\}\}/g, () => data.sharedBans)
         .replace(/\{\{voiceTightening\}\}/g, () => data.voiceTightening || '');
@@ -286,6 +288,12 @@ export default async function handler(req, res) {
         // Load and populate prompt template
         const promptTemplate = loadPromptTemplate(breadth);
 
+        // Ground the narrative in the study fact base when it exists (the write-first flow generates it
+        // before the narrative is ever read). Hybrid grounding; '' when absent (the "just read it"
+        // escape hatch), so those narratives generate ungrounded exactly as before.
+        const learnContent = await getLearnContent(anchorId, breadth);
+        const factBase = buildNarrativeGrounding(learnContent);
+
         // Populate template
         const shared = loadSharedVoice();
         const isScienceNode = ancestors.some(a => SCIENCE_ROOTS.has(a.id));
@@ -297,10 +305,12 @@ export default async function handler(req, res) {
             prerequisites: 'None', // Can be expanded later to track user progress
             childAnchors: formatChildAnchors(children, breadth),
             scienceMode: isScienceNode ? SCIENCE_MODE_BLOCK : '',
+            factBase,
             sharedVoice: shared.voice,
             sharedBans: shared.bans,
             voiceTightening: shared.tightening
         });
+        console.log(`Narrative grounding: ${factBase ? 'fact base (' + factBase.length + ' chars)' : 'none (ungrounded)'}`);
 
         // Step 5: Call LLM API
         console.log(`Calling Anthropic API for narrative generation (${NARRATIVE_MODEL}${isScienceNode ? ', science mode' : ''})...`);

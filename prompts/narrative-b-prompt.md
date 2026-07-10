@@ -43,6 +43,8 @@ The text inside the `<strong>` tags should read as part of the sentence. The `da
 
 {{childAnchors}}
 
+{{factBase}}
+
 ---
 
 ## Narrative Voice
