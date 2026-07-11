@@ -1,17 +1,19 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
 import { useToasts } from './AchievementToasts'
 import './generative.css'
 
-// The "learn" flow for an anchor. Linear, write-first (settled with the user 2026-07-05, see
-// project knowledge/Learn_Flow_Reorder_Spec.md):
-//   start -> study the fact cards -> write the history from memory -> mark -> save flashcards
-//   -> choice: rewrite, or read the guided narrative (the terminal reveal).
-// The narrative is deliberately LAST: producing an account from partial knowledge is what builds
-// retention, so the polished narrative is the reveal, not the scaffold. The write path is only wired
-// for anchors that have study data (generated on demand); "just read it" stays available as an escape.
+// The "learn" flow for an anchor. Write-first, with a COLD write before study (settled 2026-07-10, see
+// project knowledge/Cold_Write_Flow_Plan.md):
+//   start -> write what you already know (cold; cards generate in the background) -> mark
+//         -> study the fact cards -> write it again from memory -> mark -> save flashcards -> narrative.
+// The cold write is the pretest: attempting an account before studying primes what you then read, and
+// it counts for XP like any write, so someone who already knows the topic isn't made to repeat it. No
+// step is ever locked — the mark only changes the guiding text, which always steers toward reading the
+// cards and writing again. Marking is coverage-based and kind: say something true about each part,
+// connect them, get nothing wrong = full marks (lib/marking.js).
 
 const LAYERS = [
     { key: 'what', label: 'What happened' },
@@ -29,14 +31,18 @@ function layerHasContent(v) {
 
 const WHY_DISCLAIMER = 'This is the mainstream explanation. Where the causes are genuinely debated, see the Debates layer for more nuance.'
 
+// The per-part credit -> the human label + tone shown in the coverage breakdown.
+const CREDIT_META = {
+    full: { label: 'covered', tone: 'ok' },
+    partial: { label: 'partial', tone: 'warn' },
+    none: { label: 'missing', tone: 'info' },
+}
+
 // A source URL -> a short human label (its domain), for the citation popovers. Falls back to the raw
 // string if the URL will not parse.
 function sourceLabel(url) {
     try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url }
 }
-
-// Normalise a title/label for loose matching (missing-concept titles vs flashcard group labels).
-const normLabel = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
 
 function FactCard({ fact }) {
     const [open, setOpen] = useState(null)
@@ -102,10 +108,23 @@ function FactCard({ fact }) {
     )
 }
 
-function MarkReport({ result, onContinue, onRestart }) {
+// The guiding line under the score. It never locks a step; it points at the sensible next one, and
+// before study it always steers the learner to read the cards and then write again.
+function guidanceText(score, hasStudied) {
+    if (!hasStudied) {
+        if (score >= 100) return 'You already know this cold. Read the fact cards to check the detail, then write it once more to lock it in.'
+        if (score >= 60) return 'Good start. Read the fact cards to fill the gaps, then write it again to raise your score.'
+        return 'Read the fact cards carefully, then write the history again from memory.'
+    }
+    if (score >= 100) return 'Full marks. Save your flashcards, then read the narrative to compare.'
+    if (score >= 60) return 'Nicely done. Save your flashcards, or rewrite to push for full marks.'
+    return 'Keep going — reread the cards and rewrite from memory. Save flashcards to help it stick.'
+}
+
+function MarkReport({ result, hasStudied, onStudy, onFlashcards, onRewrite, onNarrative, onRestart }) {
     const errors = result.factualErrors || []
     const misconceptions = result.misconceptions || []
-    const missing = result.missingConcepts || []
+    const parts = result.subAnchorScores || []
     const interp = result.interpretationNotes || []
     const score = result.mark?.score
     const cov = result.coverage || {}
@@ -119,7 +138,7 @@ function MarkReport({ result, onContinue, onRestart }) {
                 </div>
                 <div className="gl-coverage">
                     <span className="gl-coverage-num">{cov.covered}/{cov.total}</span>
-                    <span className="gl-coverage-label">key concepts covered</span>
+                    <span className="gl-coverage-label">parts covered</span>
                 </div>
                 {typeof result.xpEarned === 'number' && (
                     <div className="gl-coverage">
@@ -129,6 +148,8 @@ function MarkReport({ result, onContinue, onRestart }) {
                 )}
             </div>
 
+            <p className="gl-guidance">{guidanceText(score, hasStudied)}</p>
+
             {typeof result.nextReviewDays === 'number' && (
                 <p className="gl-rewrite-note">
                     These points fade over time. Rewrite this in about {result.nextReviewDays} day{result.nextReviewDays === 1 ? '' : 's'} to keep them{result.passed === false ? ' — and aim for 60+ next time to stretch the interval' : ''}.
@@ -137,6 +158,27 @@ function MarkReport({ result, onContinue, onRestart }) {
 
             {result.mark?.rationale && <p className="gl-rationale">{result.mark.rationale}</p>}
 
+            <section className="gl-section gl-parts-section">
+                <h3 className="gl-section-title">Coverage by part</h3>
+                <p className="gl-section-subtitle">
+                    Full marks means something substantive and true about each part, connected into one story.
+                </p>
+                <ul className="gl-parts-list">
+                    {parts.map((p, i) => {
+                        const meta = CREDIT_META[p.credit] || CREDIT_META.none
+                        return (
+                            <li key={i} className={`gl-part gl-tone-${meta.tone}`}>
+                                <span className="gl-part-badge">{meta.label}</span>
+                                <div className="gl-part-text">
+                                    <strong>{p.subAnchor}</strong>
+                                    {p.note && <span>{p.note}</span>}
+                                </div>
+                            </li>
+                        )
+                    })}
+                </ul>
+            </section>
+
             <Section title="Factual errors" items={errors} tone="error" empty="No factual errors found."
                 render={e => (<><strong>“{e.quote}”</strong><span>{e.problem}</span>
                     {e.contradicts && <span className="gl-cite">Fact base: {e.contradicts}</span>}</>)} />
@@ -144,18 +186,31 @@ function MarkReport({ result, onContinue, onRestart }) {
             <Section title="Misconceptions" items={misconceptions} tone="warn" empty="No misconceptions found."
                 render={m => (<><strong>“{m.quote}”</strong><span>{m.problem}</span></>)} />
 
-            <Section title="Missing key concepts" items={missing} tone="info" empty="You covered every key concept."
-                render={m => (<><strong>{m.subAnchor}</strong><span>{m.note}</span></>)} />
-
             <Section title="Interpretation notes" items={interp} tone="ok"
                 empty="No unconventional interpretations flagged."
                 subtitle="Defensible takes on open debates — these are not errors."
                 render={n => (<><strong>“{n.quote}”</strong><span>{n.note}</span></>)} />
 
             <div className="gl-result-actions">
-                <button type="button" className="gl-btn gl-btn-primary" onClick={onContinue}>
-                    Save your flashcards →
-                </button>
+                {!hasStudied ? (
+                    <>
+                        <button type="button" className="gl-btn gl-btn-primary" onClick={onStudy}>
+                            Read the fact cards →
+                        </button>
+                        <button type="button" className="gl-btn gl-btn-ghost" onClick={onNarrative}>
+                            Skip to the narrative
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <button type="button" className="gl-btn gl-btn-primary" onClick={onFlashcards}>
+                            Save your flashcards →
+                        </button>
+                        <button type="button" className="gl-btn gl-btn-ghost" onClick={onRewrite}>
+                            Rewrite from memory
+                        </button>
+                    </>
+                )}
                 <button type="button" className="gl-btn gl-btn-ghost" onClick={onRestart}>
                     Start over
                 </button>
@@ -205,11 +260,10 @@ function groupFlashcards(cards) {
     return groups.sort((a, b) => (a.key === 'general' ? 1 : 0) - (b.key === 'general' ? 1 : 0))
 }
 
-// The post-mark flashcards step: the 5 auto cores plus the pool the learner picks from (up to 3). The
-// cards that the mark flagged as MISSING from their write are floated to the top and badged, so saving
-// is aimed at the gaps the write just exposed. Reveal an answer to self-test in place. Reuses the
-// existing flashcard machinery (instantiate-cores, /api/flashcards slots + set-slot).
-function FlashcardDeck({ anchorId, breadth, missing, clerkEnabled, auth }) {
+// The post-mark flashcards step: the 5 auto cores plus the pool the learner picks from (up to 3).
+// Reveal an answer to self-test in place. Reuses the existing flashcard machinery (instantiate-cores,
+// /api/flashcards slots + set-slot). Decoupled from the mark — it just offers the topic's cards.
+function FlashcardDeck({ anchorId, breadth, clerkEnabled, auth }) {
     const [data, setData] = useState(null)
     const [preparing, setPreparing] = useState(true)
     const [busy, setBusy] = useState(null)
@@ -217,7 +271,6 @@ function FlashcardDeck({ anchorId, breadth, missing, clerkEnabled, auth }) {
     const [revealed, setRevealed] = useState(new Set())
 
     const signedIn = !clerkEnabled || auth.isSignedIn
-    const missingSet = new Set((missing || []).map(normLabel))
 
     const load = useCallback(async () => {
         try {
@@ -296,13 +349,12 @@ function FlashcardDeck({ anchorId, breadth, missing, clerkEnabled, auth }) {
 
     const atMax = data.used >= data.max
     const availableGroups = groupFlashcards(data.available)
-        .sort((a, b) => (missingSet.has(normLabel(b.label)) ? 1 : 0) - (missingSet.has(normLabel(a.label)) ? 1 : 0))
 
     return (
         <div className="gl-fc">
             <p className="gl-fc-intro">
-                Your {data.cores.length} core cards are saved automatically. Add up to {data.max} more —
-                the ones you skipped in your write are marked below. Reveal any card to test yourself now.
+                Your {data.cores.length} core cards are saved automatically. Add up to {data.max} more.
+                Reveal any card to test yourself now.
             </p>
 
             <p className="gl-fc-sub">Core cards · saved</p>
@@ -323,38 +375,32 @@ function FlashcardDeck({ anchorId, breadth, missing, clerkEnabled, auth }) {
 
             <p className="gl-fc-sub">Your picks · {data.used}/{data.max}</p>
             {error && <p className="gl-error">{error}</p>}
-            {availableGroups.map(group => {
-                const isGap = missingSet.has(normLabel(group.label))
-                return (
-                    <div key={group.key} className="gl-fc-group">
-                        <h4 className="gl-fc-group-label">
-                            {group.label}
-                            {isGap && <span className="gl-fc-gap">you skipped this</span>}
-                        </h4>
-                        <ul className="gl-fc-list">
-                            {group.cards.map(c => {
-                                const k = `slot-${c.index}`
-                                return (
-                                    <li key={k} className={`gl-fc-item ${c.selected ? 'selected' : ''}`}>
-                                        <button
-                                            type="button"
-                                            className={`gl-fc-toggle ${c.selected ? 'selected' : ''}`}
-                                            disabled={busy === c.question || (!c.selected && atMax)}
-                                            onClick={() => toggle(c, !c.selected)}
-                                        >
-                                            {c.selected ? 'Remove' : (atMax ? 'Full' : 'Add')}
-                                        </button>
-                                        <div className="gl-fc-text">
-                                            <p className="gl-fc-q">{c.question}</p>
-                                            {answer(k, c.answer)}
-                                        </div>
-                                    </li>
-                                )
-                            })}
-                        </ul>
-                    </div>
-                )
-            })}
+            {availableGroups.map(group => (
+                <div key={group.key} className="gl-fc-group">
+                    <h4 className="gl-fc-group-label">{group.label}</h4>
+                    <ul className="gl-fc-list">
+                        {group.cards.map(c => {
+                            const k = `slot-${c.index}`
+                            return (
+                                <li key={k} className={`gl-fc-item ${c.selected ? 'selected' : ''}`}>
+                                    <button
+                                        type="button"
+                                        className={`gl-fc-toggle ${c.selected ? 'selected' : ''}`}
+                                        disabled={busy === c.question || (!c.selected && atMax)}
+                                        onClick={() => toggle(c, !c.selected)}
+                                    >
+                                        {c.selected ? 'Remove' : (atMax ? 'Full' : 'Add')}
+                                    </button>
+                                    <div className="gl-fc-text">
+                                        <p className="gl-fc-q">{c.question}</p>
+                                        {answer(k, c.answer)}
+                                    </div>
+                                </li>
+                            )
+                        })}
+                    </ul>
+                </div>
+            ))}
 
             <Link to="/flashcards" className="gl-fc-deck-link">Study your full deck →</Link>
         </div>
@@ -371,12 +417,14 @@ function GenerativeLearning() {
     const { isSignedIn, getToken } = auth
     const toasts = useToasts()
 
-    const [stage, setStage] = useState('start') // start | generating | study | write | marking | result | flashcards
-    const [text, setText] = useState('')
+    const [stage, setStage] = useState('start') // start | coldwrite | study | write | marking | result | flashcards
+    const [text, setText] = useState('')         // persists from the cold write into the second write
     const [result, setResult] = useState(null)
     const [error, setError] = useState(null)
+    const [hasStudied, setHasStudied] = useState(false)
     const [anchorInfo, setAnchorInfo] = useState(null)
-    const [data, setData] = useState(null) // study fact-cards for this anchor+breadth, from the DB
+    const [data, setData] = useState(null)       // study fact-cards for this anchor+breadth, from the DB
+    const genRef = useRef(null)                  // in-flight background generation promise
 
     // Load the study fact-cards if they already exist for this anchor+breadth (cached in learn_content).
     useEffect(() => {
@@ -404,55 +452,70 @@ function GenerativeLearning() {
     }, [id, breadth, data, anchorInfo])
 
     const wordCount = text.trim().split(/\s+/).filter(Boolean).length
-    const missingTitles = (result?.missingConcepts || []).map(m => m.subAnchor)
 
-    // Start the write path. Requires sign-in: generation costs API spend and marking is per-user. If the
-    // study cards are already cached, go straight to study; otherwise generate them on demand behind a
-    // loading screen (research -> cards, ~1 min), then study.
-    const startWrite = async () => {
-        setError(null)
-        if (clerkEnabled && !isSignedIn) {
-            setError('Please sign in to start.')
-            return
-        }
-        if (data) { setStage('study'); return }
-        setStage('generating')
-        try {
+    // Kick off study-content generation in the background (research -> cards, ~1 min) so it runs while
+    // the learner is writing their cold answer. No-op if the content is already cached or already in
+    // flight. Resolves to the content; the promise is reused by the cold submit so it can wait if the
+    // learner finishes writing first. On failure the ref is cleared so the next call retries.
+    const startGeneration = useCallback(() => {
+        if (data) return Promise.resolve(data)
+        if (genRef.current) return genRef.current
+        const p = (async () => {
             const token = clerkEnabled ? await getToken() : null
             const res = await fetch('/api/learn?action=generate', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
+                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                 body: JSON.stringify({ id, breadth }),
             })
             const d = await res.json()
             if (!res.ok || !d.success || !d.exists) throw new Error(d.error || 'Could not prepare this topic.')
             setData(d)
             setAnchorInfo({ title: d.title, scope: d.scope })
-            setStage('study')
-        } catch (err) {
-            setError(err.message)
-            setStage('start')
-        }
+            return d
+        })()
+        genRef.current = p
+        p.catch(() => { genRef.current = null })
+        return p
+    }, [data, clerkEnabled, getToken, id, breadth])
+
+    // From the start screen: go to the cold-write screen and fire generation in the background.
+    const startWrite = () => {
+        setError(null)
+        if (clerkEnabled && !isSignedIn) { setError('Please sign in to start.'); return }
+        setStage('coldwrite')
+        startGeneration().catch(err => setError(err.message))
     }
 
-    const submit = async () => {
+    // Skip the cold write: go straight to studying the cards (waits on a spinner if still generating).
+    const skipToStudy = () => {
         setError(null)
-        if (clerkEnabled && !isSignedIn) {
-            setError('Sign in to get your writing marked and earn XP.')
+        if (clerkEnabled && !isSignedIn) { setError('Please sign in to start.'); return }
+        setHasStudied(true)
+        setStage('study')
+        startGeneration().catch(err => setError(err.message))
+    }
+
+    // Shared submit for both the cold write and the second write. Ensures the study content exists
+    // (usually already generated in the background), marks the text, and shows the result. `returnStage`
+    // is where to send the learner if something fails.
+    const submitMark = async (returnStage) => {
+        setError(null)
+        if (clerkEnabled && !isSignedIn) { setError('Sign in to get your writing marked and earn XP.'); return }
+        setStage('marking')
+        let content
+        try {
+            content = await startGeneration()
+        } catch (err) {
+            setError(err.message)
+            setStage(returnStage)
             return
         }
-        setStage('marking')
+        if (!content) { setError('Could not prepare this topic.'); setStage(returnStage); return }
         try {
             const token = clerkEnabled ? await getToken() : null
             const res = await fetch('/api/learn?action=mark', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
+                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                 body: JSON.stringify({ narrative: text, anchorId: id, breadth }),
             })
             const d = await res.json()
@@ -463,9 +526,11 @@ function GenerativeLearning() {
             if (d.levelUps?.length) toasts?.levelUps(d.levelUps)
         } catch (err) {
             setError(err.message)
-            setStage('write')
+            setStage(returnStage)
         }
     }
+
+    const restart = () => { setText(''); setResult(null); setHasStudied(false); setStage('start') }
 
     return (
         <div className="gl-page">
@@ -479,10 +544,10 @@ function GenerativeLearning() {
                     {anchorInfo?.scope && <p className="gl-scope">{anchorInfo.scope}</p>}
 
                     <div className="gl-start-card">
-                        <p className="gl-start-lead">Write it yourself, then check your work.</p>
+                        <p className="gl-start-lead">Write what you know, then check and deepen it.</p>
                         <ol className="gl-start-steps">
-                            <li>Study the key facts.</li>
-                            <li>Write the history from memory and get it marked.</li>
+                            <li>Write what you already know — no need to study first.</li>
+                            <li>Read the key facts, then write it again from memory and get marked.</li>
                             <li>Save flashcards, then read the guided narrative to compare.</li>
                         </ol>
                         {clerkEnabled && !isSignedIn ? (
@@ -491,7 +556,7 @@ function GenerativeLearning() {
                             </SignInButton>
                         ) : (
                             <button type="button" className="gl-btn gl-btn-primary gl-btn-lg" onClick={startWrite}>
-                                {data ? 'Start →' : 'Prepare & start →'}
+                                Start writing →
                             </button>
                         )}
                     </div>
@@ -507,74 +572,118 @@ function GenerativeLearning() {
                 </div>
             )}
 
-            {/* ---------- GENERATING ---------- */}
-            {stage === 'generating' && (
-                <div className="gl-marking">
-                    <div className="gl-spinner" />
-                    <p className="gl-marking-text">Preparing this topic…</p>
-                    <p className="gl-marking-note">Researching authoritative sources and writing your study facts. This takes about a minute.</p>
-                </div>
-            )}
-
-            {/* ---------- STUDY ---------- */}
-            {stage === 'study' && data && (
-                <div className="gl-study">
-                    <p className="gl-eyebrow">Step 1 · Study</p>
-                    <h1 className="gl-title">{data.title}</h1>
+            {/* ---------- COLD WRITE ---------- */}
+            {stage === 'coldwrite' && (
+                <div className="gl-write">
+                    <p className="gl-eyebrow">Step 1 · What you already know</p>
+                    <h1 className="gl-title">{anchorInfo?.title || 'This topic'}</h1>
                     <p className="gl-instruction">
-                        Read through the facts and open the layers that interest you. The small number after a
-                        fact shows its sources — tap it for the links. When you click
-                        <strong> I’m ready to write</strong>, the facts disappear and you write from memory.
+                        Before you study anything, write what you already know about this topic, in your own
+                        words. Getting it partly wrong is fine — having a go first is what makes the facts
+                        stick when you read them. You’ll get a chance to study and rewrite next.
                     </p>
 
-                    {data.prelude && (
-                        <section className="gl-subanchor gl-prelude">
-                            <h2 className="gl-subanchor-title gl-prelude-title">{data.prelude.title}</h2>
-                            {data.prelude.facts.map((f, j) => <FactCard key={j} fact={f} />)}
-                        </section>
-                    )}
+                    <textarea
+                        className="gl-textarea"
+                        value={text}
+                        onChange={e => setText(e.target.value)}
+                        placeholder={`Tell the story of ${anchorInfo?.title || 'this topic'} as best you can…`}
+                        rows={14}
+                        autoFocus
+                    />
+                    <div className="gl-write-meta">
+                        <span className="gl-wordcount">{wordCount} words</span>
+                        <span className="gl-hidden-note">We’re preparing the facts while you write.</span>
+                    </div>
 
-                    {data.subAnchors.map((sa, i) => (
-                        <section key={sa.title} className="gl-subanchor">
-                            <h2 className="gl-subanchor-title">
-                                <span className="gl-subanchor-num">{i + 1}</span>{sa.title}
-                            </h2>
-                            {sa.facts.map((f, j) => <FactCard key={j} fact={f} />)}
-                        </section>
-                    ))}
-
-                    {Array.isArray(data.sources) && data.sources.length > 0 && (
-                        <details className="gl-sources">
-                            <summary>All sources ({data.sources.length})</summary>
-                            <ul>
-                                {data.sources.map((u, i) => (
-                                    <li key={i}><a href={u} target="_blank" rel="noopener noreferrer">{sourceLabel(u)}</a></li>
-                                ))}
-                            </ul>
-                        </details>
-                    )}
+                    {error && <p className="gl-error">{error}</p>}
 
                     <div className="gl-study-footer">
-                        <button type="button" className="gl-btn gl-btn-ghost" onClick={() => setStage('start')}>
-                            ← Back
+                        <button type="button" className="gl-btn gl-btn-ghost" onClick={skipToStudy}>
+                            Skip this →
                         </button>
-                        <button type="button" className="gl-btn gl-btn-primary" onClick={() => setStage('write')}>
-                            I’m ready to write →
+                        <button
+                            type="button"
+                            className="gl-btn gl-btn-primary"
+                            onClick={() => submitMark('coldwrite')}
+                            disabled={wordCount < 20}
+                            title={wordCount < 20 ? 'Write at least ~20 words first' : ''}
+                        >
+                            Submit for marking →
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* ---------- WRITE ---------- */}
-            {stage === 'write' && data && (
+            {/* ---------- STUDY ---------- */}
+            {stage === 'study' && (
+                <div className="gl-study">
+                    <p className="gl-eyebrow">Step 2 · Study</p>
+                    <h1 className="gl-title">{data?.title || anchorInfo?.title || 'This topic'}</h1>
+                    {!data ? (
+                        <div className="gl-marking">
+                            <div className="gl-spinner" />
+                            <p className="gl-marking-text">Preparing this topic…</p>
+                            <p className="gl-marking-note">Researching authoritative sources and writing your study facts. This takes about a minute.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <p className="gl-instruction">
+                                Read through the facts and open the layers that interest you. The small number after a
+                                fact shows its sources — tap it for the links. When you click
+                                <strong> I’m ready to write</strong>, the facts disappear and you write from memory.
+                            </p>
+
+                            {data.prelude && (
+                                <section className="gl-subanchor gl-prelude">
+                                    <h2 className="gl-subanchor-title gl-prelude-title">{data.prelude.title}</h2>
+                                    {data.prelude.facts.map((f, j) => <FactCard key={j} fact={f} />)}
+                                </section>
+                            )}
+
+                            {data.subAnchors.map((sa, i) => (
+                                <section key={sa.title} className="gl-subanchor">
+                                    <h2 className="gl-subanchor-title">
+                                        <span className="gl-subanchor-num">{i + 1}</span>{sa.title}
+                                    </h2>
+                                    {sa.facts.map((f, j) => <FactCard key={j} fact={f} />)}
+                                </section>
+                            ))}
+
+                            {Array.isArray(data.sources) && data.sources.length > 0 && (
+                                <details className="gl-sources">
+                                    <summary>All sources ({data.sources.length})</summary>
+                                    <ul>
+                                        {data.sources.map((u, i) => (
+                                            <li key={i}><a href={u} target="_blank" rel="noopener noreferrer">{sourceLabel(u)}</a></li>
+                                        ))}
+                                    </ul>
+                                </details>
+                            )}
+
+                            <div className="gl-study-footer">
+                                <button type="button" className="gl-btn gl-btn-ghost" onClick={() => setStage(result ? 'result' : 'start')}>
+                                    ← Back
+                                </button>
+                                <button type="button" className="gl-btn gl-btn-primary" onClick={() => setStage('write')}>
+                                    I’m ready to write →
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
+
+            {/* ---------- SECOND WRITE ---------- */}
+            {stage === 'write' && (
                 <div className="gl-write">
-                    <p className="gl-eyebrow">Step 2 · Write</p>
-                    <h1 className="gl-title">{data.title}</h1>
+                    <p className="gl-eyebrow">Step 3 · Write it again</p>
+                    <h1 className="gl-title">{data?.title || anchorInfo?.title || 'This topic'}</h1>
                     <p className="gl-instruction">
-                        Write the history of this topic in your own words, from memory. You get full marks
-                        if you remember all the key parts of the story, explain them clearly so they hang
-                        together, and get nothing factually wrong. You don’t need to include every detail
-                        from the facts page.
+                        Now write the history in your own words, from memory. You get full marks if you say
+                        something true about each part of the story, connect them so they hang together, and get
+                        nothing factually wrong. You don’t need to repeat every detail from the facts page — the
+                        detail belongs in each part’s own topic.
                     </p>
 
                     <textarea
@@ -599,7 +708,7 @@ function GenerativeLearning() {
                         <button
                             type="button"
                             className="gl-btn gl-btn-primary"
-                            onClick={submit}
+                            onClick={() => submitMark('write')}
                             disabled={wordCount < 20}
                             title={wordCount < 20 ? 'Write at least ~20 words first' : ''}
                         >
@@ -613,8 +722,10 @@ function GenerativeLearning() {
             {stage === 'marking' && (
                 <div className="gl-marking">
                     <div className="gl-spinner" />
-                    <p className="gl-marking-text">Marking your narrative…</p>
-                    <p className="gl-marking-note">Checking facts, misconceptions, and coverage.</p>
+                    <p className="gl-marking-text">Marking your writing…</p>
+                    <p className="gl-marking-note">
+                        {data ? 'Checking coverage, facts, and how it hangs together.' : 'Preparing this topic, then marking. This can take about a minute.'}
+                    </p>
                 </div>
             )}
 
@@ -622,20 +733,24 @@ function GenerativeLearning() {
             {stage === 'result' && result && (
                 <div className="gl-result-wrap">
                     <p className="gl-eyebrow">Your mark</p>
-                    <h1 className="gl-title">{data.title}</h1>
+                    <h1 className="gl-title">{data?.title || anchorInfo?.title || 'This topic'}</h1>
                     <MarkReport
                         result={result}
-                        onContinue={() => setStage('flashcards')}
-                        onRestart={() => { setText(''); setResult(null); setStage('start') }}
+                        hasStudied={hasStudied}
+                        onStudy={() => { setHasStudied(true); setStage('study') }}
+                        onFlashcards={() => setStage('flashcards')}
+                        onRewrite={() => setStage('write')}
+                        onNarrative={() => navigate(`/narrative/${id}?breadth=${breadth}`)}
+                        onRestart={restart}
                     />
                 </div>
             )}
 
             {/* ---------- FLASHCARDS ---------- */}
-            {stage === 'flashcards' && data && (
+            {stage === 'flashcards' && (
                 <div className="gl-flashcards-stage">
-                    <p className="gl-eyebrow">Step 3 · Keep it</p>
-                    <h1 className="gl-title">{data.title}</h1>
+                    <p className="gl-eyebrow">Step 4 · Keep it</p>
+                    <h1 className="gl-title">{data?.title || anchorInfo?.title || 'This topic'}</h1>
                     <p className="gl-instruction">
                         Save the facts you want to keep. They go into your spaced-repetition deck and come
                         back over the next few days, which is what makes them stick.
@@ -644,7 +759,6 @@ function GenerativeLearning() {
                     <FlashcardDeck
                         anchorId={id}
                         breadth={breadth}
-                        missing={missingTitles}
                         clerkEnabled={clerkEnabled}
                         auth={auth}
                     />
