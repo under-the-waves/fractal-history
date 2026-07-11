@@ -1,11 +1,22 @@
+// Unified narrative endpoint. One Vercel function dispatching three actions on `?action=`:
+//   action=get        (GET)        fetch an existing narrative + children + ancestors for display
+//   action=generate   (GET|POST)   generate (or return the cached) narrative via the LLM
+//   action=fact-check  (POST)       retroactively fact-check / cite an existing narrative
+//
+// Consolidated from the former api/get-narrative.js, api/generate-narrative.js, and
+// api/fact-check-narrative.js to stay under the Vercel Hobby 12-function cap (see CLAUDE.md).
+// Each handler's logic is preserved verbatim; only the entry dispatch is new.
+
 import Anthropic from '@anthropic-ai/sdk';
+import { neon } from '@neondatabase/serverless';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import { linkChildAnchors } from '../lib/linkChildAnchors.js';
 import { query, getAncestorPath } from '../lib/db.js';
 import { getLearnContent } from '../lib/learnContent.js';
-import { buildNarrativeGrounding } from '../lib/narrativeGrounding.js';
+import { buildNarrativeGrounding, citeFromFactBase } from '../lib/narrativeGrounding.js';
+import { factCheckNarrative } from '../lib/factCheck.js';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -20,6 +31,19 @@ function getAnthropicClient() {
     }
     return anthropic;
 }
+
+let sql = null;
+
+function getSql() {
+    if (!sql) {
+        sql = neon(process.env.DATABASE_URL);
+    }
+    return sql;
+}
+
+// ---------------------------------------------------------------------------
+// Shared / generation helpers
+// ---------------------------------------------------------------------------
 
 // Load prompt template from file
 function loadPromptTemplate(breadth) {
@@ -85,8 +109,8 @@ function loadSharedVoice() {
     return { voice: m2[1].trim(), bans: m2[2].trim(), tightening: '' };
 }
 
-// Get child anchors for a given parent and breadth
-async function getChildAnchors(parentId, breadth) {
+// Get child anchors for a given parent and breadth (generation view).
+async function getChildAnchorsForGeneration(parentId, breadth) {
     // Gather children under ANY of the parent's tree positions (a reused anchor sits at several), to
     // match /api/get-tree. The old `LIMIT 1` picked one arbitrary position, so a reused anchor could
     // resolve to a childless position and wrongly report "no children".
@@ -211,7 +235,136 @@ async function storeNarrative(anchorId, breadth, narrativeData) {
     return result[0];
 }
 
-export default async function handler(req, res) {
+// ---------------------------------------------------------------------------
+// action=get  (formerly api/get-narrative.js)
+// ---------------------------------------------------------------------------
+
+// Get child anchors for a specific breadth (display view).
+async function getChildAnchorsForDisplay(parentId, breadth) {
+    return await query(
+        `SELECT a.id, a.title
+         FROM anchors a
+         JOIN tree_positions tp ON a.id = tp.anchor_id
+         WHERE tp.parent_position_id = (
+             SELECT position_id FROM tree_positions WHERE anchor_id = $1 LIMIT 1
+         )
+         AND tp.breadth = $2
+         ORDER BY tp.position ASC`,
+        [parentId, breadth]
+    );
+}
+
+async function handleGet(req, res) {
+    if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const { id, breadth = 'A' } = req.query;
+
+    if (!id) {
+        return res.status(400).json({ error: 'Anchor ID is required' });
+    }
+
+    if (!['A', 'B', 'C'].includes(breadth)) {
+        return res.status(400).json({ error: 'Breadth must be A, B, or C' });
+    }
+
+    try {
+        // Fetch anchor, narrative, children, and ancestors in parallel
+        const [anchorResult, narrativeResult, childAnchors, ancestors] = await Promise.all([
+            query(
+                'SELECT id, title, scope, generation_status FROM anchors WHERE id = $1 LIMIT 1',
+                [id]
+            ),
+            query(
+                `SELECT narrative, key_concepts, questions, estimated_read_time,
+                        fact_checked_narrative, sources, fact_checked_at
+                 FROM narratives WHERE anchor_id = $1 AND breadth = $2 LIMIT 1`,
+                [id, breadth]
+            ),
+            getChildAnchorsForDisplay(id, breadth),
+            getAncestorPath(id)
+        ]);
+
+        if (anchorResult.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Anchor not found'
+            });
+        }
+
+        const anchor = anchorResult[0];
+
+        // If no narrative exists
+        if (narrativeResult.length === 0) {
+            return res.status(200).json({
+                success: true,
+                anchor: {
+                    id: anchor.id,
+                    title: anchor.title,
+                    scope: anchor.scope,
+                    breadth,
+                    narrativeExists: false,
+                    childAnchorsExist: childAnchors.length > 0,
+                    childAnchorsCount: childAnchors.length,
+                    ancestors
+                },
+                needsGeneration: true
+            });
+        }
+
+        const narrativeData = narrativeResult[0];
+
+        // Calculate word count from narrative HTML
+        const textContent = narrativeData.narrative.replace(/<[^>]*>/g, ' ');
+        const wordCount = textContent.split(/\s+/).filter(word => word.length > 0).length;
+
+        // Post-process: convert child anchor <strong> tags to tree-navigation links (and
+        // rewrite any older /narrative links). pathPrefix is root -> this anchor.
+        const childLinks = childAnchors.map(c => ({ id: c.id, title: c.title }));
+        const pathPrefix = ancestors.map(a => a.id);
+        const linkedNarrative = linkChildAnchors(narrativeData.narrative, childLinks, breadth, pathPrefix);
+        const linkedFactChecked = narrativeData.fact_checked_narrative
+            ? linkChildAnchors(narrativeData.fact_checked_narrative, childLinks, breadth, pathPrefix)
+            : null;
+
+        return res.status(200).json({
+            success: true,
+            anchor: {
+                id: anchor.id,
+                title: anchor.title,
+                scope: anchor.scope,
+                breadth,
+                narrative: linkedNarrative,
+                factCheckedNarrative: linkedFactChecked,
+                sources: narrativeData.sources || null,
+                factCheckedAt: narrativeData.fact_checked_at || null,
+                keyConcepts: narrativeData.key_concepts || [],
+                questions: narrativeData.questions || [],
+                estimatedReadTime: narrativeData.estimated_read_time || 5,
+                wordCount,
+                ancestors,
+                childAnchors: childAnchors.map(c => ({ id: c.id, title: c.title })),
+                narrativeExists: true
+            },
+            needsGeneration: false
+        });
+
+    } catch (error) {
+        console.error('Error fetching narrative:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to fetch narrative',
+            details: error.message
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// action=generate  (formerly api/generate-narrative.js)
+// ---------------------------------------------------------------------------
+
+async function handleGenerate(req, res) {
     // Support both GET and POST for flexibility
     if (req.method !== 'GET' && req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -265,7 +418,7 @@ export default async function handler(req, res) {
         // Fetch anchor details, children, and ancestors in parallel
         const [anchor, children, ancestors] = await Promise.all([
             getAnchorDetails(anchorId),
-            getChildAnchors(anchorId, breadth),
+            getChildAnchorsForGeneration(anchorId, breadth),
             getAncestorPath(anchorId)
         ]);
 
@@ -377,5 +530,97 @@ export default async function handler(req, res) {
             details: error.message,
             stage: 'error'
         });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// action=fact-check  (formerly api/fact-check-narrative.js)
+// ---------------------------------------------------------------------------
+
+// Retroactive fact-check endpoint for existing narratives
+async function handleFactCheck(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const { anchorId, breadth } = req.body;
+
+    if (!anchorId || !breadth) {
+        return res.status(400).json({ error: 'anchorId and breadth are required' });
+    }
+
+    try {
+        const db = getSql();
+
+        const narratives = await db`
+            SELECT id, narrative, anchor_id, breadth
+            FROM narratives
+            WHERE anchor_id = ${anchorId} AND breadth = ${breadth}
+        `;
+
+        if (narratives.length === 0) {
+            return res.status(404).json({ error: 'Narrative not found' });
+        }
+
+        const narrative = narratives[0];
+
+        const anchors = await db`
+            SELECT id, title, scope FROM anchors WHERE id = ${anchorId}
+        `;
+        const anchor = anchors[0];
+
+        // Prefer citing the study fact base (one LLM call, no web search) when it exists — it holds the
+        // same research-derived sources the study cards use, so the narrative cites the same set and
+        // cannot contradict them. Fall back to the full web re-search only for anchors with no fact base
+        // (the "just read it" escape hatch). Retires the duplicate ~64-search citation path for the
+        // common flow. See: project knowledge/Learn_Flow_Reorder_Spec.md (Phase 2).
+        const learnContent = await getLearnContent(anchorId, breadth);
+        const result = learnContent
+            ? await citeFromFactBase(narrative.narrative, learnContent)
+            : await factCheckNarrative(narrative.narrative, anchor.title, anchor.scope, breadth);
+
+        if (!result) {
+            return res.status(500).json({ error: 'Failed to parse fact-check results' });
+        }
+
+        await db`
+            UPDATE narratives
+            SET fact_checked_narrative = ${result.narrative},
+                sources = ${JSON.stringify(result.sources)},
+                fact_checked_at = NOW()
+            WHERE anchor_id = ${anchorId} AND breadth = ${breadth}
+        `;
+
+        return res.status(200).json({
+            success: true,
+            narrative: result.narrative,
+            sources: result.sources,
+            corrections: result.corrections,
+        });
+
+    } catch (error) {
+        console.error('Error fact-checking narrative:', error);
+        return res.status(500).json({ error: 'Failed to fact-check narrative' });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dispatch
+// ---------------------------------------------------------------------------
+
+export { handleGet, handleGenerate, handleFactCheck };
+
+export default async function handler(req, res) {
+    const action = req.query.action || req.body?.action || 'get';
+
+    switch (action) {
+        case 'get':
+            return handleGet(req, res);
+        case 'generate':
+            return handleGenerate(req, res);
+        case 'fact-check':
+            return handleFactCheck(req, res);
+        default:
+            return res.status(400).json({ error: `Unknown narrative action: ${action}` });
     }
 }

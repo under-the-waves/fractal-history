@@ -40,7 +40,10 @@ production deploy fail** at the post-build step with
 `exceeded_serverless_functions_per_deployment` - and the Vite build itself still
 succeeds, so the failure is easy to miss.
 
-**Current count: 9** (the 9 endpoints in `api/`) - 3 slots of headroom.
+**Current count: 10** (the 10 endpoints in `api/`) - 2 slots of headroom. The three
+narrative endpoints (get / generate / fact-check) were consolidated into one
+`api/narrative.js` dispatching on `?action=` to reclaim headroom after the count hit the
+12-function cap.
 
 **Before adding anything under `api/`, check the count stays ≤ 12:**
 ```bash

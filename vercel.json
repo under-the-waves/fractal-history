@@ -1,9 +1,8 @@
 {
   "functions": {
-    "api/generate-narrative.js": { "maxDuration": 60 },
+    "api/narrative.js": { "maxDuration": 60 },
     "api/generate-anchors.js": { "maxDuration": 60 },
     "api/generate-flashcards.js": { "maxDuration": 30 },
-    "api/fact-check-narrative.js": { "maxDuration": 60 },
     "api/learn.js": { "maxDuration": 60 }
   },
   "rewrites": [
