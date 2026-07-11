@@ -291,7 +291,7 @@ function NarrativeReading() {
             }
 
             // First, check if narrative exists
-            const checkResponse = await fetch(`/api/get-narrative?id=${id}&breadth=${breadth}`)
+            const checkResponse = await fetch(`/api/narrative?action=get&id=${id}&breadth=${breadth}`)
             const checkData = await safeJson(checkResponse, 'Checking narrative')
 
             if (!checkResponse.ok) {
@@ -338,7 +338,7 @@ function NarrativeReading() {
 
             // Now generate the narrative (children guaranteed to exist)
             setLoadingStage('generating_narrative')
-            const generateResponse = await fetch(`/api/generate-narrative?id=${id}&breadth=${breadth}`)
+            const generateResponse = await fetch(`/api/narrative?action=generate&id=${id}&breadth=${breadth}`)
             const generateData = await safeJson(generateResponse, 'Generating narrative')
 
             if (!generateResponse.ok || !generateData.success) {
@@ -378,7 +378,7 @@ function NarrativeReading() {
         if (factCheckInFlight.current === key) return
         factCheckInFlight.current = key
         setFactCheckStatus('checking')
-        fetch('/api/fact-check-narrative', {
+        fetch('/api/narrative?action=fact-check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ anchorId: anchor.id, breadth })
@@ -387,7 +387,7 @@ function NarrativeReading() {
             .then(data => {
                 if (!data.success) { setFactCheckStatus('error'); return }
                 // Re-fetch so the fact-checked narrative gets the same child-anchor link processing
-                return fetch(`/api/get-narrative?id=${anchor.id}&breadth=${breadth}`)
+                return fetch(`/api/narrative?action=get&id=${anchor.id}&breadth=${breadth}`)
                     .then(r => r.json())
                     .then(fresh => {
                         if (fresh.success && fresh.anchor) {
@@ -406,7 +406,7 @@ function NarrativeReading() {
             setError(null)
             setIsGenerating(true)
             setLoadingStage('generating_narrative')
-            const resp = await fetch(`/api/generate-narrative?id=${id}&breadth=${breadth}&regenerate=true`)
+            const resp = await fetch(`/api/narrative?action=generate&id=${id}&breadth=${breadth}&regenerate=true`)
             const text = await resp.text()
             let data
             try { data = JSON.parse(text) }

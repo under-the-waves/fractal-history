@@ -2,7 +2,7 @@
 // stale fact-check columns so the new text shows and re-fact-checks on next view.
 //
 // Usage: node scripts/regenerate-narratives.mjs 1A-E8F2G:A 1A-Q7R2S:A
-import handler from '../api/generate-narrative.js';
+import handler from '../api/narrative.js';
 import { query } from '../lib/db.js';
 
 const specs = process.argv.slice(2);
@@ -13,7 +13,7 @@ const toPlain = h => (h || '').replace(/<\/p>\s*<p>/g, '\n\n').replace(/<[^>]+>/
 for (const spec of specs) {
   const [id, breadth = 'A'] = spec.split(':');
   console.log(`\n\n######## Regenerating ${id} (${breadth}) ########`);
-  const req = { method: 'GET', query: { id, breadth, regenerate: 'true' }, body: {} };
+  const req = { method: 'GET', query: { action: 'generate', id, breadth, regenerate: 'true' }, body: {} };
   let captured = null;
   const res = { status: (code) => ({ json: (obj) => { captured = { code, obj }; return obj; } }) };
   try {

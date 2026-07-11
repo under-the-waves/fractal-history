@@ -444,7 +444,7 @@ function GenerativeLearning() {
     useEffect(() => {
         if (data || anchorInfo) return
         let cancelled = false
-        fetch(`/api/get-narrative?id=${id}&breadth=${breadth}`)
+        fetch(`/api/narrative?action=get&id=${id}&breadth=${breadth}`)
             .then(r => r.json())
             .then(d => { if (!cancelled && d.anchor) setAnchorInfo({ title: d.anchor.title, scope: d.anchor.scope }) })
             .catch(() => { })
