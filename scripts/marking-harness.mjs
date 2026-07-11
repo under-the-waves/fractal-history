@@ -27,6 +27,9 @@ for (const line of env.split('\n')) {
   if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
 }
 
+// The deterministic scorer lives in lib/marking.js so the harness and production agree.
+const { scoreFromModel } = await import('../lib/marking.js');
+
 const args = Object.fromEntries(process.argv.slice(2).map(a => {
   const [k, v] = a.replace(/^--/, '').split('=');
   return [k, v === undefined ? true : v];
@@ -37,13 +40,14 @@ const promptFile = args.prompt || 'prompts/_marking-pass.md';
 const dir = args.dir || 'prototype/test-narratives';
 
 // The sub-anchor rubric for this anchor (matches the fact base headings).
-const RUBRIC = [
+const RUBRIC_LIST = [
   'Origin of Self-Replicating Molecules',
   'Evolution of Photosynthesis',
   'Great Oxidation Event',
   'Endosymbiosis and Eukaryotic Cells',
   'First Multicellular Organisms',
-].map((s, i) => `${i + 1}. ${s}`).join('\n');
+];
+const RUBRIC = RUBRIC_LIST.map((s, i) => `${i + 1}. ${s}`).join('\n');
 
 const factBase = fs.readFileSync(factsFile, 'utf-8');
 const promptTpl = fs.readFileSync(promptFile, 'utf-8');
@@ -89,18 +93,19 @@ for (const file of files) {
   console.log('='.repeat(70));
   if (args.raw) { console.log(text); continue; }
 
-  let r;
-  try { r = parseJson(text); } catch { console.log('COULD NOT PARSE:\n', text); continue; }
+  let raw;
+  try { raw = parseJson(text); } catch { console.log('COULD NOT PARSE:\n', text); continue; }
+  const r = scoreFromModel(RUBRIC_LIST, raw);
 
-  console.log(`  MARK: ${r.mark?.score}/100  |  coverage ${r.coverage?.covered}/${r.coverage?.total}`);
+  console.log(`  MARK: ${r.mark?.score}/100  |  coverage ${r.coverage?.covered}/${r.coverage?.total}  |  coherent: ${r.coherent}`);
   console.log(`  rationale: ${r.mark?.rationale}`);
+  list('parts', r.subAnchorScores, p => `[${p.credit}] ${p.subAnchor} — ${p.note}`);
   list('factual errors', r.factualErrors, e => `"${e.quote}" — ${e.problem}`);
   list('misconceptions', r.misconceptions, m => `"${m.quote}" — ${m.problem}`);
-  list('missing concepts', r.missingConcepts, m => `${m.subAnchor} — ${m.note}`);
   list('interpretation notes (should NOT be errors)', r.interpretationNotes, n => `"${n.quote}" — ${n.note}`);
 }
 
 console.log('\n' + '-'.repeat(70));
-console.log('Expected: 01 clean | 02 catches 3 errors (Harvard, 1.2Gya GOE, mito from photosynthetic)');
-console.log('          03 flags Great Oxidation Event missing | 04 NO factual errors, all in interp notes');
+console.log('Expected: 01 clean, high | 02 catches 3 errors (Harvard, 1.2Gya GOE, mito from photosynthetic)');
+console.log('          03 Great Oxidation Event -> none/partial | 04 NO factual errors, all in interp notes');
 process.exit(0);
