@@ -15,14 +15,26 @@ import './generative.css'
 // cards and writing again. Marking is coverage-based and kind: say something true about each part,
 // connect them, get nothing wrong = full marks (lib/marking.js).
 
+// Order the learner sees. "Why it happened" follows "What happened" so it reads as explaining the
+// event, not the "What it was like" scene; the scene comes after the cause.
 const LAYERS = [
     { key: 'what', label: 'What happened' },
-    { key: 'like', label: 'What it was like' },
     { key: 'why', label: 'Why it happened' },
+    { key: 'like', label: 'What it was like' },
     { key: 'how', label: 'How we know' },
     { key: 'debates', label: 'Debates' },
     { key: 'vignettes', label: 'Vignettes' },
 ]
+
+// Split the `like` prose (a single string) into sentences so it renders as bullets like the other
+// layers. Keeps the spaced en dashes ( – ) intact; only breaks on sentence-ending punctuation
+// followed by a capital or quote. Falls back to the whole string as one bullet.
+function likeBullets(text) {
+    return String(text || '')
+        .split(/(?<=[.?!])\s+(?=[A-Z"'“‘])/)
+        .map(s => s.trim())
+        .filter(Boolean)
+}
 
 // A layer has content if it's a non-empty array (bullet layers) or a non-empty string (`like`, prose).
 function layerHasContent(v) {
@@ -95,13 +107,9 @@ function FactCard({ fact }) {
             {open && (
                 <>
                     {open === 'why' && <p className="gl-why-disclaimer">{WHY_DISCLAIMER}</p>}
-                    {open === 'like' ? (
-                        <p className="gl-layer-body gl-layer-prose">{fact.like}</p>
-                    ) : (
-                        <ul className="gl-layer-body">
-                            {fact[open].map((b, i) => <li key={i}>{b}</li>)}
-                        </ul>
-                    )}
+                    <ul className="gl-layer-body">
+                        {(open === 'like' ? likeBullets(fact.like) : fact[open]).map((b, i) => <li key={i}>{b}</li>)}
+                    </ul>
                 </>
             )}
         </div>
