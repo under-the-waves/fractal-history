@@ -21,7 +21,12 @@ Each fact card has:
 - four expandable layers, each a list (array) of short bullet points:
   - `what` — WHAT HAPPENED: the actual event or phenomenon itself, described concretely. This is NOT
     the experiment, discovery, or evidence that revealed it. (For "the origin of self-replicating
-    molecules", describe a molecule starting to copy itself — not Miller's experiment.)
+    molecules", describe a molecule starting to copy itself — not Miller's experiment.) State the fact
+    and its date/place DIRECTLY, as a plain claim about the world. Do NOT frame it through the evidence:
+    never lead with "the earliest known…", "the oldest…", "the first discovered…", "the oldest
+    fossil/tool found at <site>". That describes how we know it and belongs in `how`. Write "Early
+    humans in Africa made stone tools from about 2.6 million years ago", not "the earliest known stone
+    tools come from Gona".
   - `why` — WHY IT HAPPENED: the main cause(s) of the event, or for a scientific topic the mechanism
     that produced it — the STANDARD, MAINSTREAM explanation a textbook would give. State the accepted
     account plainly. Genuine scholarly disagreement about the causes belongs in `debates`, not here.

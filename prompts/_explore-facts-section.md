@@ -25,7 +25,11 @@ Each fact card has:
   `[]`. Never invent, guess, or shorten a URL.
 - several expandable layers. Except for `like` (a string), each is a list (array) of short bullet points:
   - `what` — WHAT HAPPENED: the actual event or phenomenon itself, described concretely. This is NOT
-    the experiment, discovery, or evidence that revealed it.
+    the experiment, discovery, or evidence that revealed it. State the fact and its date/place
+    DIRECTLY, as a plain claim about the world. Do NOT frame it through the evidence: never lead with
+    "the earliest known…", "the oldest…", "the first discovered…", "the oldest fossil/tool found at
+    <site>". That describes how we know it and belongs in `how`. Write "Early humans in Africa made
+    stone tools from about 2.6 million years ago", not "the earliest known stone tools come from Gona".
   - `like` — WHAT IT WAS LIKE (a STRING of plain prose, not a list): what this scene or period was
     actually like to be in. Where there are people, name a vantage point ("For a front-line soldier",
     "For a typical farmer") and state plainly what that experience involved. Where there are none (deep
