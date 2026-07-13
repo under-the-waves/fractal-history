@@ -911,6 +911,36 @@ ${scopeList}
 - Output ONLY the JSON object.`;
 }
 
+// The single geographic threshold: the Cretaceous–Paleogene boundary. Everything before it is one
+// shared story (the fragmenting supercontinents, and behind them cosmic and planetary time) under the
+// Cosmic & Planetary root; after it each modern continent carries its own history. See
+// project knowledge/Geographic_Temporal_Threshold_Spec.md.
+const GEO_THRESHOLD_LABEL = '66 million years ago';
+const COSMIC_ROOT_ID = '1C-I6J1K';
+
+// Given a root-first ancestor path, return the temporal domain that bounds temporal (B) division of a
+// geographic place, or null when the division is not inside the geographic axis (no level-1 C
+// ancestor). The Cosmic & Planetary branch runs from the Big Bang to the threshold; every modern
+// continent runs from the threshold to the present. Applied only when there is no nearer temporal (B)
+// ancestor already bounding the window.
+function geographicTemporalDomain(ancestorPath) {
+    if (!Array.isArray(ancestorPath)) return null;
+    const rootGeo = ancestorPath.find(a => a && a.level === 1 && a.breadth === 'C');
+    if (!rootGeo) return null;
+    if (rootGeo.id === COSMIC_ROOT_ID) {
+        return {
+            start: 'the Big Bang (13.8 billion years ago)',
+            end: GEO_THRESHOLD_LABEL,
+            rule: `This runs from the Big Bang to ${GEO_THRESHOLD_LABEL}. Your LATEST period MUST end at ${GEO_THRESHOLD_LABEL} — the Cretaceous–Paleogene boundary, when the dinosaurs died and the modern continents begin their separate histories. It does NOT extend into human history.`,
+        };
+    }
+    return {
+        start: GEO_THRESHOLD_LABEL,
+        end: 'the present',
+        rule: `This place's history runs from ${GEO_THRESHOLD_LABEL} to the present. Your EARLIEST period MUST begin at ${GEO_THRESHOLD_LABEL} — the land's Cenozoic natural history and the evolution of its animals and plants — never at the start of recorded civilisation. Human history is the most recent part of this span, not the whole of it.`,
+    };
+}
+
 function buildBreadthBPrompt(parentId, parentTitle, parentScope, ancestorPath, existingSiblings) {
     // Format ancestor path. Shared formatter hides temporal/geographic topical labels,
     // showing only their coordinates (a when / a where).
@@ -939,14 +969,19 @@ function buildBreadthBPrompt(parentId, parentTitle, parentScope, ancestorPath, e
         else constraints.topic.push(a.title);
     });
 
+    // A geographic place is bounded by the 66-Mya threshold when no nearer temporal (B) ancestor
+    // already fixes the window. This is what stops a continent's periods starting at recorded
+    // history, and stops Cosmic & Planetary running into the human era.
+    const geoDomain = constraints.temporal.length === 0 ? geographicTemporalDomain(ancestorPath) : null;
+
     const constraintSummary = `
 **Inherited Scope Constraints:**
 ${constraints.topic.length > 0 ? `- Topic: ${constraints.topic.join(' → ')}` : ''}
 ${constraints.geographic.length > 0 ? `- Geography: Limited to ${constraints.geographic[constraints.geographic.length - 1]}` : '- Geography: No geographic limitations'}
-${constraints.temporal.length > 0 ? `- Time: Subdividing ${constraints.temporal[constraints.temporal.length - 1]}` : '- Time: Full historical timespan available'}
+${constraints.temporal.length > 0 ? `- Time: Subdividing ${constraints.temporal[constraints.temporal.length - 1]}` : geoDomain ? `- Time: This place spans ${geoDomain.start} to ${geoDomain.end}` : '- Time: Full historical timespan available'}
 ${constraints.analytical.length > 0 ? `- Thematic focus: ${constraints.analytical.join(', ')}` : ''}
 
-Your temporal anchors must respect ALL these constraints.
+Your temporal anchors must respect ALL these constraints.${geoDomain ? `\n\n**HARD TEMPORAL BOUND (non-negotiable):** ${geoDomain.rule}` : ''}
     `.trim();
 
     return `# Breadth-B Temporal Anchor Selection Task

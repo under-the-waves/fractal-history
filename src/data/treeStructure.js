@@ -98,7 +98,7 @@ export const treeStructure = [
   },
   {
     "id": "1C-I6J1K",
-    "title": "Cosmic & Planetary",
+    "title": "Cosmic & Planetary (13.8 BYA – 66 Mya)",
     "level": 1,
     "breadth": "C",
     "parentId": "0-ROOT",
@@ -107,7 +107,7 @@ export const treeStructure = [
   },
   {
     "id": "1C-L3M8N",
-    "title": "Africa",
+    "title": "Africa (66 Mya – present)",
     "level": 1,
     "breadth": "C",
     "parentId": "0-ROOT",
@@ -116,7 +116,7 @@ export const treeStructure = [
   },
   {
     "id": "1C-O9P5Q",
-    "title": "Eurasia",
+    "title": "Eurasia (66 Mya – present)",
     "level": 1,
     "breadth": "C",
     "parentId": "0-ROOT",
@@ -125,7 +125,7 @@ export const treeStructure = [
   },
   {
     "id": "1C-R2S7T",
-    "title": "Americas",
+    "title": "Americas (66 Mya – present)",
     "level": 1,
     "breadth": "C",
     "parentId": "0-ROOT",
@@ -134,7 +134,7 @@ export const treeStructure = [
   },
   {
     "id": "1C-U4V1W",
-    "title": "Oceania",
+    "title": "Oceania (66 Mya – present)",
     "level": 1,
     "breadth": "C",
     "parentId": "0-ROOT",

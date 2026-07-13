@@ -2,7 +2,9 @@
 
 Level 1 follows the standard A/B/C pattern: A=analytical (most essential aspects), B=temporal (complete time coverage), C=geographic (complete space coverage). 
 
-**The one unique aspect of Level 1:** Geographic divisions (1C) are temporally scoped - each region only covers the period when it meaningfully exists (e.g., China starts ~5000 BCE when Chinese civilization emerges, not at the Big Bang). This is necessary because Level 1's enormous scope (Big Bang to present) means modern geographic divisions like "China" or "France" are anachronistic for most of cosmic and early Earth history.
+**The one unique aspect of Level 1:** the geographic (1C) axis partitions the timeline at a single threshold, **66 million years ago** (the Cretaceous–Paleogene boundary). Cosmic & Planetary covers the Big Bang to 66 Mya; each modern continent covers 66 Mya to the present. Every geographic node is a *place* covering its land across that domain — modern names label the land at all depths, and civilisation is the recent chapters of a place's timeline. Full rationale and rules: **project knowledge/Geographic_Temporal_Threshold_Spec.md**.
+
+This supersedes the earlier design (below) in which each region self-scoped to when it "meaningfully exists" (China ~5000 BCE, Africa ~200 Mya, etc.). The dates in the 1C section below are updated to the uniform threshold; some surrounding prose still describes the old self-scoping approach and is retained only for history.
 
 ---
 
@@ -117,27 +119,27 @@ Students wanting "all of Chinese history" can visit China under each temporal er
 
 ### The Five Regional Anchors:
 
-1. **1C-1: Cosmic & Planetary** (13.8 billion years ago - ~200 million years ago)
-   - Universe, solar system, Earth formation
-   - Early life before continents take recognizable shapes
-   - Covers what predates regional divisions
+1. **1C-1: Cosmic & Planetary** (13.8 billion years ago - 66 million years ago)
+   - Universe, solar system, Earth formation, the emergence and early evolution of life
+   - The deep geological ages through the Palaeozoic and Mesozoic: the supercontinents Pangaea and Gondwana and their breakup, and the age of the dinosaurs
+   - Ends at the Cretaceous–Paleogene boundary (66 Mya), where the modern continents begin their separate histories
 
-2. **1C-2: Africa** (~200 million years ago - present)
+2. **1C-2: Africa** (66 million years ago - present)
    - Brief: Geological formation, African Rift Valley, unique fauna
    - Substantial: Human evolution, early civilizations, diverse African societies, colonialism, modern nations
    - Subdivides at Level 2 into: North Africa, West Africa, East Africa, Southern Africa, etc.
 
-3. **1C-3: Eurasia** (~200 million years ago - present)
+3. **1C-3: Eurasia** (66 million years ago - present)
    - Brief: Continental formation, land bridge connections with climate changes
    - Substantial: Human spread, early civilizations, interconnected history
    - Subdivides at Level 2 into: **East Asia** (China, Japan, Korea), **South Asia** (India, Pakistan, Bangladesh), **Europe** (France, Germany, Britain), **Middle East**, **Central Asia**
 
-4. **1C-4: Americas** (~15 million years ago - present)
+4. **1C-4: Americas** (66 million years ago - present)
    - Brief: Formation of Isthmus of Panama connecting continents
    - Substantial: Human arrival via Beringia, indigenous civilizations, European contact, modern nations
    - Subdivides at Level 2 into: North America, Mesoamerica, Andean region, South America, Caribbean
 
-5. **1C-5: Oceania** (~45 million years ago - present)
+5. **1C-5: Oceania** (66 million years ago - present)
    - Brief: Australia's separation from Antarctica, Pacific island formation
    - Substantial: Aboriginal settlement, Pacific navigation, European contact, modern nations
    - Subdivides at Level 2 into: Australia, Pacific Islands, New Zealand
@@ -146,15 +148,15 @@ Students wanting "all of Chinese history" can visit China under each temporal er
 
 ## What Makes Level 1's Geographic Structure Unique
 
-Because Level 1 covers Big Bang to present (13.8 billion years), **geographic divisions must be temporally scoped** to avoid anachronisms.
+Because Level 1 covers Big Bang to present (13.8 billion years), the geographic axis is partitioned at a single threshold, 66 million years ago (see Geographic_Temporal_Threshold_Spec.md).
 
-**Each geographic anchor starts when that region/entity meaningfully exists:**
-- China: ~5000 BCE (early agricultural settlements)
-- France: ~500-1000 CE (Frankish kingdoms emerge)
-- Americas: ~15 million years ago (landmasses connected), focusing on post-human arrival (~15,000 BCE)
-- Africa: ~200 million years ago (landmass formation), covering geological history before humans
+**Every geographic anchor is a place covering its land across its root's domain:**
+- Cosmic & Planetary and everything under it: the Big Bang to 66 Mya.
+- Every modern continent and everything under it (regions, countries): 66 Mya to the present. "China" means the land now called China from 66 Mya — its deep natural history first, then human arrival, then Chinese civilisation as the recent chapters.
 
-At deeper levels, geographic anchors inherit temporal boundaries from parent anchors (e.g., "Pacific Theater" under WWII automatically covers 1941-1945). At Level 1, there's no parent anchor, so each geographic anchor defines its own temporal scope.
+Modern names label the land at all depths; the changing map is explained in the narrative (the same convention used for Sundaland and Beringia). Deeper geographic anchors inherit the 66-Mya-to-present domain from their continent; a nearer temporal (B) ancestor narrows the window further (e.g., "Pacific Theater" under WWII covers 1941-1945).
+
+**Superseded:** the earlier rule below, where each anchor self-scoped to when its civilisation emerged (China ~5000 BCE, France ~500-1000 CE), and continents used different start dates (Africa ~200 Mya, Americas ~15 Mya, Oceania ~45 Mya). Retained for history.
 
 #### Structure Within Each Regional Anchor
 
