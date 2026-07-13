@@ -295,8 +295,11 @@ async function handleGet(req, res) {
 
         const anchor = anchorResult[0];
 
-        // If no narrative exists
-        if (narrativeResult.length === 0) {
+        // If no narrative exists. A flashcard-only anchor has a placeholder narratives row (the
+        // flashcard generator seeds `narrative = ''` to hold the question pool), so a row can exist
+        // with no narrative text. Treat that as "not generated" — otherwise the reader serves an empty
+        // narrative as real and then fact-checks it into a headline stub.
+        if (narrativeResult.length === 0 || !narrativeResult[0].narrative || !narrativeResult[0].narrative.trim()) {
             return res.status(200).json({
                 success: true,
                 anchor: {
@@ -563,6 +566,13 @@ async function handleFactCheck(req, res) {
         }
 
         const narrative = narratives[0];
+
+        // Nothing to fact-check if the base narrative is empty (a flashcard-only placeholder row). Citing
+        // an empty narrative made the model synthesise a stub from the source claims, which the reader then
+        // showed as the narrative. Bail so the reader generates the real narrative first.
+        if (!narrative.narrative || !narrative.narrative.trim()) {
+            return res.status(409).json({ error: 'No narrative to fact-check yet; generate the narrative first.' });
+        }
 
         const anchors = await db`
             SELECT id, title, scope FROM anchors WHERE id = ${anchorId}
