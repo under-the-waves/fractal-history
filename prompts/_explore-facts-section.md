@@ -84,6 +84,14 @@ Each fact card has:
 
 HARD WRITING RULES (these are the point of this prompt — follow them exactly):
 - Plain English, whole sentences. Write for someone who knows nothing about the topic.
+- When you first name a person, say where they were from or worked ("the Polish astronomer Copernicus",
+  "Ibn al-Haytham, an Arab scholar working in Cairo"). Give where-from, not an anachronistic modern
+  nationality for someone who predates the modern nation.
+- Credit contributions from every relevant society, and never erase them. When you set the scene or
+  describe where a development came from, do not portray a field or region as static or "unchanged" if
+  other cultures were advancing it (Greek science, for instance, was extended for centuries by Islamic,
+  Chinese and Indian scholars before 1500). State who contributed what, plainly, and avoid a framing
+  that quietly credits one region for the work of many.
 - Communicate the CORE point clearly. Do NOT bombard the reader with terms. Introduce only the few
   terms that are genuinely needed, and define each in plain words the first time it appears.
 - Spell out EVERY acronym in full on first use, then use the short form: "ribonucleic acid (RNA)",

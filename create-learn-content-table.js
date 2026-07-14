@@ -19,7 +19,8 @@ async function createLearnContentTable() {
                 breadth CHAR(1) NOT NULL CHECK (breadth IN ('A', 'B', 'C')),
                 title TEXT NOT NULL,
                 scope TEXT NOT NULL DEFAULT '',
-                prelude JSONB,                          -- { title, facts[] } or null
+                prelude JSONB,                          -- { title, facts[] } or null ("Before this")
+                postlude JSONB,                         -- { title, facts[] } or null ("Why it mattered")
                 sub_anchors JSONB NOT NULL DEFAULT '[]',-- [{ title, facts[] }]
                 fact_base TEXT NOT NULL DEFAULT '',     -- verified grading ground-truth (markdown)
                 rubric JSONB NOT NULL DEFAULT '[]',     -- [sub-anchor title, ...]
