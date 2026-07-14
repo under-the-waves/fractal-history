@@ -109,15 +109,20 @@ HARD WRITING RULES (these are the point of this prompt — follow them exactly):
   contested, say so plainly — that is usually what belongs in `debates`. Do not invent specifics, and
   do not give a precise date you are unsure of; use a range or "roughly".
 
+## Bookend layers (`before` / `whyItMattered`)
+
+{{bookendLayers}}
+
 OUTPUT: return ONLY valid JSON in exactly this shape, and nothing else:
 {
   "title": {{titleRule}},
   "facts": [
-    { "headline": "...", "when": "...", "sources": ["..."], "what": ["..."], "like": "...", "why": ["..."], "how": ["..."], "debates": ["..."], "vignettes": ["..."] }
+    { "headline": "...", "when": "...", "sources": ["..."], "before": ["..."], "what": ["..."], "like": "...", "why": ["..."], "whyItMattered": ["..."], "how": ["..."], "debates": ["..."], "vignettes": ["..."] }
   ]
 }
-Every list layer that has no content must be an empty array `[]`. `like` is a plain STRING; when there
-is no scene to describe, use an empty string `""`. Output only the JSON.
+Every list layer that has no content must be an empty array `[]` (this includes `before` and
+`whyItMattered` unless the bookend instruction above says to fill them). `like` is a plain STRING; when
+there is no scene to describe, use an empty string `""`. Output only the JSON.
 
 ---
 EVIDENCE for this section:

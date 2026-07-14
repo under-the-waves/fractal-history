@@ -18,9 +18,11 @@ import './generative.css'
 // Order the learner sees. "Why it happened" follows "What happened" so it reads as explaining the
 // event, not the "What it was like" scene; the scene comes after the cause.
 const LAYERS = [
+    { key: 'before', label: 'Before' },
     { key: 'what', label: 'What happened' },
     { key: 'why', label: 'Why it happened' },
     { key: 'like', label: 'What it was like' },
+    { key: 'whyItMattered', label: 'Why it mattered' },
     { key: 'how', label: 'How we know' },
     { key: 'debates', label: 'Debates' },
     { key: 'vignettes', label: 'Vignettes' },
