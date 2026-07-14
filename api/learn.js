@@ -30,15 +30,15 @@ export default async function handler(req, res) {
     try {
         if (action === 'get') {
             if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-            return handleGet(req, res);
+            return await handleGet(req, res);
         }
         if (action === 'generate') {
             if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-            return handleGenerate(req, res);
+            return await handleGenerate(req, res);
         }
         if (action === 'mark') {
             if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-            return handleMark(req, res);
+            return await handleMark(req, res);
         }
         return res.status(400).json({ error: 'Unknown action. Use action=get|generate|mark.' });
     } catch (error) {
