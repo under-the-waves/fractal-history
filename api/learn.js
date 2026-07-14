@@ -56,6 +56,7 @@ function publicContent(content) {
         title: content.title,
         scope: content.scope,
         prelude: content.prelude,
+        postlude: content.postlude,
         subAnchors: content.subAnchors,
         sources: content.sources,
     };

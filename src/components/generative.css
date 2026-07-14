@@ -199,6 +199,11 @@ ul.gl-layer-body {
 .gl-prelude .gl-fact { background: #fff; }
 .gl-prelude-title { font-size: 17px; color: #374151; }
 
+/* Closing "Why it mattered" card — bookends the prelude, with a light violet accent for significance. */
+.gl-postlude { padding: 16px; background: #f7f5ff; border: 1px solid #e7e2fb; border-radius: 14px; }
+.gl-postlude .gl-fact { background: #fff; }
+.gl-postlude-title { font-size: 17px; color: #6d28d9; }
+
 .gl-study-footer {
     display: flex;
     justify-content: space-between;

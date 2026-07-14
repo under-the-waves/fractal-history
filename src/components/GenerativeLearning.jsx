@@ -637,9 +637,11 @@ function GenerativeLearning() {
                     ) : (
                         <>
                             <p className="gl-instruction">
-                                Read through the facts and open the layers that interest you. The small number after a
-                                fact shows its sources — tap it for the links. When you click
-                                <strong> I’m ready to write</strong>, the facts disappear and you write from memory.
+                                Skim the headlines to get the sequence of what happened — that is what you are here to
+                                learn. You don’t need to read everything: open a card’s layers only when you want to know
+                                why something mattered or what it involved. The small number after a fact shows its
+                                sources. When you click <strong>I’m ready to write</strong>, the facts disappear and you
+                                write from memory.
                             </p>
 
                             {data.prelude && (
@@ -657,6 +659,13 @@ function GenerativeLearning() {
                                     {sa.facts.map((f, j) => <FactCard key={j} fact={f} />)}
                                 </section>
                             ))}
+
+                            {data.postlude && (
+                                <section className="gl-subanchor gl-postlude">
+                                    <h2 className="gl-subanchor-title gl-postlude-title">{data.postlude.title}</h2>
+                                    {data.postlude.facts.map((f, j) => <FactCard key={j} fact={f} />)}
+                                </section>
+                            )}
 
                             {Array.isArray(data.sources) && data.sources.length > 0 && (
                                 <details className="gl-sources">
