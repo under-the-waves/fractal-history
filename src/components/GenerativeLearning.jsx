@@ -526,7 +526,10 @@ function GenerativeLearning() {
                 headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                 body: JSON.stringify({ narrative: text, anchorId: id, breadth }),
             })
-            const d = await res.json()
+            const raw = await res.text()
+            let d
+            try { d = JSON.parse(raw) }
+            catch { throw new Error('Marking failed — the server returned an unexpected response. Please try again.') }
             if (!res.ok || !d.success) throw new Error(d.error || 'Marking failed.')
             setResult(d)
             setStage('result')
