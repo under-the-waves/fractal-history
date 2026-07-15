@@ -387,10 +387,14 @@ async function handleGenerate(req, res) {
     }
 
     try {
-        // Step 1: Check if narrative already exists
+        // Step 1: Check if narrative already exists. A flashcard-only anchor has a placeholder
+        // narratives row (the flashcard generator seeds narrative = '' to hold the question pool), so a
+        // row can exist with no narrative text. Require actual narrative text — otherwise generation
+        // short-circuits and returns the empty placeholder as "cached, complete", so the narrative can
+        // never be generated through the normal button. Mirrors the same guard in handleGet.
         if (!forceRegenerate) {
             const existingNarrative = await getNarrative(anchorId, breadth);
-            if (existingNarrative) {
+            if (existingNarrative && existingNarrative.narrative && existingNarrative.narrative.trim()) {
                 console.log(`Returning existing narrative for ${anchorId} breadth ${breadth}`);
 
                 // Get ancestor path for display
