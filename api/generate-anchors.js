@@ -540,14 +540,18 @@ export default async function handler(req, res) {
         } else {
             // Breadth B: existing parsing
             anchors = parseTemporalAnchorResponse(response, parentId);
+            // Hard guarantee: canonical numeric date format. Rewrite vague boundaries ("18th century",
+            // "1930s", "40,000 years ago") into specific years BEFORE cap/contiguity, which parse the
+            // boundaries — clean values sort correctly and snap cleanly.
+            anchors = canonicaliseTemporalBoundaries(anchors);
             anchors = capTemporalAnchors(anchors, 5); // hard guarantee: never exceed 5 periods
             // Hard guarantee: gap-free, non-overlapping coverage. capTemporalAnchors only closes gaps
             // when it MERGES (>5 periods); at ≤5 the model can still return periods with a hole
             // (e.g. Mongol 1206–1227, 1227–1241, [1241–1251 gap], 1251–1294) or an overlap. Snap each
             // period's start to the previous period's end so coverage is always continuous.
             anchors = enforceTemporalContiguity(anchors);
-            // Hard guarantee: every B title ends with its date range (append from timeBoundaries if missing).
-            anchors = anchors.map(a => ({ ...a, title: ensureTitleRange(a.title, a.timeBoundaries) }));
+            // Hard guarantee: every B title shows its (canonical) date range, rebuilt from the boundaries.
+            anchors = anchors.map(a => ({ ...a, title: setTitleRange(a.title, a.timeBoundaries) }));
             candidates = parseTemporalCandidates(response);
 
             try {
@@ -1260,19 +1264,20 @@ Provide your response as valid JSON:
 - The final top-level "anchors" array must contain AT MOST 5 periods
 - Mark exactly one scheme as selected (the highest scoring)
 
-**CRITICAL:** Use human-readable date formats, NOT raw numbers.
+**CRITICAL — date format.** Every boundary (in the timeBoundaries object and in every title) MUST be a
+specific numeric year. Never use vague or relative forms.
 
-**For billions of years ago:**
-- Correct: "4 BYA", "3.5 BYA", "2.4 BYA"
+- **Years CE (common era):** the number alone — "1700", "1945", "651". Do NOT write a century ("18th
+  century") or a decade ("the 1930s") — choose the actual year, e.g. "1701" or "1930".
+- **Years BC:** the number followed by BC — "40,000 BC", "3000 BC", "500 BC". Do NOT write "40,000 years
+  ago" or "10,000 BP".
+- **Deep time, older than 1 million years:** use MYA (million years ago) or BYA (billion years ago) —
+  "66 MYA", "4.5 BYA", "3 MYA". Do NOT render these as BC.
+- A month may prefix a year for a short span — "August 1914" — but a bare year is preferred.
+- "present" is allowed ONLY for an end boundary that reaches today.
 
-**For millions of years ago:**
-- Correct: "3 MYA", "200,000 years ago", "1.8 MYA"
-
-**For thousands of years BCE:**
-- Correct: "10,000 BCE", "3,000 BCE", "8,000 BCE"
-
-**For recent history:**
-- Correct: "1939", "1945", "1941 CE"
+**FORBIDDEN** anywhere in a title or boundary: century words ("18th century"), decade forms ("1930s"),
+"N years ago" for anything under 1 million years, "BP", and any range without explicit years.
 
 ---
 
@@ -1592,6 +1597,84 @@ function ensureTitleRange(title, tb) {
     if (start && end) return `${title}: ${start} – ${end}`;
     if (start) return `${title}: from ${start}`;
     return title;
+}
+
+// Rebuild a B title's date range from (canonicalised) boundaries. Unlike ensureTitleRange this REPLACES
+// any range the model wrote, so the persisted title always shows the canonical years. Falls back to
+// ensureTitleRange when boundaries are incomplete, so a title never loses its range.
+function setTitleRange(title, tb) {
+    const name = ((title || '').split(':')[0].trim()) || title || 'Period';
+    const start = tb && tb.start != null ? String(tb.start).trim() : '';
+    const end = tb && tb.end != null ? String(tb.end).trim() : '';
+    if (start && end) return `${name}: ${start} – ${end}`;
+    return ensureTitleRange(title, tb);
+}
+
+// Canonical temporal date format. The model is told to emit specific numeric years — "1700",
+// "40,000 BC", "66 MYA" — never vague forms ("18th century", "the 1930s", "40,000 years ago"). This is
+// the code backstop (a prompt is a soft constraint): it deterministically rewrites the mechanical
+// offenders so a vague date can never persist. `role` is 'start' (older boundary) or 'end' (younger):
+// a century or decade maps to its first year for a start and its last year for an end.
+const _commas = (n) => Math.round(n).toLocaleString('en-US');
+const _plain = (x) => String(parseFloat(x));
+function canonicalDate(token, role) {
+    if (token == null) return token;
+    const s = String(token).trim();
+    if (!s) return s;
+    if (/^(present|today|now|ongoing|current)$/i.test(s)) return 'present';
+    const isEnd = role === 'end';
+    let m;
+
+    // Deep time stays in MYA/BYA (writing "66,000,000 BC" would be absurd); normalise long forms.
+    if ((m = s.match(/(\d+(?:\.\d+)?)\s*(?:bya|billion\s*years?\s*ago)/i))) return `${_plain(m[1])} BYA`;
+    if ((m = s.match(/(\d+(?:\.\d+)?)\s*(?:mya|million\s*years?\s*ago)/i))) return `${_plain(m[1])} MYA`;
+
+    // Thousands-scale years-ago / KYA / "NK" -> BC (relabelled; the ~2ky present offset is immaterial at
+    // this scale and "40,000 BC" is the requested form). A value >= 1,000,000 promotes to MYA.
+    const yearsAgo = (yrs) => (yrs >= 1e6 ? `${_plain(yrs / 1e6)} MYA` : `${_commas(yrs)} BC`);
+    if ((m = s.match(/([\d.,]+)\s*k(?:ya)?\b/i))) return yearsAgo(parseFloat(m[1].replace(/,/g, '')) * 1000);
+    if ((m = s.match(/([\d.,]+)\s*(thousand\s*)?years?\s*ago/i))) return yearsAgo(parseFloat(m[1].replace(/,/g, '')) * (m[2] ? 1000 : 1));
+
+    // Century, optionally qualified (early/mid/late) and BC. CE century N covers (N-1)*100+1 .. N*100.
+    if ((m = s.match(/(early|mid|late)?\s*(\d{1,2})(?:st|nd|rd|th)?\s*cent(?:ury|\.)?/i))) {
+        const q = (m[1] || '').toLowerCase();
+        const n = parseInt(m[2]);
+        if (/\bb\.?c\.?e?\b/i.test(s)) { // BC century: older = larger number
+            return `${_commas(isEnd ? (n - 1) * 100 + 1 : n * 100)} BC`;
+        }
+        const lo = (n - 1) * 100 + 1, hi = n * 100;
+        let y = isEnd ? hi : lo;
+        if (q === 'early') y = isEnd ? lo + 32 : lo;
+        else if (q === 'mid') y = isEnd ? lo + 65 : lo + 33;
+        else if (q === 'late') y = isEnd ? hi : lo + 66;
+        return String(y);
+    }
+
+    // Decade "1930s", optionally qualified.
+    if ((m = s.match(/(early|mid|late)?\s*(\d{3,4})0s\b/i))) {
+        const q = (m[1] || '').toLowerCase();
+        const base = parseInt(m[2] + '0');
+        let y = isEnd ? base + 9 : base;
+        if (q === 'early') y = isEnd ? base + 3 : base;
+        else if (q === 'mid') y = isEnd ? base + 6 : base + 3;
+        else if (q === 'late') y = isEnd ? base + 9 : base + 7;
+        return String(y);
+    }
+
+    // Already carries an explicit numeric year (optionally month- or era-qualified) — canonical, keep.
+    if (/\d/.test(s)) return s;
+
+    console.warn(`Could not canonicalise temporal boundary "${token}"; leaving as-is.`);
+    return s;
+}
+
+// Rewrite every B anchor's start/end boundary into the canonical format.
+function canonicaliseTemporalBoundaries(anchors) {
+    if (!Array.isArray(anchors)) return anchors;
+    return anchors.map(a => {
+        const tb = a.timeBoundaries || {};
+        return { ...a, timeBoundaries: { ...tb, start: canonicalDate(tb.start, 'start'), end: canonicalDate(tb.end, 'end') } };
+    });
 }
 
 function capTemporalAnchors(anchors, max = 5) {
