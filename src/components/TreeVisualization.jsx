@@ -432,6 +432,19 @@ function TreeVisualization() {
         }
     };
 
+    // Wait until a background pre-generation for `key` finishes (its finally deletes the key), or
+    // until timeout. Lets a foreground click piggy-back on an in-flight background generation instead
+    // of firing a duplicate request. The server advisory lock is the real guarantee; this just avoids
+    // paying for a second LLM call in the common same-tab case.
+    const waitForInFlight = (key, timeoutMs = 30000) => new Promise(resolve => {
+        const started = Date.now();
+        const tick = () => {
+            if (!inFlightGenRef.current.has(key) || Date.now() - started > timeoutMs) return resolve();
+            setTimeout(tick, 200);
+        };
+        tick();
+    });
+
     // After the active node settles, warm the most-likely-next nodes on idle:
     //   - the current node's OTHER two breadths (instant breadth toggles), and
     //   - one level ahead in the CURRENT breadth (each visible child's children).
@@ -537,6 +550,15 @@ function TreeVisualization() {
             // Keep loadingBreadth set so the overlay stays mounted continuously –
             // generating only changes the copy inside the same overlay, never swaps it.
             const fgGenKey = `${nodeId}|${breadth}`;
+            // If a background pre-generation for this exact node+breadth is already running, wait for
+            // it and load its result instead of firing a duplicate request. This is the race that put
+            // 7 anchors under one Mongol parent: the user clicked a breadth whose background warm was
+            // still in flight. (The server advisory lock also covers cross-tab/reload races.)
+            if (inFlightGenRef.current.has(fgGenKey)) {
+                await waitForInFlight(fgGenKey);
+                await fetchBreadthData(nodeId, anchorTitle, breadth);
+                return;
+            }
             inFlightGenRef.current.add(fgGenKey);
             setGenerating(true);
             try {
