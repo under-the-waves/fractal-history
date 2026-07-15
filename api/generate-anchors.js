@@ -122,6 +122,16 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
+    // Serialise concurrent generation of the SAME (parent, breadth). Two requests must never both
+    // pass the "do children already exist?" check and both append — that produced 7 Mongol B-anchors
+    // (two complete schemes written 4s apart). We hold a row-based mutex in `generation_locks`: the
+    // database is reached through Neon's transaction-mode pooler, where session-level advisory locks
+    // do NOT pin to one backend and cannot serialise (verified — a second connection acquired the
+    // "held" lock immediately). A unique-key row with stale-steal is pooler-safe. A request that loses
+    // the race waits for the winner and returns the winner's anchors instead of generating a duplicate.
+    let lockHeld = false;
+    let lockKey = null;
+
     try {
         const { parentId, parentTitle, parentScope, breadth = 'A', regenerate = false } = req.body;
 
@@ -138,6 +148,52 @@ export default async function handler(req, res) {
         }
 
         console.log(`Generating anchors for parent: ${parentId} - ${parentTitle}`);
+
+        // Acquire the (parent, breadth) mutex atomically, BEFORE the idempotency check, so the check
+        // and the insert below form one critical section. This single statement inserts the lock row,
+        // or — if a row exists but is older than the staleness window (a crashed request) — steals it,
+        // so a stuck key cannot wedge generation forever. A returned row means we hold the lock; no row
+        // means another request is actively generating this exact node+breadth right now.
+        lockKey = `${parentId}|${breadth}`;
+        const acquired = await query(
+            `INSERT INTO generation_locks (lock_key, acquired_at)
+             VALUES ($1, now())
+             ON CONFLICT (lock_key) DO UPDATE SET acquired_at = now()
+               WHERE generation_locks.acquired_at < now() - interval '90 seconds'
+             RETURNING lock_key`,
+            [lockKey]
+        );
+        if (acquired.length === 0) {
+            // We lost the race. Rather than generate a duplicate set, wait for the winner to finish and
+            // return its children. Bounded well under the 60s function limit (generation is ~10-15s).
+            const parentPosForWait = await query(
+                'SELECT position_id FROM tree_positions WHERE anchor_id = $1 LIMIT 1',
+                [parentId]
+            );
+            const parentPositionId = parentPosForWait.length > 0 ? parentPosForWait[0].position_id : null;
+            for (let attempt = 0; attempt < 30 && parentPositionId; attempt++) {
+                await new Promise(r => setTimeout(r, 1000));
+                const kids = await query(`
+                    SELECT a.id, a.title, a.scope, a.generation_status, tp.level, tp.breadth, tp.position
+                    FROM anchors a JOIN tree_positions tp ON a.id = tp.anchor_id
+                    WHERE tp.parent_position_id = $1 AND tp.breadth = $2
+                    ORDER BY tp.position ASC`, [parentPositionId, breadth]);
+                if (kids.length > 0) {
+                    console.log(`Waited for concurrent generation of ${parentId} breadth ${breadth}; returning ${kids.length} anchors.`);
+                    return res.status(200).json({
+                        success: true, parentId, parentTitle, breadth,
+                        anchorsGenerated: kids.length, anchors: kids, skipped: true, waited: true
+                    });
+                }
+            }
+            // The winner never produced children within the window (it likely failed). Ask the caller
+            // to retry; by then the lock will have gone stale and be stealable by the retry.
+            return res.status(503).json({
+                success: false, parentId, parentTitle, breadth,
+                error: 'Another generation for this node is already in progress. Please retry shortly.'
+            });
+        }
+        lockHeld = true;
 
         // Idempotency: if children already exist for this parent+breadth, return them
         const parentPos = await query(
@@ -485,6 +541,11 @@ export default async function handler(req, res) {
             // Breadth B: existing parsing
             anchors = parseTemporalAnchorResponse(response, parentId);
             anchors = capTemporalAnchors(anchors, 5); // hard guarantee: never exceed 5 periods
+            // Hard guarantee: gap-free, non-overlapping coverage. capTemporalAnchors only closes gaps
+            // when it MERGES (>5 periods); at ≤5 the model can still return periods with a hole
+            // (e.g. Mongol 1206–1227, 1227–1241, [1241–1251 gap], 1251–1294) or an overlap. Snap each
+            // period's start to the previous period's end so coverage is always continuous.
+            anchors = enforceTemporalContiguity(anchors);
             // Hard guarantee: every B title ends with its date range (append from timeBoundaries if missing).
             anchors = anchors.map(a => ({ ...a, title: ensureTitleRange(a.title, a.timeBoundaries) }));
             candidates = parseTemporalCandidates(response);
@@ -655,6 +716,17 @@ export default async function handler(req, res) {
             error: 'Failed to generate anchors',
             details: error.message
         });
+    } finally {
+        // Release the mutex so the next generation of this node can proceed. Only the request that
+        // actually acquired the lock deletes the row (a waiter never held it). If the delete fails,
+        // the row simply goes stale and the next request reclaims it.
+        if (lockHeld && lockKey) {
+            try {
+                await query('DELETE FROM generation_locks WHERE lock_key = $1', [lockKey]);
+            } catch (releaseErr) {
+                console.error('Failed to release generation lock (it will go stale and be reclaimed):', releaseErr.message);
+            }
+        }
     }
 }
 
@@ -1560,6 +1632,35 @@ function capTemporalAnchors(anchors, max = 5) {
 
     work.forEach((a, i) => { a.position = i + 1; });
     return work;
+}
+
+// Enforce gap-free, non-overlapping temporal coverage. Sort periods oldest-first and snap each
+// period's start to the previous period's end, so consecutive periods share one boundary. Only a
+// period whose start actually moved is re-titled (untouched periods keep their model-authored range).
+// Runs AFTER capTemporalAnchors, so the input is already at most 5 periods.
+function enforceTemporalContiguity(anchors) {
+    if (!Array.isArray(anchors) || anchors.length < 2) return anchors;
+
+    const startVal = (a) => parseTimePeriodToSortValue(a.timeBoundaries?.start ?? a.title);
+    const nameOf = (a) => ((a.title || '').split(':')[0].trim() || a.title || 'Period');
+
+    // Oldest-first: older periods carry a LARGER sort value, so sort descending.
+    const ordered = [...anchors].sort((a, b) => startVal(b) - startVal(a));
+
+    for (let i = 1; i < ordered.length; i++) {
+        const prevEnd = ordered[i - 1].timeBoundaries?.end;
+        const cur = ordered[i];
+        const curStart = cur.timeBoundaries?.start;
+        if (prevEnd != null && String(curStart) !== String(prevEnd)) {
+            console.warn(`Breadth B: closing boundary gap/overlap — "${nameOf(cur)}" start ${curStart} -> ${prevEnd}.`);
+            cur.timeBoundaries = { ...cur.timeBoundaries, start: prevEnd };
+            // The title's old range is now stale; rebuild it from the corrected boundaries.
+            cur.title = ensureTitleRange(nameOf(cur), cur.timeBoundaries);
+        }
+    }
+
+    ordered.forEach((a, i) => { a.position = i + 1; });
+    return ordered;
 }
 
 function parseTemporalAnchorResponse(response, parentId) {
