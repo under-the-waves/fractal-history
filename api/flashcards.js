@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { getAuthenticatedUser } from '../lib/auth.js';
-import { applyReviewDelta } from '../lib/scoring.js';
+import { applyReviewDelta, displayScore } from '../lib/scoring.js';
 import { bankMastery, recordActivityDay, evaluateAchievements, levelSnapshot } from '../lib/achievements.js';
 
 const sql = neon(process.env.DATABASE_URL);
@@ -231,6 +231,17 @@ function calculateSRS(card, rating) {
     };
 }
 
+/** The displayed score on one anchor, read around a review to report the XP the review gained.
+ *  Node-scoped (matching the write flow's xpEarned) — there is no root score row to read a global
+ *  figure from, the root being virtual (see lib/db.js). */
+async function nodeDisplayScore(userId, anchorId) {
+    const rows = await sql`
+        SELECT subtree_raw FROM user_topic_scores
+        WHERE user_id = ${userId} AND anchor_id = ${anchorId}
+    `;
+    return rows.length ? Math.round(displayScore(Number(rows[0].subtree_raw))) : 0;
+}
+
 async function handlePatch(req, res, userId) {
     try {
         const { id, rating } = req.body;
@@ -269,13 +280,16 @@ async function handlePatch(req, res, userId) {
         `;
 
         // Reviewing a scored card changes its retention, so update the mastery score up the tree, then
-        // check for newly-unlocked achievements and level-ups to surface as toasts.
+        // check for newly-unlocked achievements, level-ups, and the XP gained, to surface in the UI.
         let achievements = [];
         let levelUps = [];
+        let xpDelta = 0;
         if (card.is_core || card.is_personal_slot) {
             const before = await levelSnapshot(userId, card.anchor_id);
+            const nodeBefore = await nodeDisplayScore(userId, card.anchor_id);
             await applyReviewDelta(userId, card.anchor_id);
             try {
+                xpDelta = (await nodeDisplayScore(userId, card.anchor_id)) - nodeBefore;
                 await recordActivityDay(userId);
                 await bankMastery(userId);
                 achievements = await evaluateAchievements(userId);
@@ -290,7 +304,7 @@ async function handlePatch(req, res, userId) {
             }
         }
 
-        return res.status(200).json({ success: true, flashcard: updated[0], achievements, levelUps });
+        return res.status(200).json({ success: true, flashcard: updated[0], achievements, levelUps, xpDelta });
     } catch (error) {
         console.error('Error reviewing flashcard:', error);
         return res.status(500).json({ error: 'Failed to review flashcard' });

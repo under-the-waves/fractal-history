@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/react';
 import { useClerkEnabled } from '../hooks/useClerkAuth';
 import { ACHIEVEMENTS, CATEGORIES } from '../../shared/achievements';
 import AchievementBadge from './AchievementBadge';
+import { useToasts } from './AchievementToasts';
 import './achievements.css';
 
 export default function AchievementsPage() {
@@ -15,6 +16,7 @@ export default function AchievementsPage() {
 
 function AchievementsInner() {
     const auth = useAuth();
+    const toasts = useToasts();
     const [state, setState] = useState({ loading: true });
 
     useEffect(() => {
@@ -28,6 +30,9 @@ function AchievementsInner() {
                 if (!cancelled && data.success) {
                     const ach = data.achievements || { unlocked: [], stats: null };
                     setState({ unlocked: ach.unlocked || [], stats: ach.stats });
+                    // Anything the load-time evaluation just unlocked gets a toast as well as
+                    // appearing in the grid below (see MasteryScoreLoader for the same pattern).
+                    if (ach.newlyUnlocked?.length) toasts?.achievements(ach.newlyUnlocked);
                 } else if (!cancelled) {
                     setState({ error: true });
                 }
@@ -36,7 +41,7 @@ function AchievementsInner() {
             }
         })();
         return () => { cancelled = true; };
-    }, [auth.isSignedIn]);
+    }, [auth.isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (state.signedOut) return <div className="achv-page"><p className="achv-empty">Sign in to track achievements.</p></div>;
     if (state.loading) return <div className="achv-page"><p className="achv-empty">Loading achievements…</p></div>;
