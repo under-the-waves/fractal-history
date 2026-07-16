@@ -2828,6 +2828,52 @@ button.orientation-axis-value:hover {
   font-weight: 600;
 }
 
+.study-complete-xp {
+  font-family: 'Source Sans Pro', -apple-system, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2e9e5b;
+  margin: 0 0 12px 0;
+}
+
+/* Floating "+N XP" chips: brief reward cue after a scored review. Fixed near the bottom of the
+   viewport (above the rating buttons) so they don't depend on card layout; styled to match the
+   achievement toast pills. Decorative only — the session tally carries the same information. */
+.xp-chip-host {
+  position: fixed;
+  bottom: 130px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.xp-chip {
+  display: inline-block;
+  background: #fff;
+  border: 1px solid #e2e6ea;
+  border-left: 3px solid #2e9e5b;
+  color: #2e9e5b;
+  font-family: 'Source Sans Pro', -apple-system, sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  animation: xpChipRise 1.4s ease-out forwards;
+}
+
+@keyframes xpChipRise {
+  0% { opacity: 0; transform: translateY(10px) scale(0.85); }
+  15% { opacity: 1; transform: translateY(0) scale(1.06); }
+  30% { transform: translateY(-4px) scale(1); }
+  100% { opacity: 0; transform: translateY(-46px) scale(1); }
+}
+
 .study-next-due {
   color: #888;
   font-size: 14px;

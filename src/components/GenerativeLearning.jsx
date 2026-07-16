@@ -152,7 +152,7 @@ function MarkReport({ result, hasStudied, onStudy, onFlashcards, onRewrite, onNa
                 </div>
                 {typeof result.xpEarned === 'number' && (
                     <div className="gl-coverage">
-                        <span className="gl-coverage-num">+{result.xpEarned} XP</span>
+                        <span className="gl-coverage-num gl-xp-pop">+{result.xpEarned} XP</span>
                         <span className="gl-coverage-label">added to your mastery</span>
                     </div>
                 )}

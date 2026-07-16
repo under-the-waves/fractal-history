@@ -56,13 +56,15 @@ export default async function handler(req, res) {
         }
         // Achievements: bank any currently-mastered narratives, then evaluate so a user who earned
         // something before this feature existed (or between sessions) has it unlocked on load. Returns
-        // the full unlocked list plus the stats the Achievements page needs for progress hints.
-        let achievements = { unlocked: [], stats: null };
+        // the full unlocked list plus the stats the Achievements page needs for progress hints, and
+        // whatever this evaluation newly unlocked so the caller can toast it (unlocks that happen at
+        // load time would otherwise be silent).
+        let achievements = { unlocked: [], stats: null, newlyUnlocked: [] };
         try {
             await bankMastery(userId);
             const stats = await computeStats(userId);
-            await evaluateAchievements(userId, stats);
-            achievements = { unlocked: await getUnlocked(userId), stats };
+            const newlyUnlocked = await evaluateAchievements(userId, stats);
+            achievements = { unlocked: await getUnlocked(userId), stats, newlyUnlocked };
         } catch (achErr) {
             console.error('Achievement evaluation failed (non-fatal):', achErr);
         }

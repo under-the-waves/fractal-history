@@ -4,6 +4,8 @@ import { useClerkEnabled } from '../hooks/useClerkAuth'
 import { Link } from 'react-router-dom'
 import { useToasts } from './AchievementToasts'
 
+let xpChipSeq = 0 // ids for the floating "+N XP" chips, so rapid ratings stack cleanly
+
 const RATING_BUTTONS = [
     { label: 'Again', rating: 0, className: 'rating-again' },
     { label: 'Hard', rating: 1, className: 'rating-hard' },
@@ -60,9 +62,10 @@ function StudyMode({ auth, onSwitchToBrowse }) {
     const [loading, setLoading] = useState(true)
     const [reviewing, setReviewing] = useState(false)
     const [removing, setRemoving] = useState(false)
-    const [sessionStats, setSessionStats] = useState({ total: 0, again: 0, hard: 0, good: 0, easy: 0 })
+    const [sessionStats, setSessionStats] = useState({ total: 0, again: 0, hard: 0, good: 0, easy: 0, xp: 0 })
     const [sessionComplete, setSessionComplete] = useState(false)
     const [stats, setStats] = useState(null)
+    const [xpChips, setXpChips] = useState([])
     const toasts = useToasts()
 
     const fetchReviewCards = useCallback(async () => {
@@ -78,7 +81,7 @@ function StudyMode({ auth, onSwitchToBrowse }) {
                 setCurrentIndex(0)
                 setShowAnswer(false)
                 setSessionComplete(false)
-                setSessionStats({ total: 0, again: 0, hard: 0, good: 0, easy: 0 })
+                setSessionStats({ total: 0, again: 0, hard: 0, good: 0, easy: 0, xp: 0 })
             }
         } catch (err) {
             console.error('Failed to fetch review cards:', err)
@@ -125,14 +128,23 @@ function StudyMode({ auth, onSwitchToBrowse }) {
                 body: JSON.stringify({ id: card.id, rating })
             })
             const data = await res.json().catch(() => null)
+            let xpGain = 0
             if (data?.success) {
                 if (data.achievements?.length) toasts?.achievements(data.achievements)
                 if (data.levelUps?.length) toasts?.levelUps(data.levelUps)
+                // Float a brief "+N XP" chip when the review moved the global score up.
+                if (typeof data.xpDelta === 'number' && data.xpDelta > 0) {
+                    xpGain = data.xpDelta
+                    const id = ++xpChipSeq
+                    setXpChips(prev => [...prev, { id, amount: xpGain }])
+                    setTimeout(() => setXpChips(prev => prev.filter(c => c.id !== id)), 1400)
+                }
             }
 
             setSessionStats(prev => ({
                 ...prev,
                 total: prev.total + 1,
+                xp: prev.xp + xpGain,
                 [ratingNames[rating]]: prev[ratingNames[rating]] + 1
             }))
 
@@ -188,6 +200,14 @@ function StudyMode({ auth, onSwitchToBrowse }) {
         }
     }
 
+    // Rendered in both the live session and the completion screen, so a chip from the final
+    // rating isn't cut off when the view switches.
+    const xpChipHost = (
+        <div className="xp-chip-host" aria-hidden="true">
+            {xpChips.map(c => <span key={c.id} className="xp-chip">+{c.amount} XP</span>)}
+        </div>
+    )
+
     if (loading) {
         return <div className="flashcards-loading">Loading study session...</div>
     }
@@ -217,9 +237,11 @@ function StudyMode({ auth, onSwitchToBrowse }) {
     if (sessionComplete) {
         return (
             <div className="study-complete">
+                {xpChipHost}
                 <h2>Session complete</h2>
                 <div className="study-complete-stats">
                     <p className="study-complete-total">{sessionStats.total} cards reviewed</p>
+                    {sessionStats.xp > 0 && <p className="study-complete-xp">+{sessionStats.xp} XP earned</p>}
                     <div className="study-complete-breakdown">
                         {sessionStats.again > 0 && <span className="rating-again">{sessionStats.again} Again</span>}
                         {sessionStats.hard > 0 && <span className="rating-hard">{sessionStats.hard} Hard</span>}
@@ -251,6 +273,7 @@ function StudyMode({ auth, onSwitchToBrowse }) {
 
     return (
         <div className="study-session">
+            {xpChipHost}
             <div className="study-progress">
                 <div className="study-progress-bar">
                     <div

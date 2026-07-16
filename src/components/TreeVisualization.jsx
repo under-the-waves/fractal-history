@@ -10,6 +10,7 @@ import {
 } from '../data/treeStructure';
 import WhyTheseAnchors from './WhyTheseAnchors';
 import OrientationPanel from './OrientationPanel';
+import { useToasts } from './AchievementToasts';
 import { getRandomFact } from '../data/historyFacts';
 import { levelForScore, levelInfo } from '../../shared/levels';
 
@@ -58,6 +59,7 @@ function GlobalLevelBadge({ score }) {
 // Rendered only when Clerk is enabled, so useAuth is always inside ClerkProvider. Renders nothing.
 function MasteryScoreLoader({ onLoaded }) {
     const auth = useAuth();
+    const toasts = useToasts();
     useEffect(() => {
         if (!auth.isSignedIn) return;
         let cancelled = false;
@@ -66,7 +68,14 @@ function MasteryScoreLoader({ onLoaded }) {
                 const token = await auth.getToken();
                 const res = await fetch('/api/scores', { headers: { Authorization: `Bearer ${token}` } });
                 const data = await res.json();
-                if (!cancelled && data.success) onLoaded({ scores: data.scores || {}, peaks: data.peaks || {}, breadths: data.breadths || {}, breadthScores: data.breadthScores || {} });
+                if (!cancelled && data.success) {
+                    onLoaded({ scores: data.scores || {}, peaks: data.peaks || {}, breadths: data.breadths || {}, breadthScores: data.breadthScores || {} });
+                    // The load-time evaluation can itself unlock achievements (ones earned before
+                    // toasts existed, or whose conditions flipped since the last review). Toast them
+                    // here so no unlock is silent.
+                    const fresh = data.achievements?.newlyUnlocked;
+                    if (fresh?.length) toasts?.achievements(fresh);
+                }
             } catch (err) {
                 console.error('Failed to load mastery scores:', err);
             }
