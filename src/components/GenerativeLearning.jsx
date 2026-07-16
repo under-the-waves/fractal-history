@@ -58,7 +58,14 @@ function sourceLabel(url) {
     try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url }
 }
 
-function FactCard({ fact }) {
+// `hideWhen`: suppress the card's own `when` date when it sits under a numbered sub-anchor heading
+// that already shows a date range. Only a B (temporal) study's numbered sub-anchors have that dated
+// heading — their titles are the anchor's own "Descriptive Name: date range" title (the convention
+// temporalCoordinate() in lib/promptLoader.js relies on elsewhere), so the per-card date underneath is
+// redundant and can even read as contradicting it. Callers pass `breadth === 'B'` for `data.subAnchors`
+// cards only; the scene-setting prelude/postlude (no numbered heading) and A/C-axis sub-anchors (whose
+// titles are a theme/place name, not a date) keep `when` regardless.
+function FactCard({ fact, hideWhen = false }) {
     const [open, setOpen] = useState(null)
     const [showSrc, setShowSrc] = useState(false)
     const sources = Array.isArray(fact.sources) ? fact.sources.filter(Boolean) : []
@@ -93,7 +100,7 @@ function FactCard({ fact }) {
                     </ul>
                 </div>
             )}
-            {fact.when && <p className="gl-fact-when">{fact.when}</p>}
+            {!hideWhen && fact.when && <p className="gl-fact-when">{fact.when}</p>}
             <div className="gl-layer-tabs">
                 {available.map(l => (
                     <button
@@ -714,7 +721,7 @@ function GenerativeLearning() {
                                     <h2 className="gl-subanchor-title">
                                         <span className="gl-subanchor-num">{i + 1}</span>{sa.title}
                                     </h2>
-                                    {sa.facts.map((f, j) => <FactCard key={j} fact={f} />)}
+                                    {sa.facts.map((f, j) => <FactCard key={j} fact={f} hideWhen={breadth === 'B'} />)}
                                 </section>
                             ))}
 
