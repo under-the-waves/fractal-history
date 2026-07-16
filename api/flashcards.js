@@ -43,14 +43,19 @@ async function handleGet(req, res, userId) {
             return handleGetSlots(req, res, userId);
         }
 
+        // tp.level is the anchor's canonical tree level (0 = Root), used for the Browse table's
+        // Level column. LEFT JOIN so a card whose anchor somehow lacks a canonical position still
+        // appears, with level = null. Safe from duplication: tree_positions.is_canonical marks at
+        // most one row per anchor (see add-anchor-reuse-columns.js), so this can't fan out rows.
         let flashcards;
         if (anchorId) {
             flashcards = await sql`
                 SELECT f.id, f.anchor_id, f.breadth, f.question, f.answer, f.created_at,
                        f.next_review_date, f.interval_days, f.ease_factor, f.repetitions, f.last_reviewed_at,
-                       a.title as anchor_title
+                       a.title as anchor_title, tp.level
                 FROM flashcards f
                 JOIN anchors a ON f.anchor_id = a.id
+                LEFT JOIN tree_positions tp ON tp.anchor_id = f.anchor_id AND tp.is_canonical = true
                 WHERE f.user_id = ${userId} AND f.anchor_id = ${anchorId}
                 ORDER BY f.created_at DESC
             `;
@@ -58,9 +63,10 @@ async function handleGet(req, res, userId) {
             flashcards = await sql`
                 SELECT f.id, f.anchor_id, f.breadth, f.question, f.answer, f.created_at,
                        f.next_review_date, f.interval_days, f.ease_factor, f.repetitions, f.last_reviewed_at,
-                       a.title as anchor_title
+                       a.title as anchor_title, tp.level
                 FROM flashcards f
                 JOIN anchors a ON f.anchor_id = a.id
+                LEFT JOIN tree_positions tp ON tp.anchor_id = f.anchor_id AND tp.is_canonical = true
                 WHERE f.user_id = ${userId}
                 ORDER BY f.created_at DESC
             `;
