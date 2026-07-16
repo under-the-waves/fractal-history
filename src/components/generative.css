@@ -552,6 +552,22 @@ ul.gl-layer-body {
     background: #ecfdf5;
     border-radius: 6px;
 }
+.gl-fc-add-all {
+    display: block;
+    margin: 0 0 16px;
+    border: none;
+    border-radius: 8px;
+    background: #7c3aed;
+    color: #fff;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.gl-fc-add-all:hover:not(:disabled) { background: #6d28d9; }
+.gl-fc-add-all:disabled { background: #ddd6fe; color: #6d28d9; cursor: not-allowed; }
+
 .gl-fc-reveal {
     border: none;
     background: none;

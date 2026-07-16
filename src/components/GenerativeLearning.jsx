@@ -275,9 +275,12 @@ function groupFlashcards(cards) {
 // /api/flashcards slots + set-slot). Decoupled from the mark — it just offers the topic's cards.
 function FlashcardDeck({ anchorId, breadth, clerkEnabled, auth }) {
     const [data, setData] = useState(null)
+    const [cores, setCores] = useState(null)
     const [preparing, setPreparing] = useState(true)
     const [busy, setBusy] = useState(null)
+    const [coreBusy, setCoreBusy] = useState(null)
     const [error, setError] = useState(null)
+    const [coreError, setCoreError] = useState(null)
     const [revealed, setRevealed] = useState(new Set())
 
     const signedIn = !clerkEnabled || auth.isSignedIn
@@ -295,18 +298,20 @@ function FlashcardDeck({ anchorId, breadth, clerkEnabled, auth }) {
         }
     }, [anchorId, breadth, clerkEnabled, auth])
 
-    // On mount: ensure this topic's pool + 5 cores exist and are added to the user's deck (generates
-    // the pool from the fact cards on first call), then load the slots panel.
+    // On mount: ensure this topic's pool + cores exist (generates the pool from the fact cards on
+    // first call), then preview the core cards — which ones are already in the user's deck — WITHOUT
+    // adding any of them automatically, and load the personal-picks panel.
     useEffect(() => {
         let cancelled = false
         const run = async () => {
             if (!signedIn) { setPreparing(false); return }
             try {
                 const token = clerkEnabled ? await auth.getToken() : null
-                await fetch(`/api/instantiate-cores?id=${anchorId}&breadth=${breadth}`, {
-                    method: 'POST',
+                const res = await fetch(`/api/instantiate-cores?id=${anchorId}&breadth=${breadth}`, {
                     headers: token ? { Authorization: `Bearer ${token}` } : {},
                 })
+                const d = await res.json()
+                if (!cancelled && d.success) setCores(d.cores || [])
             } catch (err) {
                 console.error('Failed to prepare flashcards:', err)
             }
@@ -315,6 +320,30 @@ function FlashcardDeck({ anchorId, breadth, clerkEnabled, auth }) {
         run()
         return () => { cancelled = true }
     }, [anchorId, breadth, signedIn, clerkEnabled, auth, load])
+
+    // Add one core card (questions = [question]) or, for "Add all core cards", every core card still
+    // missing (questions = null, which sends no body — the "add all" path on the backend).
+    const addCores = async (questions) => {
+        const isAll = questions === null
+        setCoreBusy(isAll ? 'all' : questions[0])
+        setCoreError(null)
+        try {
+            const token = clerkEnabled ? await auth.getToken() : null
+            const res = await fetch(`/api/instantiate-cores?id=${anchorId}&breadth=${breadth}`, {
+                method: 'POST',
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json' },
+                body: isAll ? undefined : JSON.stringify({ questions }),
+            })
+            const d = await res.json()
+            if (!d.success) { setCoreError(d.error || 'Could not add the card.'); return }
+            const addedSet = new Set(d.added || [])
+            setCores(prev => prev.map(c => addedSet.has(c.question) ? { ...c, added: true } : c))
+        } catch {
+            setCoreError('Could not add the card.')
+        } finally {
+            setCoreBusy(null)
+        }
+    }
 
     const toggle = async (card, enabled) => {
         setBusy(card.question)
@@ -353,35 +382,59 @@ function FlashcardDeck({ anchorId, breadth, clerkEnabled, auth }) {
     }
 
     if (preparing || !data) return <p className="gl-fc-hint">Preparing your flashcards…</p>
-    if ((data.cores?.length || 0) === 0 && (data.available?.length || 0) === 0) {
+    if ((cores?.length || 0) === 0 && (data.available?.length || 0) === 0) {
         return <p className="gl-fc-hint">Flashcards aren’t ready for this topic yet.</p>
     }
 
     const atMax = data.used >= data.max
     const availableGroups = groupFlashcards(data.available)
+    const remainingCores = (cores || []).filter(c => !c.added)
+    const allCoresAdded = (cores || []).length > 0 && remainingCores.length === 0
 
     return (
         <div className="gl-fc">
             <p className="gl-fc-intro">
-                Your {data.cores.length} core cards are saved automatically. Add up to {data.max} more.
-                Reveal any card to test yourself now.
+                Add a core card to save it to your deck. Add all {cores?.length || 0} core cards to be able
+                to earn full mastery experience points (XP) for this topic. Reveal any card to test yourself
+                now.
             </p>
 
-            <p className="gl-fc-sub">Core cards · saved</p>
-            <ul className="gl-fc-list">
-                {data.cores.map((c, i) => {
-                    const k = `core-${i}`
-                    return (
-                        <li key={k} className="gl-fc-item gl-fc-core">
-                            <span className="gl-fc-badge">Core</span>
-                            <div className="gl-fc-text">
-                                <p className="gl-fc-q">{c.question}</p>
-                                {answer(k, c.answer)}
-                            </div>
-                        </li>
-                    )
-                })}
-            </ul>
+            {cores && cores.length > 0 && (
+                <>
+                    <p className="gl-fc-sub">Core cards · {cores.length - remainingCores.length}/{cores.length} added</p>
+                    {coreError && <p className="gl-error">{coreError}</p>}
+                    <ul className="gl-fc-list">
+                        {cores.map((c, i) => {
+                            const k = `core-${i}`
+                            return (
+                                <li key={k} className="gl-fc-item gl-fc-core">
+                                    <span className="gl-fc-badge">Core</span>
+                                    <div className="gl-fc-text">
+                                        <p className="gl-fc-q">{c.question}</p>
+                                        {answer(k, c.answer)}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className={`gl-fc-toggle ${c.added ? 'selected' : ''}`}
+                                        disabled={c.added || coreBusy === c.question}
+                                        onClick={() => addCores([c.question])}
+                                    >
+                                        {c.added ? 'Added' : (coreBusy === c.question ? 'Adding…' : 'Add')}
+                                    </button>
+                                </li>
+                            )
+                        })}
+                    </ul>
+                    <button
+                        type="button"
+                        className="gl-fc-add-all"
+                        disabled={allCoresAdded || coreBusy === 'all'}
+                        onClick={() => addCores(null)}
+                    >
+                        {allCoresAdded ? 'All core cards added' : (coreBusy === 'all' ? 'Adding all…' : 'Add all core cards')}
+                    </button>
+                </>
+            )}
 
             <p className="gl-fc-sub">Your picks · {data.used}/{data.max}</p>
             {error && <p className="gl-error">{error}</p>}
