@@ -55,24 +55,68 @@ function previewIntervals(card) {
     }))
 }
 
+const STUDY_SETTINGS_KEY = 'fh-study-settings'
+const DEFAULT_NEW_LIMIT = 20
+const DEFAULT_DUE_LIMIT = 100
+
+function loadStudySettings() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(STUDY_SETTINGS_KEY) || '{}')
+        return {
+            newLimit: Number.isInteger(saved.newLimit) ? saved.newLimit : DEFAULT_NEW_LIMIT,
+            dueLimit: Number.isInteger(saved.dueLimit) ? saved.dueLimit : DEFAULT_DUE_LIMIT,
+        }
+    } catch {
+        return { newLimit: DEFAULT_NEW_LIMIT, dueLimit: DEFAULT_DUE_LIMIT }
+    }
+}
+
+// A card's Anki-style bucket, used both for the pre-session counts (from the stats endpoint) and
+// for the live remaining-count during a session (computed from the in-session card list, so a
+// card re-queued by Again — see handleRating below — moves out of "new" into "learning" the
+// moment its updated fields come back from the PATCH).
+function cardBucket(card) {
+    if (!card.next_review_date) return 'new'
+    return (card.repetitions || 0) < 2 ? 'learning' : 'review'
+}
+
 function StudyMode({ auth, onSwitchToBrowse }) {
     const [cards, setCards] = useState([])
     const [currentIndex, setCurrentIndex] = useState(0)
     const [showAnswer, setShowAnswer] = useState(false)
-    const [loading, setLoading] = useState(true)
+    const [started, setStarted] = useState(false)
+    const [statsLoading, setStatsLoading] = useState(true)
+    const [loading, setLoading] = useState(false)
     const [reviewing, setReviewing] = useState(false)
     const [removing, setRemoving] = useState(false)
     const [sessionStats, setSessionStats] = useState({ total: 0, again: 0, hard: 0, good: 0, easy: 0, xp: 0 })
     const [sessionComplete, setSessionComplete] = useState(false)
     const [stats, setStats] = useState(null)
     const [xpChips, setXpChips] = useState([])
+    const [newLimit, setNewLimit] = useState(() => loadStudySettings().newLimit)
+    const [dueLimit, setDueLimit] = useState(() => loadStudySettings().dueLimit)
     const toasts = useToasts()
+
+    // Persist the session-size settings as soon as the user changes them, so the next visit to
+    // Study restores them without needing to press Start first.
+    useEffect(() => {
+        try {
+            localStorage.setItem(STUDY_SETTINGS_KEY, JSON.stringify({ newLimit, dueLimit }))
+        } catch {
+            // localStorage unavailable (e.g. private browsing) — settings just won't persist
+        }
+    }, [newLimit, dueLimit])
 
     const fetchReviewCards = useCallback(async () => {
         try {
             setLoading(true)
             const token = await auth.getToken()
-            const response = await fetch('/api/flashcards?mode=review', {
+            const params = new URLSearchParams({
+                mode: 'review',
+                newLimit: String(newLimit),
+                dueLimit: String(dueLimit),
+            })
+            const response = await fetch(`/api/flashcards?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             const data = await response.json()
@@ -88,7 +132,7 @@ function StudyMode({ auth, onSwitchToBrowse }) {
         } finally {
             setLoading(false)
         }
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [newLimit, dueLimit]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchStats = useCallback(async () => {
         try {
@@ -102,13 +146,27 @@ function StudyMode({ auth, onSwitchToBrowse }) {
             }
         } catch (err) {
             console.error('Failed to fetch stats:', err)
+        } finally {
+            setStatsLoading(false)
         }
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Only fetch the deck overview on mount — the actual review cards aren't fetched until the
+    // user confirms the session size on the setup screen and presses Start.
     useEffect(() => {
-        fetchReviewCards()
         fetchStats()
-    }, [])
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleStart = () => {
+        setStarted(true)
+        fetchReviewCards()
+    }
+
+    const clampLimitInput = (raw) => {
+        const n = parseInt(raw, 10)
+        if (Number.isNaN(n)) return 0
+        return Math.min(500, Math.max(0, n))
+    }
 
     const handleRating = async (rating) => {
         if (reviewing) return
@@ -149,11 +207,14 @@ function StudyMode({ auth, onSwitchToBrowse }) {
             }))
 
             if (rating === 0) {
-                // Again: move card to end of queue for re-show later in session
+                // Again: move card to end of queue for re-show later in session. Merge in the
+                // updated SRS fields from the PATCH response (next_review_date, repetitions) so
+                // the live bucket counters correctly show it as "learning" rather than "new".
+                const updatedFields = data?.success ? data.flashcard : null
                 setCards(prev => {
                     const next = [...prev]
                     const [again] = next.splice(currentIndex, 1)
-                    next.push(again)
+                    next.push(updatedFields ? { ...again, ...updatedFields } : again)
                     return next
                 })
                 setShowAnswer(false)
@@ -208,30 +269,89 @@ function StudyMode({ auth, onSwitchToBrowse }) {
         </div>
     )
 
+    const nothingAvailable = (
+        <div className="study-empty">
+            <h2>Nothing to review</h2>
+            <p>
+                {stats && stats.total > 0
+                    ? 'All caught up. Come back later when cards are due.'
+                    : 'Read some narratives and save flashcards to start studying.'}
+            </p>
+            {stats && (
+                <div className="study-stats-summary">
+                    <span>{stats.total} total</span>
+                    <span>{stats.reviewedToday} reviewed today</span>
+                </div>
+            )}
+            <button onClick={onSwitchToBrowse} className="study-browse-link">
+                Browse all cards
+            </button>
+        </div>
+    )
+
+    if (statsLoading) {
+        return <div className="flashcards-loading">Loading study session...</div>
+    }
+
+    // Pre-session setup screen: shown until the user presses Start. Skipped straight to the
+    // empty state if there is nothing available to study at all.
+    if (!started) {
+        const available = stats ? stats.new + stats.learning + stats.review : 0
+        if (available === 0) {
+            return nothingAvailable
+        }
+        return (
+            <div className="study-setup">
+                <h2>Ready to study</h2>
+                <div className="study-setup-counts">
+                    <div className="study-setup-count study-count-new">
+                        <span className="study-setup-count-number">{stats.new}</span>
+                        <span className="study-setup-count-label">New</span>
+                    </div>
+                    <div className="study-setup-count study-count-learning">
+                        <span className="study-setup-count-number">{stats.learning}</span>
+                        <span className="study-setup-count-label">Learning</span>
+                    </div>
+                    <div className="study-setup-count study-count-review">
+                        <span className="study-setup-count-number">{stats.review}</span>
+                        <span className="study-setup-count-label">To review</span>
+                    </div>
+                </div>
+                <div className="study-setup-fields">
+                    <label className="study-setup-field">
+                        New cards this session
+                        <input
+                            type="number"
+                            min="0"
+                            max="500"
+                            value={newLimit}
+                            onChange={(e) => setNewLimit(clampLimitInput(e.target.value))}
+                        />
+                    </label>
+                    <label className="study-setup-field">
+                        Maximum reviews
+                        <input
+                            type="number"
+                            min="0"
+                            max="500"
+                            value={dueLimit}
+                            onChange={(e) => setDueLimit(clampLimitInput(e.target.value))}
+                        />
+                    </label>
+                </div>
+                <button onClick={handleStart} className="study-start-button">
+                    Start studying
+                </button>
+            </div>
+        )
+    }
+
     if (loading) {
         return <div className="flashcards-loading">Loading study session...</div>
     }
 
     if (cards.length === 0) {
-        return (
-            <div className="study-empty">
-                <h2>Nothing to review</h2>
-                <p>
-                    {stats && stats.total > 0
-                        ? 'All caught up. Come back later when cards are due.'
-                        : 'Read some narratives and save flashcards to start studying.'}
-                </p>
-                {stats && (
-                    <div className="study-stats-summary">
-                        <span>{stats.total} total</span>
-                        <span>{stats.reviewedToday} reviewed today</span>
-                    </div>
-                )}
-                <button onClick={onSwitchToBrowse} className="study-browse-link">
-                    Browse all cards
-                </button>
-            </div>
-        )
+        return nothingAvailable
     }
 
     if (sessionComplete) {
@@ -271,19 +391,24 @@ function StudyMode({ auth, onSwitchToBrowse }) {
     const card = cards[currentIndex]
     const intervals = previewIntervals(card)
 
+    // Remaining cards, Anki-style: everything from the current card onward, bucketed by
+    // cardBucket. A card re-queued by Again carries its updated fields (see handleRating), so it
+    // counts as "learning" here even if it started the session as "new".
+    const remainingCounts = cards.slice(currentIndex).reduce(
+        (acc, c) => {
+            acc[cardBucket(c)] += 1
+            return acc
+        },
+        { new: 0, learning: 0, review: 0 }
+    )
+
     return (
         <div className="study-session">
             {xpChipHost}
-            <div className="study-progress">
-                <div className="study-progress-bar">
-                    <div
-                        className="study-progress-fill"
-                        style={{ width: `${(currentIndex / cards.length) * 100}%` }}
-                    />
-                </div>
-                <span className="study-progress-text">
-                    Card {currentIndex + 1} of {cards.length}
-                </span>
+            <div className="study-remaining-counts">
+                <span className="study-remaining-count study-count-new">{remainingCounts.new} new</span>
+                <span className="study-remaining-count study-count-learning">{remainingCounts.learning} learning</span>
+                <span className="study-remaining-count study-count-review">{remainingCounts.review} to review</span>
             </div>
 
             <div className="study-card-context">
