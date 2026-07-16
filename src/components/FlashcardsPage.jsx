@@ -347,8 +347,35 @@ function StudyMode({ auth, onSwitchToBrowse }) {
 
 const BREADTH_LABEL = { A: 'Analytical', B: 'Temporal', C: 'Geographic' }
 
+// Column definitions for the sortable Browse table header. `key` matches the state used to
+// track the active sort column; `getValue` extracts the value to compare for that column.
+// Missing/null values (e.g. a card whose anchor lacks a canonical tree position, or a card
+// that has never been studied) are pushed to the end when sorting ascending, and so to the
+// start when the sort is reversed to descending.
+const BROWSE_COLUMNS = [
+    { key: 'narrative', label: 'Narrative', getValue: (card) => card.anchor_title || '' },
+    { key: 'type', label: 'Type', getValue: (card) => BREADTH_LABEL[card.breadth] || card.breadth || '' },
+    { key: 'question', label: 'Question', getValue: (card) => card.question || '' },
+    { key: 'answer', label: 'Answer', getValue: (card) => card.answer || '' },
+    { key: 'level', label: 'Level', getValue: (card) => (card.level === null || card.level === undefined ? null : card.level) },
+    { key: 'due', label: 'Due', getValue: (card) => (card.next_review_date ? new Date(card.next_review_date).getTime() : null) },
+]
+
+// Ascending comparator with nulls sorted last, so the direction toggle naturally puts them
+// first when reversed.
+function compareValues(a, b) {
+    if (a === null && b === null) return 0
+    if (a === null) return 1
+    if (b === null) return -1
+    if (typeof a === 'string') return a.localeCompare(b)
+    return a - b
+}
+
 function BrowseMode({ auth, flashcards, setFlashcards }) {
     const [deletingId, setDeletingId] = useState(null)
+    const [searchQuery, setSearchQuery] = useState('')
+    const [sortKey, setSortKey] = useState(null)
+    const [sortDir, setSortDir] = useState('asc')
 
     const handleDelete = async (id) => {
         setDeletingId(id)
@@ -375,6 +402,20 @@ function BrowseMode({ auth, flashcards, setFlashcards }) {
         return due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     }
 
+    const formatLevel = (card) => {
+        if (card.level === null || card.level === undefined) return '—'
+        return card.level === 0 ? 'Root' : String(card.level)
+    }
+
+    const handleSort = (key) => {
+        if (sortKey === key) {
+            setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'))
+        } else {
+            setSortKey(key)
+            setSortDir('asc')
+        }
+    }
+
     if (flashcards.length === 0) {
         return (
             <div className="flashcards-empty">
@@ -384,47 +425,95 @@ function BrowseMode({ auth, flashcards, setFlashcards }) {
         )
     }
 
+    const query = searchQuery.trim().toLowerCase()
+    const visibleCards = query
+        ? flashcards.filter(card => (
+            (card.question || '').toLowerCase().includes(query) ||
+            (card.answer || '').toLowerCase().includes(query) ||
+            (card.anchor_title || '').toLowerCase().includes(query)
+        ))
+        : flashcards
+
+    const activeColumn = BROWSE_COLUMNS.find(c => c.key === sortKey)
+    const sortedCards = activeColumn
+        ? [...visibleCards].sort((a, b) => {
+            const result = compareValues(activeColumn.getValue(a), activeColumn.getValue(b))
+            return sortDir === 'asc' ? result : -result
+        })
+        : visibleCards
+
     return (
         <div className="flashcards-groups">
-            <table className="flashcard-table">
-                <thead>
-                    <tr>
-                        <th>Narrative</th>
-                        <th>Type</th>
-                        <th>Question</th>
-                        <th>Answer</th>
-                        <th>Due</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {flashcards.map(card => (
-                        <tr key={card.id}>
-                            <td>
-                                <Link
-                                    to={`/narrative/${card.anchor_id}?breadth=${card.breadth}`}
-                                    className="flashcard-narrative-link"
+            <div className="flashcard-search-bar">
+                <input
+                    type="text"
+                    className="flashcard-search-input"
+                    placeholder="Search cards..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    aria-label="Search flashcards"
+                />
+                {query && (
+                    <span className="flashcard-search-count">
+                        {sortedCards.length} of {flashcards.length} cards
+                    </span>
+                )}
+            </div>
+            <div className="flashcard-table-scroll">
+                <table className="flashcard-table">
+                    <thead>
+                        <tr>
+                            {BROWSE_COLUMNS.map(col => (
+                                <th
+                                    key={col.key}
+                                    className="flashcard-table-sortable"
+                                    onClick={() => handleSort(col.key)}
+                                    aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                                 >
-                                    {card.anchor_title}
-                                </Link>
-                            </td>
-                            <td>{BREADTH_LABEL[card.breadth] || card.breadth}</td>
-                            <td className="flashcard-table-question">{card.question}</td>
-                            <td className="flashcard-table-answer">{card.answer}</td>
-                            <td className="flashcard-table-due">{formatDue(card)}</td>
-                            <td>
-                                <button
-                                    className="flashcard-delete"
-                                    disabled={deletingId === card.id}
-                                    onClick={() => handleDelete(card.id)}
-                                >
-                                    {deletingId === card.id ? '...' : 'Remove'}
-                                </button>
-                            </td>
+                                    <span className="flashcard-table-sort-label">
+                                        {col.label}
+                                        <span className="flashcard-table-sort-arrow">
+                                            {sortKey === col.key ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                                        </span>
+                                    </span>
+                                </th>
+                            ))}
+                            <th></th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {sortedCards.map(card => (
+                            <tr key={card.id}>
+                                <td>
+                                    <Link
+                                        to={`/narrative/${card.anchor_id}?breadth=${card.breadth}`}
+                                        className="flashcard-narrative-link"
+                                    >
+                                        {card.anchor_title}
+                                    </Link>
+                                </td>
+                                <td>{BREADTH_LABEL[card.breadth] || card.breadth}</td>
+                                <td className="flashcard-table-question">{card.question}</td>
+                                <td className="flashcard-table-answer">{card.answer}</td>
+                                <td className="flashcard-table-level">{formatLevel(card)}</td>
+                                <td className="flashcard-table-due">{formatDue(card)}</td>
+                                <td>
+                                    <button
+                                        className="flashcard-delete"
+                                        disabled={deletingId === card.id}
+                                        onClick={() => handleDelete(card.id)}
+                                    >
+                                        {deletingId === card.id ? '...' : 'Remove'}
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {sortedCards.length === 0 && (
+                    <p className="flashcard-search-empty">No cards match your search.</p>
+                )}
+            </div>
         </div>
     )
 }
