@@ -2312,6 +2312,68 @@ button.orientation-axis-value:hover {
   margin: 0 0 20px 0;
 }
 
+.flashcard-error {
+  font-size: 13px;
+  color: #c0392b;
+  margin: 0 0 10px 0;
+}
+
+/* --- Core-cards panel: opt-in "Add" per core card, plus "Add all core cards" --- */
+
+.core-cards-panel {
+  margin: 0 0 1.25rem;
+}
+
+.core-add-button {
+  flex: none;
+  min-width: 4.5rem;
+  margin-top: 0.1rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #2d6cdf;
+  border-radius: 4px;
+  background: transparent;
+  color: #2d6cdf;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.core-add-button:hover:not(:disabled) {
+  background: #f2f6fe;
+}
+
+.core-add-button.added {
+  border-color: #27ae60;
+  color: #27ae60;
+  cursor: default;
+}
+
+.core-add-button:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.core-add-all-button {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  background: #2d6cdf;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.core-add-all-button:hover:not(:disabled) {
+  background: #2358b0;
+}
+
+.core-add-all-button:disabled {
+  background: #a9c3ee;
+  cursor: default;
+}
+
 .flashcard-group {
   margin-bottom: 24px;
 }

@@ -49,8 +49,94 @@ function groupFlashcards(cards) {
     return groups.sort((a, b) => (a.key === 'general' ? 1 : 0) - (b.key === 'general' ? 1 : 0))
 }
 
-// The flashcard panel for a narrative: the 5 automatic core cards, plus the learner's up-to-3
-// personal picks chosen from the non-core pool. Drives /api/flashcards mode=slots and set-slot.
+// The core-cards panel: this narrative's core cards (usually 5), each added to the learner's deck
+// only when they choose to. Adding a card is what makes it reviewable and therefore scorable (see
+// lib/scoring.js), so the panel explains that mastery points depend on adding all of them. Driven by
+// GET/POST /api/instantiate-cores — GET previews the cards and each one's added state without writing
+// anything, POST adds either one card (body: { questions: [question] }) or, for "Add all core cards",
+// every card still missing (no body).
+function CoreCardsPanel({ auth, anchorId, breadth, cores, onCoresChange }) {
+    const [busy, setBusy] = useState(null) // question string, 'all', or null
+    const [error, setError] = useState(null)
+    const [revealed, setRevealed] = useState(new Set())
+
+    const reveal = (key) => setRevealed(prev => new Set([...prev, key]))
+    const answer = (key, text) => revealed.has(key)
+        ? <p className="scored-a">{text}</p>
+        : <button type="button" className="flashcard-reveal-button" onClick={() => reveal(key)}>Show answer</button>
+
+    const addCards = async (questions) => {
+        const isAll = questions === null
+        setBusy(isAll ? 'all' : questions[0])
+        setError(null)
+        try {
+            const token = await auth.getToken()
+            const res = await fetch(`/api/instantiate-cores?id=${anchorId}&breadth=${breadth}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: isAll ? undefined : JSON.stringify({ questions })
+            })
+            const d = await res.json()
+            if (!d.success) { setError(d.error || 'Could not add the card.'); return }
+            const addedSet = new Set(d.added || [])
+            onCoresChange(prev => prev.map(c => addedSet.has(c.question) ? { ...c, added: true } : c))
+        } catch {
+            setError('Could not add the card.')
+        } finally {
+            setBusy(null)
+        }
+    }
+
+    if (!cores || cores.length === 0) return null
+
+    const remaining = cores.filter(c => !c.added)
+    const allAdded = remaining.length === 0
+
+    return (
+        <div className="core-cards-panel">
+            <p className="scored-intro">
+                These {cores.length} core cards are this narrative's most essential facts. Add a card to
+                put it in your deck for review. Add all {cores.length} core cards to be able to earn full
+                mastery experience points (XP) for this narrative.
+            </p>
+            {error && <p className="flashcard-error">{error}</p>}
+            <ul className="scored-core-list">
+                {cores.map((c, i) => {
+                    const k = `core-${i}`
+                    return (
+                        <li key={k} className="scored-core-item">
+                            <span className="scored-badge">Core</span>
+                            <div className="scored-card-text">
+                                <p className="scored-q">{c.question}</p>
+                                {answer(k, c.answer)}
+                            </div>
+                            <button
+                                type="button"
+                                className={`core-add-button ${c.added ? 'added' : ''}`}
+                                disabled={c.added || busy === c.question}
+                                onClick={() => addCards([c.question])}
+                            >
+                                {c.added ? 'Added' : (busy === c.question ? 'Adding…' : 'Add')}
+                            </button>
+                        </li>
+                    )
+                })}
+            </ul>
+            <button
+                type="button"
+                className="core-add-all-button"
+                disabled={allAdded || busy === 'all'}
+                onClick={() => addCards(null)}
+            >
+                {allAdded ? 'All core cards added' : (busy === 'all' ? 'Adding all…' : 'Add all core cards')}
+            </button>
+        </div>
+    )
+}
+
+// The personal-slots panel for a narrative: the learner's up-to-3 personal picks chosen from the
+// non-core pool. Drives /api/flashcards mode=slots and set-slot. The core cards themselves are shown
+// and added separately by CoreCardsPanel above.
 function PersonalSlots({ auth, anchorId, breadth, reloadKey }) {
     const [data, setData] = useState(null)
     const [busy, setBusy] = useState(null)
@@ -109,25 +195,9 @@ function PersonalSlots({ auth, anchorId, breadth, reloadKey }) {
     return (
         <div className="scored-cards">
             <p className="scored-intro">
-                Your {data.cores.length} core cards are studied automatically. Add up to {data.max} more
-                cards to count toward your score.
+                Add up to {data.max} more cards from below to count toward your score, alongside your
+                core cards.
             </p>
-
-            <p className="scored-cards-sub">Core cards &middot; automatic</p>
-            <ul className="scored-core-list">
-                {data.cores.map((c, i) => {
-                    const k = `core-${i}`
-                    return (
-                        <li key={k} className="scored-core-item">
-                            <span className="scored-badge">Core</span>
-                            <div className="scored-card-text">
-                                <p className="scored-q">{c.question}</p>
-                                {answer(k, c.answer)}
-                            </div>
-                        </li>
-                    )
-                })}
-            </ul>
 
             <p className="scored-cards-sub">Your picks &middot; {data.used}/{data.max}</p>
             {error && <p className="flashcard-error">{error}</p>}
@@ -164,21 +234,24 @@ function PersonalSlots({ auth, anchorId, breadth, reloadKey }) {
 function FlashcardSaveSection({ anchorId, breadth }) {
     const auth = useAuth()
     const [preparing, setPreparing] = useState(true)
+    const [cores, setCores] = useState(null)
     const [reloadKey, setReloadKey] = useState(0)
     const loadingFact = useMemo(() => getRandomFact(), [])
 
-    // On mount (first study): ensure this narrative's pool + 5 cores exist and are instantiated for
-    // the user (generates on first view), then reveal the flashcard panel.
+    // On mount (first study): ensure this narrative's pool exists and its cores are marked (generates
+    // on first view), then preview them — which of the 5 core cards the learner already has in their
+    // deck — WITHOUT adding anything automatically. The learner adds cards explicitly below.
     useEffect(() => {
         if (!auth.isSignedIn) { setPreparing(false); return }
         let cancelled = false
         const run = async () => {
             try {
                 const token = await auth.getToken()
-                await fetch(`/api/instantiate-cores?id=${anchorId}&breadth=${breadth}`, {
-                    method: 'POST',
+                const res = await fetch(`/api/instantiate-cores?id=${anchorId}&breadth=${breadth}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
+                const d = await res.json()
+                if (!cancelled && d.success) setCores(d.cores || [])
             } catch (err) {
                 console.error('Failed to prepare flashcards:', err)
             }
@@ -216,7 +289,16 @@ function FlashcardSaveSection({ anchorId, breadth }) {
                     </div>
                 </div>
             ) : (
-                <PersonalSlots auth={auth} anchorId={anchorId} breadth={breadth} reloadKey={reloadKey} />
+                <>
+                    <CoreCardsPanel
+                        auth={auth}
+                        anchorId={anchorId}
+                        breadth={breadth}
+                        cores={cores}
+                        onCoresChange={setCores}
+                    />
+                    <PersonalSlots auth={auth} anchorId={anchorId} breadth={breadth} reloadKey={reloadKey} />
+                </>
             )}
         </section>
     )
