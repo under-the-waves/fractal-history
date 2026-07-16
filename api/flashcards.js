@@ -73,22 +73,49 @@ async function handleGet(req, res, userId) {
     }
 }
 
+// Parses a query-string limit: absent or non-numeric returns null (caller decides the default /
+// uncapped behaviour), otherwise clamps to 0-500 so a stray huge value can't blow up the query.
+// Using Number.isNaN (rather than `parseInt(...) || fallback`) means an explicit 0 is honoured
+// instead of being coerced to the fallback.
+function parseLimit(raw) {
+    if (raw === undefined) return null;
+    const n = parseInt(raw, 10);
+    if (Number.isNaN(n)) return null;
+    return Math.min(500, Math.max(0, n));
+}
+
 async function handleGetReview(req, res, userId) {
     try {
-        const newCardLimit = parseInt(req.query.newLimit) || 20;
+        const parsedNewLimit = parseLimit(req.query.newLimit);
+        const newCardLimit = parsedNewLimit === null ? 20 : parsedNewLimit;
+        const dueCardLimit = parseLimit(req.query.dueLimit); // null = uncapped, as before
 
-        // Overdue cards first (oldest due date first), then new cards (oldest first)
-        const dueCards = await sql`
-            SELECT f.id, f.anchor_id, f.breadth, f.question, f.answer, f.created_at,
-                   f.next_review_date, f.interval_days, f.ease_factor, f.repetitions, f.last_reviewed_at,
-                   a.title as anchor_title
-            FROM flashcards f
-            JOIN anchors a ON f.anchor_id = a.id
-            WHERE f.user_id = ${userId}
-              AND f.next_review_date IS NOT NULL
-              AND f.next_review_date <= NOW()
-            ORDER BY f.next_review_date ASC
-        `;
+        // Overdue cards first (oldest due date first), then new cards (oldest first). dueLimit is
+        // optional (Anki calls this "maximum reviews per session"); omit it for the old uncapped behaviour.
+        const dueCards = dueCardLimit === null
+            ? await sql`
+                SELECT f.id, f.anchor_id, f.breadth, f.question, f.answer, f.created_at,
+                       f.next_review_date, f.interval_days, f.ease_factor, f.repetitions, f.last_reviewed_at,
+                       a.title as anchor_title
+                FROM flashcards f
+                JOIN anchors a ON f.anchor_id = a.id
+                WHERE f.user_id = ${userId}
+                  AND f.next_review_date IS NOT NULL
+                  AND f.next_review_date <= NOW()
+                ORDER BY f.next_review_date ASC
+            `
+            : await sql`
+                SELECT f.id, f.anchor_id, f.breadth, f.question, f.answer, f.created_at,
+                       f.next_review_date, f.interval_days, f.ease_factor, f.repetitions, f.last_reviewed_at,
+                       a.title as anchor_title
+                FROM flashcards f
+                JOIN anchors a ON f.anchor_id = a.id
+                WHERE f.user_id = ${userId}
+                  AND f.next_review_date IS NOT NULL
+                  AND f.next_review_date <= NOW()
+                ORDER BY f.next_review_date ASC
+                LIMIT ${dueCardLimit}
+            `;
 
         const newCards = await sql`
             SELECT f.id, f.anchor_id, f.breadth, f.question, f.answer, f.created_at,
@@ -110,25 +137,34 @@ async function handleGetReview(req, res, userId) {
     }
 }
 
+// Anki-style buckets: "new" cards have never been studied (no next_review_date yet); "learning"
+// and "review" are both due now but split by SRS phase (see calculateSRS above — repetitions 0-1
+// is the learning phase with fixed graduating intervals, 2+ is the SM-2 review phase). `due` is
+// kept as learning + review so any older caller reading `due` alone still gets a correct total.
 async function handleGetStats(req, res, userId) {
     try {
         const stats = await sql`
             SELECT
                 COUNT(*) as total,
-                COUNT(*) FILTER (WHERE next_review_date IS NOT NULL AND next_review_date <= NOW()) as due,
                 COUNT(*) FILTER (WHERE next_review_date IS NULL) as new,
+                COUNT(*) FILTER (WHERE next_review_date IS NOT NULL AND next_review_date <= NOW() AND repetitions < 2) as learning,
+                COUNT(*) FILTER (WHERE next_review_date IS NOT NULL AND next_review_date <= NOW() AND repetitions >= 2) as review,
                 COUNT(*) FILTER (WHERE last_reviewed_at IS NOT NULL AND last_reviewed_at >= CURRENT_DATE) as reviewed_today
             FROM flashcards
             WHERE user_id = ${userId}
         `;
 
         const row = stats[0];
+        const learning = parseInt(row.learning);
+        const review = parseInt(row.review);
         return res.status(200).json({
             success: true,
             stats: {
                 total: parseInt(row.total),
-                due: parseInt(row.due),
                 new: parseInt(row.new),
+                learning,
+                review,
+                due: learning + review,
                 reviewedToday: parseInt(row.reviewed_today)
             }
         });
