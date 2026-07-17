@@ -2818,6 +2818,15 @@ button.orientation-axis-value:hover {
   text-decoration: underline;
 }
 
+/* Shows which bucket the current card is in (New, Learning, or Review); the study-count-*
+   classes supply the same colours as the setup screen and remaining counters. */
+.study-bucket-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
 .study-breadth-badge {
   font-size: 11px;
   font-weight: 700;
