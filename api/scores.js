@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { getAuthenticatedUser } from '../lib/auth.js';
-import { displayScore, computeBreadthBreakdown, computeBreadthSubtreeBreakdown } from '../lib/scoring.js';
+import { displayScore, computeOwnBreadthWithWrite, computeBreadthSubtreeBreakdown } from '../lib/scoring.js';
 import { bankMastery, computeStats, evaluateAchievements, getUnlocked } from '../lib/achievements.js';
 
 const sql = neon(process.env.DATABASE_URL);
@@ -28,8 +28,10 @@ export default async function handler(req, res) {
             scores[r.anchor_id] = Math.round(displayScore(Number(r.subtree_raw)));
             peaks[r.anchor_id] = Math.round(displayScore(Number(r.subtree_peak)));
         }
-        // Per-breadth own scores (0..B each) so the tree can show which breadths of a node are done.
-        const rawBreadths = await computeBreadthBreakdown(userId);
+        // Per-breadth own scores (0..B+WRITE_FULL, i.e. 0..50, each) so the tree can show how much of a
+        // node's OWN content — flashcard mastery AND narrative writing — is done in that breadth. `written`
+        // flags which (anchor, breadth) pairs have a stored write mark at all, for the "written here" tick.
+        const { own: rawBreadths, written } = await computeOwnBreadthWithWrite(userId);
         const breadths = {};
         for (const [anchorId, byBreadth] of Object.entries(rawBreadths)) {
             breadths[anchorId] = {};
@@ -40,7 +42,8 @@ export default async function handler(req, res) {
         // number came from the analytical (A), temporal (B), and geographic (C) pathways. Computed live,
         // then apportioned against the stored integer total with largest-remainder rounding, so the three
         // parts always sum EXACTLY to the badge — no "they don't add up" drift from mid-day decay.
-        const rawBreadthSub = await computeBreadthSubtreeBreakdown(userId);
+        // Reuses rawBreadths (the same own map above) so the card + write queries run once per request.
+        const rawBreadthSub = await computeBreadthSubtreeBreakdown(userId, rawBreadths);
         const breadthScores = {};
         for (const [anchorId, parts] of Object.entries(rawBreadthSub)) {
             const total = scores[anchorId];
@@ -69,7 +72,7 @@ export default async function handler(req, res) {
             console.error('Achievement evaluation failed (non-fatal):', achErr);
         }
 
-        return res.status(200).json({ success: true, scores, peaks, breadths, breadthScores, achievements });
+        return res.status(200).json({ success: true, scores, peaks, breadths, breadthScores, written, achievements });
     } catch (error) {
         console.error('Error fetching scores:', error);
         return res.status(500).json({ error: 'Failed to fetch scores', details: error.message });

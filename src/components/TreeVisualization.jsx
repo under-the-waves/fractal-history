@@ -28,12 +28,31 @@ function useIsMobile(breakpoint = 768) {
     return isMobile;
 }
 
+// A node's own-mastery bar (under each A/B/C tile) runs 0..50: up to 20 for flashcard mastery of that
+// breadth's cards, plus up to 30 for a fully-retained write-your-own of that breadth (matches lib/scoring.js
+// B + WRITE_FULL). Full when both halves are essentially complete; "essentially" because decay is
+// continuous, so a bar that reads 49/50 shouldn't look unfinished.
+const OWN_MAX = 50;
+const OWN_MASTERED = 47;
+
 // Abbreviate a score for a compact badge (e.g. 1.2k, 21k). Shared by the desktop SVG badge and the
 // mobile HTML pill so they read identically.
 function formatScore(score) {
     return score >= 1000
         ? (score / 1000).toFixed(score >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k'
         : String(score);
+}
+
+// Tooltip text for a breadth tile, spelling out the three signals it carries: the number (pathway
+// total), the underline (own study of this level), and the tick (a written narrative). Shared so the
+// desktop SVG <title> and the mobile tile's aria-label read identically.
+function breadthTileTooltip(breadth, pathXp, bOwn, isWritten) {
+    const numberPart = pathXp != null
+        ? `Number: ${formatScore(pathXp)} XP – this topic plus everything beneath it.`
+        : 'Number: no XP yet in this pathway.';
+    const barPart = `Bar: ${Math.round(bOwn)}/${OWN_MAX} – your own study of this level.`;
+    const tickPart = isWritten ? " Tick: you have written this level's narrative." : '';
+    return `${numberPart} ${barPart}${tickPart}`;
 }
 
 // Global rank badge for the tree header: the user's overall Level + band (from the root anchor's peak,
@@ -55,6 +74,30 @@ function GlobalLevelBadge({ score }) {
     );
 }
 
+// The three-signal legend shown in both the desktop and mobile legend panels, explaining what a
+// breadth tile's number, underline, and tick each mean (see breadthTileTooltip for the same wording
+// as a hover tooltip on the tiles themselves).
+function TileSignalLegend() {
+    return (
+        <>
+            <div className="legend-item">
+                <span className="legend-swatch legend-swatch-number" aria-hidden="true">128</span>
+                <span><strong>Number:</strong> this topic plus everything beneath it</span>
+            </div>
+            <div className="legend-item">
+                <span className="legend-swatch legend-swatch-bar" aria-hidden="true">
+                    <span className="legend-swatch-bar-fill"></span>
+                </span>
+                <span><strong>Bar:</strong> your own study of this level</span>
+            </div>
+            <div className="legend-item">
+                <span className="legend-swatch legend-swatch-tick" aria-hidden="true">✓</span>
+                <span><strong>Tick:</strong> you have written this level's narrative</span>
+            </div>
+        </>
+    );
+}
+
 // Auth-gated loader: fetches the signed-in user's per-node mastery scores once and lifts them up.
 // Rendered only when Clerk is enabled, so useAuth is always inside ClerkProvider. Renders nothing.
 function MasteryScoreLoader({ onLoaded }) {
@@ -69,7 +112,7 @@ function MasteryScoreLoader({ onLoaded }) {
                 const res = await fetch('/api/scores', { headers: { Authorization: `Bearer ${token}` } });
                 const data = await res.json();
                 if (!cancelled && data.success) {
-                    onLoaded({ scores: data.scores || {}, peaks: data.peaks || {}, breadths: data.breadths || {}, breadthScores: data.breadthScores || {} });
+                    onLoaded({ scores: data.scores || {}, peaks: data.peaks || {}, breadths: data.breadths || {}, breadthScores: data.breadthScores || {}, written: data.written || {} });
                     // The load-time evaluation can itself unlock achievements (ones earned before
                     // toasts existed, or whose conditions flipped since the last review). Toast them
                     // here so no unlock is silent.
@@ -92,6 +135,7 @@ function TreeVisualization() {
     const [peaks, setPeaks] = useState({});
     const [breadths, setBreadths] = useState({});
     const [breadthScores, setBreadthScores] = useState({});
+    const [written, setWritten] = useState({});
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [activePath, setActivePath] = useState([]);
@@ -1005,8 +1049,10 @@ function TreeVisualization() {
 
     // Three per-pathway tiles for a node (mobile). Each tile shows the breadth letter and that pathway's
     // share of the node's total XP; tapping opens the pathway. A thin underline shows how much of the
-    // node's OWN cards are mastered in that breadth (green complete, amber partial). `active: true` fills
-    // the currently-selected pathway (used on the focused card); children pass `active: false`.
+    // node's OWN content (flashcard mastery + narrative writing, 0..OWN_MAX) is done in that breadth
+    // (green complete, amber partial), and a small tick marks a breadth the user has written a narrative
+    // for at this node. `active: true` fills the currently-selected pathway (used on the focused card);
+    // children pass `active: false`.
     const renderBreadthTiles = (anchor, { active }) => (
         <div className="mobile-breadth-tiles" role="group" aria-label={`Open ${anchor.title} by pathway`}>
             {['A', 'B', 'C'].map(b => {
@@ -1014,21 +1060,24 @@ function TreeVisualization() {
                 const isActive = active && b === getActiveBreadth(anchor.id);
                 const pathXp = breadthScores[anchor.id]?.[b];
                 const bOwn = breadths[anchor.id]?.[b] || 0;
-                const frac = Math.min(1, bOwn / 19);
+                const frac = Math.min(1, bOwn / OWN_MAX);
+                const isWritten = !!written[anchor.id]?.[b];
                 return (
                     <button
                         key={b}
                         className={`mobile-breadth-tile${isActive ? ' active' : ''}`}
                         onClick={(e) => { e.stopPropagation(); handleBreadthSelect(anchor, b); }}
                         style={isActive ? { background: color, borderColor: color, color: '#fff' } : { borderColor: color, color }}
-                        aria-label={`Open ${b} pathway`}
+                        aria-label={`Open ${b} pathway. ${breadthTileTooltip(b, pathXp, bOwn, isWritten)}`}
+                        title={breadthTileTooltip(b, pathXp, bOwn, isWritten)}
                     >
                         <span className="mbt-letter">{b}</span>
                         <span className={`mbt-xp${pathXp == null ? ' muted' : ''}`}>{pathXp != null ? formatScore(pathXp) : '–'}</span>
+                        {isWritten && <span className="mbt-tick" aria-hidden="true">✓</span>}
                         {bOwn > 0 && (
                             <span className="mbt-underline" aria-hidden="true">
                                 <span className="mbt-underline-fill"
-                                    style={{ width: `${frac * 100}%`, background: bOwn >= 19 ? '#2e9e5b' : '#e0a030' }}></span>
+                                    style={{ width: `${frac * 100}%`, background: bOwn >= OWN_MASTERED ? '#2e9e5b' : '#e0a030' }}></span>
                             </span>
                         )}
                     </button>
@@ -1053,7 +1102,7 @@ function TreeVisualization() {
             <div className="tree-visualization mobile-tree-wrapper">
                 {/* Fetch the signed-in user's mastery scores on mobile too (the desktop branch has its
                     own copy; without this, mobile never loads scores). */}
-                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths, breadthScores }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); setBreadthScores(breadthScores); }} />}
+                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths, breadthScores, written }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); setBreadthScores(breadthScores); setWritten(written); }} />}
                 {introOverlay}
                 {busyOverlay}
 
@@ -1094,6 +1143,8 @@ function TreeVisualization() {
                                 <span className="legend-color" style={{ backgroundColor: '#e67e22' }}></span>
                                 <span><strong>C — Geographic:</strong> regional coverage</span>
                             </div>
+                            <div className="legend-divider"></div>
+                            <TileSignalLegend />
                         </div>
                     )}
 
@@ -1281,6 +1332,8 @@ function TreeVisualization() {
                                 <span className="legend-color" style={{ backgroundColor: '#e67e22' }}></span>
                                 <span><strong>Breadth C:</strong> Geographic anchors - regional coverage</span>
                             </div>
+                            <div className="legend-divider"></div>
+                            <TileSignalLegend />
                         </div>
                     )}
                 </div>
@@ -1303,7 +1356,7 @@ function TreeVisualization() {
                     overflowX: 'auto'
                 }}
             >
-                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths, breadthScores }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); setBreadthScores(breadthScores); }} />}
+                {clerkEnabled && <MasteryScoreLoader onLoaded={({ scores, peaks, breadths, breadthScores, written }) => { setScores(scores); setPeaks(peaks); setBreadths(breadths); setBreadthScores(breadthScores); setWritten(written); }} />}
                 <svg
                     viewBox={`0 0 ${svgWidth} ${svgHeight}`}
                     width="100%"
@@ -1414,8 +1467,10 @@ function TreeVisualization() {
                                         {/* Pathway tiles: breadth letter + that pathway's share of the total XP.
                                             Tap to open the pathway. The active pathway (on an in-path node) fills
                                             with its colour. A thin underline shows how much of THIS node's own
-                                            cards are mastered in that breadth (green when complete, amber while
-                                            partial) — the pathway XP and the own-mastery cue are different things. */}
+                                            content (flashcard mastery + narrative writing, 0..OWN_MAX) is done in
+                                            that breadth (green when complete, amber while partial) — the pathway
+                                            XP and the own-mastery cue are different things. A small tick marks a
+                                            breadth the user has written a narrative for at this node. */}
                                         {['A', 'B', 'C'].map((breadth, index) => {
                                             const activeBreadth = getActiveBreadth(node.id);
                                             const shouldShowColor = breadth === activeBreadth && isInPath;
@@ -1428,7 +1483,8 @@ function TreeVisualization() {
                                             const onDark = colors.fill === '#555555';
                                             const pathXp = breadthScores[node.anchor.id]?.[breadth];
                                             const bOwn = breadths[node.anchor.id]?.[breadth] || 0;
-                                            const frac = Math.min(1, bOwn / 19);
+                                            const frac = Math.min(1, bOwn / OWN_MAX);
+                                            const isWritten = !!written[node.anchor.id]?.[breadth];
                                             // Muted "no score yet" colour for the dash, so an unstudied tile
                                             // keeps the same letter/number layout as a scored one.
                                             const mutedNum = onDark ? 'rgba(255,255,255,0.4)' : '#b3bac2';
@@ -1441,6 +1497,7 @@ function TreeVisualization() {
                                                     }}
                                                     style={{ cursor: 'pointer' }}
                                                 >
+                                                    <title>{breadthTileTooltip(breadth, pathXp, bOwn, isWritten)}</title>
                                                     <rect
                                                         x={tileX}
                                                         y={tileY}
@@ -1481,8 +1538,29 @@ function TreeVisualization() {
                                                             <rect x={tileX + 5} y={tileY + tileH - 6} width={tileW - 10} height={3.5} rx="1.75"
                                                                 fill={shouldShowColor ? 'rgba(255,255,255,0.35)' : '#e2e6ea'} pointerEvents="none" />
                                                             <rect x={tileX + 5} y={tileY + tileH - 6} width={(tileW - 10) * frac} height={3.5} rx="1.75"
-                                                                fill={bOwn >= 19 ? '#2e9e5b' : '#e0a030'} pointerEvents="none" />
+                                                                fill={bOwn >= OWN_MASTERED ? '#2e9e5b' : '#e0a030'} pointerEvents="none" />
                                                         </>
+                                                    )}
+                                                    {/* "Written here" tick: a small filled circle + check mark in the
+                                                        tile's top-right corner, subtle enough not to compete with the
+                                                        letter/number at this size. */}
+                                                    {isWritten && (
+                                                        <g pointerEvents="none">
+                                                            <circle
+                                                                cx={tileX + tileW - 8}
+                                                                cy={tileY + 8}
+                                                                r="6"
+                                                                fill={shouldShowColor ? 'rgba(255,255,255,0.9)' : breadthColor}
+                                                            />
+                                                            <path
+                                                                d={`M ${tileX + tileW - 11} ${tileY + 8} l 2 2.5 l 4.5 -5`}
+                                                                stroke={shouldShowColor ? breadthColor : 'white'}
+                                                                strokeWidth="1.6"
+                                                                fill="none"
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                            />
+                                                        </g>
                                                     )}
                                                 </g>
                                             );
