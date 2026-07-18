@@ -13,7 +13,8 @@ WHAT TO COVER: {{coverageRule}}
 Do not fixate on a narrow detail because the wording or your sources happen to emphasise it. (E.g. for
 a section named "Total War Mobilization" the core is HOW societies mobilised — conscription, war
 economies, the 1914 mobilisations — not one or two famous battles. For a section that is a TIME WINDOW,
-cover the whole world in that window, not only whatever theme the section's name suggests.)
+cover its full scope in that window per WHAT TO COVER above, not only whatever theme the section's name
+suggests.)
 
 Each fact card has:
 - `headline`: ONE short plain sentence (~20 words max) stating the card's single core point — one
