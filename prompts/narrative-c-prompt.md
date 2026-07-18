@@ -16,6 +16,10 @@ You are writing the **C-breadth narrative** for this anchor. This means organizi
 **Ancestor path (how users reached this anchor):**
 {{ancestorPath}}
 
+**Analytical frame (what this narrative is fundamentally ABOUT):** {{analyticalFrame}}
+
+{{parentSignpost}}
+
 **Prerequisites the user has completed:** {{prerequisites}}
 
 ## The C-Anchors (Geographic Regions) You Must Teach
