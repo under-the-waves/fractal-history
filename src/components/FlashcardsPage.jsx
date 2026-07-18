@@ -80,6 +80,8 @@ function cardBucket(card) {
     return (card.repetitions || 0) < 2 ? 'learning' : 'review'
 }
 
+const BUCKET_LABEL = { new: 'New', learning: 'Learning', review: 'Review' }
+
 function StudyMode({ auth, onSwitchToBrowse }) {
     const [cards, setCards] = useState([])
     const [currentIndex, setCurrentIndex] = useState(0)
@@ -420,6 +422,9 @@ function StudyMode({ auth, onSwitchToBrowse }) {
                 </Link>
                 <span className={`study-breadth-badge breadth-${card.breadth}`}>
                     {card.breadth}
+                </span>
+                <span className={`study-bucket-badge study-count-${cardBucket(card)}`}>
+                    {BUCKET_LABEL[cardBucket(card)]}
                 </span>
             </div>
 
