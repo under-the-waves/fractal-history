@@ -206,6 +206,62 @@ button.orientation-axis-value:hover {
   flex-shrink: 0;
 }
 
+/* Divider between the breadth-colour legend and the tile-signal legend below it. */
+.legend-divider {
+  height: 1px;
+  background: #e2e6ea;
+  margin: 4px 0;
+}
+
+/* Small preview swatches for the tile-signal legend (number / bar / tick), matching the real tiles'
+   own visual language so the legend reads as "this is what you're looking at", not a separate diagram. */
+.legend-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.legend-swatch-number {
+  width: 30px;
+  height: 16px;
+  border-radius: 3px;
+  background: #eef1f4;
+  color: #2e9e5b;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.legend-swatch-bar {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: #eef1f4;
+  overflow: hidden;
+}
+
+.legend-swatch-bar-fill {
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  width: 10px;
+  height: 3.5px;
+  border-radius: 1.75px;
+  background: #2e9e5b;
+}
+
+.legend-swatch-tick {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2e9e5b;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 16px;
+}
+
 .tree-description {
   text-align: center;
   color: #666;
@@ -3801,6 +3857,22 @@ button.orientation-axis-value:hover {
 /* "No score yet" dash — keeps the tile's letter/number layout identical to a scored tile. */
 .mbt-xp.muted {
   opacity: 0.4;
+}
+
+/* "Written here" tick: a small badge in the tile's top-right corner, subtle at this size. */
+.mbt-tick {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #2e9e5b;
+  color: white;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 12px;
+  text-align: center;
 }
 
 /* Own-mastery underline pinned to the tile's bottom edge (track + coloured fill). */
