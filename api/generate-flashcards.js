@@ -14,14 +14,26 @@ function getAnthropicClient() {
     return anthropic;
 }
 
+// Applies to every sub-topic's HEADLINE card only (tagged "headline": true) -- the card selectCores
+// picks as that sub-topic's frozen "core" card, the one the learner is tested on by default. A core
+// must never test finer detail than the fact card's own headline, because that is the grain the
+// learner actually studied. Observed failure: a B headline asking "When was the Kingdom of Kush
+// founded?", drawn from a period card that mentioned Kush in a single "what happened" bullet -- far
+// below the grain of the period headline the learner saw. See buildCardsDigest below: the source digest
+// includes the headline PLUS the what/why bullets, so the model must be told which parts a core may draw on.
+const CORE_GRAIN_RULE = `  CORE-GRAIN RULE: this headline card must be answerable by a learner who remembered ONLY this sub-topic's headline fact -- the one-sentence summary at the top of its fact card -- and nothing from its "what happened" or "why it mattered" bullets. It must NEVER ask for a date, number, or name that appears only in one of those bullets, even if true and even if it is more specific or interesting than the headline. If the headline itself does not contain the thing you want to ask about, do not ask about it here.`;
+
 // Per-breadth rule for the HEADLINE card (the first of each sub-topic's cards). Validated on
 // A/B/C narratives (see project knowledge/Scoring_Engine_Design.md and the headline-validation
 // memory): the headline is the single most canonical fact for that sub-anchor, and the 5 cores
 // are selected from these headlines in code (selectCores), so no second LLM call is needed.
 const HEADLINE_RULES = {
     A: `  The FIRST card for each sub-topic MUST be its HEADLINE card: the single most essential, canonical fact a knowledgeable person names first about this sub-topic ("if you know this, you understand the sub-topic") -- never trivia. Prefer the CONCEPT, mechanism, named thing, or why it mattered. Do NOT use a date or a raw number as the answer -- chronology and figures belong to the temporal breadth. Its ANSWER must be a SHORT noun phrase (1-5 words) naming that specific thing; it must NOT restate the sub-topic's own title, and the QUESTION must not contain or give away its own answer.`,
-    B: `  The FIRST card for each sub-topic MUST be its HEADLINE card, and for temporal cards it anchors the sub-topic on the timeline: ask roughly WHEN the sub-topic's single defining event or development happened, or what FIRST marked it. Prefer a TIME as the answer -- a rough date, century, era, or "X ago" magnitude (e.g. "14th century", "about 3 billion years ago"); an ordering ("X, then Y") is also fine. The answer must NOT be a static concept or definition, and must NOT merely restate the sub-topic's own dates or label from its title. Keep the answer short. Never make the headline trivia.`,
-    C: `  The FIRST card for each sub-topic MUST be its HEADLINE card: the single most canonical fact about this region's role that a knowledgeable person would name first, as stated in the narrative. The answer must NOT merely restate the region's own name (e.g. for a region called "Eurasia", the answer may not be "Eurasia") -- name a place, people, or feature WITHIN it. A number or range may be the answer only when the magnitude itself is the defining point; do not default to the largest statistic when a defining event, place, or person is the more canonical fact. Never make the headline trivia.`
+    B: `  The FIRST card for each sub-topic MUST be its HEADLINE card, and it tests the PERIOD'S OWN DELINEATION: roughly WHEN it began or ended, or what marked its start or end -- drawn from the sub-topic's own date range (shown in its title), never from the date of an entity or event that merely happened to exist inside the period. Prefer a TIME as the answer -- a rough date, century, era, or "X ago" magnitude (e.g. "14th century", "about 3 billion years ago") -- or a short phrase naming what marked the boundary. The answer must NOT be a static concept or definition, and must NOT merely restate the sub-topic's own dates or label from its title.
+  BAD: "When was the Kingdom of Kush founded?" (a detail about an entity that happened to exist inside the period -- not the period's own boundary.)
+  GOOD: "Roughly when did [the period] begin, and what marked its start?" (tests the period's own delineation, drawn from its own date range.)
+  Keep the answer short. Never make the headline trivia.`,
+    C: `  The FIRST card for each sub-topic MUST be its HEADLINE card: the single most canonical fact about this region's role that a knowledgeable person would name first, as stated in the sub-topic's own headline fact -- not a detail found only in its "what happened" or "why it mattered" bullets. The answer must NOT merely restate the region's own name (e.g. for a region called "Eurasia", the answer may not be "Eurasia") -- name a place, people, or feature WITHIN it. A number or range may be the answer only when the magnitude itself is the defining point AND appears in the headline; do not default to the largest statistic when a defining event, place, or person is the more canonical fact. Never make the headline trivia.`
 };
 
 const breadthGuidanceFor = (breadth) => ({
@@ -55,8 +67,9 @@ export function buildFlashcardPrompt({ anchorTitle, breadth, children, narrative
         ? `Create a candidate pool the learner will choose from:
 - For EACH of the ${numSubtopics} sub-topics above, write exactly ${perSubtopic} cards, each testing a different aspect of that sub-topic. Tag each with "group": "sub:<exact sub-topic title>".
 ${headlineRule}
+${CORE_GRAIN_RULE}
   Tag ONLY the headline card with "headline": true; the other ${perSubtopic - 1} cards must NOT carry that tag and should test genuinely different aspects.
-- Then write ${generalCount} more cards drawn from the rest of the narrative -- ${generalFocus} -- that are not tied to any single sub-topic. Do NOT repeat a fact already tested by a sub-topic card. Tag each of these with "group": "general", and list them with the single most essential, canonical one FIRST (it may be chosen as a core card).
+- Then write ${generalCount} more cards drawn from the rest of the narrative -- ${generalFocus} -- that are not tied to any single sub-topic. Do NOT repeat a fact already tested by a sub-topic card. Tag each of these with "group": "general", and list them with the single most essential, canonical one FIRST (it may be chosen as a core card). These general cards, and the ${perSubtopic - 1} non-headline sub-topic cards, MAY draw on the fuller "what happened" and "why it mattered" detail in the source -- unlike the headline cards, they are the harder, optional layer and are NOT held to the core-grain rule.
 Aim for roughly ${totalTarget} cards total.`
         : `Create a candidate pool of about ${generalCount} cards drawn from across the whole narrative -- ${generalFocus}. Tag each with "group": "general", and list them with the most essential, canonical ones FIRST (the first cards may be chosen as core cards).`;
 

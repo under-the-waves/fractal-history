@@ -30,6 +30,8 @@ because they left out further detail from the fact base.
 A factual error inside a part pulls that part down (full → partial, or → none if the whole point is
 wrong). Do not require more than one true, substantive statement for **full**.
 
+**What "full" means for this breadth:** {{breadthCriteria}}
+
 **2. Coherence.** Set `coherent` to true if the narrative reads as one connected account (the parts
 relate to each other, there is a through-line). Set it to false only if it is a disconnected list of
 statements with no connective tissue. Coherence is the ONLY thing separating full coverage from a

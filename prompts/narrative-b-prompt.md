@@ -11,10 +11,16 @@ You are writing a ~1000-word historical narrative for the Fractal History learni
 
 You are writing the **B-breadth narrative** for this anchor. This means organizing your narrative around how this topic unfolded over time, guiding readers through distinct chronological periods.
 
+{{geoScopeBlock}}
+
 ## Context: Where This Anchor Sits in the Learning Path
 
 **Ancestor path (how users reached this anchor):**
 {{ancestorPath}}
+
+**Analytical frame (what this narrative is fundamentally ABOUT):** {{analyticalFrame}}
+
+{{parentSignpost}}
 
 **Prerequisites the user has completed:** {{prerequisites}}
 

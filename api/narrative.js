@@ -17,6 +17,8 @@ import { query, getAncestorPath } from '../lib/db.js';
 import { getLearnContent } from '../lib/learnContent.js';
 import { buildNarrativeGrounding, citeFromFactBase } from '../lib/narrativeGrounding.js';
 import { factCheckNarrative } from '../lib/factCheck.js';
+import { formatAncestorContext, renderAnalyticalFrame, renderParentSignpost, geographicCoordinate } from '../lib/promptLoader.js';
+import { nearestAncestorOfBreadth } from '../shared/ancestry.js';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -145,15 +147,17 @@ async function getAnchorDetails(anchorId) {
     return result.length > 0 ? result[0] : null;
 }
 
-// Format ancestor path for the prompt
-function formatAncestorPath(ancestors) {
-    if (ancestors.length <= 1) {
-        return 'This is a top-level anchor.';
-    }
+// Region-bounding block for a B (temporal) narrative that sits under (or is) a geographic (C)
+// ancestor. Adapts learnCoverageInstruction's "Do NOT broaden to the whole world" rule (see
+// lib/promptLoader.js, used by the study-content pipeline for the same purpose) to narrative prose,
+// so a B narrative of e.g. "Oceania" stays about Oceania across its periods instead of defaulting to
+// whole-world coverage. Returns '' when there is no geographic ancestor anywhere in the path
+// (unchanged whole-world narrative).
+function renderGeoScopeBlock(geoScope) {
+    if (!geoScope) return '';
+    return `## REGION-BOUNDED: THIS IS A ${geoScope.toUpperCase()} STORY, NOT A WORLD STORY
 
-    return ancestors.map((a, i) =>
-        `${i + 1}. **${a.title}** (Level ${a.level}${a.breadth ? `, Breadth ${a.breadth}` : ''})\n   Scope: ${a.scope}`
-    ).join('\n\n');
+This topic sits under a geographic anchor. Every period you narrate must stay about developments IN ${geoScope} – its peoples and powers, economy, culture and ideas, and its environment – and its connections outward, including people or forces from ${geoScope} acting elsewhere. Do NOT broaden to the whole world: the region is fixed as ${geoScope}. A period's descriptive name is a signpost for the era, not license to widen the story beyond ${geoScope}.`;
 }
 
 // Format child anchors for the prompt
@@ -177,6 +181,9 @@ function populatePromptTemplate(template, data) {
         .replace(/\{\{anchorTitle\}\}/g, data.anchorTitle)
         .replace(/\{\{anchorScope\}\}/g, data.anchorScope)
         .replace(/\{\{ancestorPath\}\}/g, data.ancestorPath)
+        .replace(/\{\{analyticalFrame\}\}/g, () => data.analyticalFrame || '')
+        .replace(/\{\{parentSignpost\}\}/g, () => data.parentSignpost || '')
+        .replace(/\{\{geoScopeBlock\}\}/g, () => data.geoScopeBlock || '')
         .replace(/\{\{prerequisites\}\}/g, data.prerequisites)
         .replace(/\{\{childAnchors\}\}/g, data.childAnchors)
         .replace(/\{\{scienceMode\}\}/g, () => data.scienceMode || '')
@@ -457,11 +464,33 @@ async function handleGenerate(req, res) {
         // Populate template
         const shared = loadSharedVoice();
         const isScienceNode = ancestors.some(a => SCIENCE_ROOTS.has(a.id));
+
+        // Ancestor/parent framing, reused from lib/promptLoader.js (the same helpers the anchor-generation
+        // and study-content pipelines use) instead of the old title-dumping formatAncestorPath: temporal
+        // (B) and geographic (C) ancestors reduce to their coordinate (a when / a where), so their topical
+        // titles exert no thematic pull on the narrative. `ancestors` already includes anchorId itself as
+        // the last element (see lib/db.js:getAncestorPath), which is exactly the "parent" these helpers
+        // expect - anchorId is the parent of the breadth-specific children this narrative is organized
+        // around, the same relationship api/generate-anchors.js has with the children it generates.
+        const analyticalFrame = renderAnalyticalFrame(ancestors);
+        const parentSignpost = renderParentSignpost(ancestors);
+
+        // A B (temporal) narrative defaults to whole-world coverage per period. When the anchor sits
+        // under (or is) a geographic (C) ancestor, bound it to that region instead - mirrors the same
+        // geoScope rule lib/learnContent.js:buildSectionFrame applies to the study-content pipeline, via
+        // nearestAncestorOfBreadth (shared/ancestry.js). null/'' for A and C narratives, and for a B
+        // narrative with no geographic ancestor anywhere in the path (unchanged whole-world behaviour).
+        const geoAncestor = breadth === 'B' ? nearestAncestorOfBreadth(ancestors, 'C') : null;
+        const geoScope = geoAncestor ? geographicCoordinate(geoAncestor) : null;
+
         const prompt = populatePromptTemplate(promptTemplate, {
             anchorId: anchorId,
             anchorTitle: anchor.title,
             anchorScope: anchor.scope || 'No scope defined',
-            ancestorPath: formatAncestorPath(ancestors),
+            ancestorPath: formatAncestorContext(ancestors),
+            analyticalFrame,
+            parentSignpost,
+            geoScopeBlock: renderGeoScopeBlock(geoScope),
             prerequisites: 'None', // Can be expanded later to track user progress
             childAnchors: formatChildAnchors(children, breadth),
             scienceMode: isScienceNode ? SCIENCE_MODE_BLOCK : '',

@@ -45,6 +45,26 @@ function layerHasContent(v) {
 
 const WHY_DISCLAIMER = 'This is the mainstream explanation. Where the causes are genuinely debated, see the Debates layer for more nuance.'
 
+// Breadth-specific framing for the start screen: what the learner will be writing about, replacing
+// the old breadth-agnostic scope paragraph, which competed with the breadth goal instead of stating it.
+const START_FRAMING = {
+    A: "You'll write about the 3 to 5 most important events, concepts, or phenomena in this topic.",
+    B: "You'll write about how this topic unfolded over time – the main periods, in order.",
+    C: "You'll write about how this topic played out across regions.",
+}
+
+// Breadth-specific focus sentence appended to the write-screen instructions (both the cold write and
+// the second write), so the learner knows what a strong answer looks like for this breadth.
+const WRITE_FOCUS = {
+    A: 'Focus on identifying the 3 to 5 most important events, concepts, or phenomena, and say why each mattered.',
+    B: 'Focus on delineating the main time periods as you see them, in order, with rough dates.',
+    C: 'Focus on identifying the key regions involved and what was distinctive about each.',
+}
+
+// Extra sentence for the second (post-study) write only, breadth C: pushed once the learner has
+// studied the regions and can reasonably be asked to connect them.
+const SECOND_WRITE_EXTRA_C = 'Try to draw at least one connection or comparison across regions.'
+
 // The per-part credit -> the human label + tone shown in the coverage breakdown.
 const CREDIT_META = {
     full: { label: 'covered', tone: 'ok' },
@@ -614,7 +634,7 @@ function GenerativeLearning() {
                 <div className="gl-start">
                     <p className="gl-eyebrow">Learn this topic</p>
                     <h1 className="gl-title">{anchorInfo?.title || 'Loading…'}</h1>
-                    {anchorInfo?.scope && <p className="gl-scope">{anchorInfo.scope}</p>}
+                    <p className="gl-scope">{START_FRAMING[breadth] || START_FRAMING.A}</p>
 
                     <div className="gl-start-card">
                         <p className="gl-start-lead">Write what you know, then check and deepen it.</p>
@@ -653,7 +673,8 @@ function GenerativeLearning() {
                     <p className="gl-instruction">
                         Before you study anything, write what you already know about this topic, in your own
                         words. Getting it partly wrong is fine — having a go first is what makes the facts
-                        stick when you read them. You’ll get a chance to study and rewrite next.
+                        stick when you read them. You’ll get a chance to study and rewrite next.{' '}
+                        {WRITE_FOCUS[breadth] || WRITE_FOCUS.A}
                     </p>
 
                     <textarea
@@ -765,7 +786,8 @@ function GenerativeLearning() {
                         Now write the history in your own words, from memory. You get full marks if you say
                         something true about each part of the story, connect them so they hang together, and get
                         nothing factually wrong. You don’t need to repeat every detail from the facts page — the
-                        detail belongs in each part’s own topic.
+                        detail belongs in each part’s own topic.{' '}
+                        {WRITE_FOCUS[breadth] || WRITE_FOCUS.A}{breadth === 'C' ? ` ${SECOND_WRITE_EXTRA_C}` : ''}
                     </p>
 
                     <textarea

@@ -40,6 +40,10 @@ You are writing the **A-breadth narrative** for this anchor—organized around t
 **Ancestor path (how users reached this anchor):**
 {{ancestorPath}}
 
+**Analytical frame (what this narrative is fundamentally ABOUT):** {{analyticalFrame}}
+
+{{parentSignpost}}
+
 **Prerequisites the user has completed:** {{prerequisites}}
 
 ## The 5 A-Anchors You Must Teach
