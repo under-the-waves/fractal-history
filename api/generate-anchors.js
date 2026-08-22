@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles, renderAnalyticalFrame, renderParentSignpost, renderParentLabel, temporalCoordinate, geographicCoordinate } from '../lib/promptLoader.js';
 import { query, getAncestorPath, wouldCreateCycle, getGlobalConceptAnchors, normaliseConceptTitle } from '../lib/db.js';
+import { analyticalAncestors } from '../shared/ancestry.js';
 import { WORLD, getName, getLevel, getChildren, expandToCandidates, expandToCountries, resolveCountries } from '../lib/geography.js';
 import dotenv from 'dotenv';
 
@@ -927,12 +928,57 @@ export function buildCountryGroupingPrompt(parentId, parentTitle, parentScope, a
         ? `\n**These regions already exist for this topic — do not duplicate them:**\n${existingSiblings.map(s => `- ${s.title}`).join('\n')}\n`
         : '';
 
-    // When the area is already narrowed to a manageable set, list it so the model groups within it.
-    // For a whole-world division we do not list ~195 countries; the model names the relevant ones
-    // from its own knowledge and the program validates them against the world set.
-    const scopeList = (!isWholeWorld && universeCca2.length <= 60)
-        ? `\n## The countries in scope\n\nGroup only from these ${universeCca2.length} countries:\n${universeCca2.map(getName).sort().join(', ')}\n`
-        : `\n## The countries in scope\n\nThe whole world is in scope. Name the countries with a real connection to this topic; everything you do not name is gathered into a leftover automatically.\n`;
+    // When the area is already narrowed, list every country in it so the model groups within it.
+    // Only a whole-world division skips the list (~195 names); there the model names the relevant
+    // countries from its own knowledge and the program validates them against the world set.
+    const scopeList = isWholeWorld
+        ? `\n## The countries in scope\n\nThe whole world is in scope. Name the countries with a real connection to this topic; everything you do not name is gathered into a leftover automatically.\n`
+        : `\n## The countries in scope\n\nGroup only from these ${universeCca2.length} countries:\n${universeCca2.map(getName).sort().join(', ')}\n`;
+
+    // A division with no analytical (A) ancestor is untopical: the parent is a pure coordinate cell
+    // (a place, a time window, or both), so "connection to the topic" cannot select countries —
+    // every country in scope has a full history here. Salient-groups-plus-leftover produces absurd
+    // results in that case (e.g. Mesopotamia swept into "Remaining Countries" as an "indirect
+    // connection" when Eurasia's whole history was divided). Untopical divisions must instead
+    // partition the area comprehensively, leaving only genuine remnants to the leftover.
+    const topical = analyticalAncestors(ancestorPath).length > 0;
+
+    const regionMeaning = topical
+        ? `A region is a group of countries that share a CONNECTION to this topic — through their people, forces, money, and decisions WHEREVER those acted, not only events that physically happened on their soil. Example: under "World War I", a region "Australia and New Zealand" covers the ANZACs who fought at Gallipoli and in France, far from home.
+
+You decide which countries belong together for THIS topic — there is no fixed map. Group them the way a historian teaching this topic would: by their role, alliance, or shared part in it (e.g. for a war: the major belligerents, the home fronts, the colonial theatres; for a cultural movement: the heartlands, then where it spread).`
+        : `There is no analytical topic here — you are dividing this area's WHOLE history. A region is a coherent historical-geographical area: countries bound together by shared civilisational history, sustained interaction, or a common historical arc. Group them the way a general world-history atlas would partition this area. Every major centre of civilisation and every populous country must sit in a named region that fits it.`;
+
+    const whatToDo = topical
+        ? `1. Form **2 to 4 named regions**, each a group of countries with a strong, coherent connection to the topic. A region can be one country or several that belong together.
+2. List each region's members as country names or ISO codes.
+3. Give each region a short title (5 words max), a 2-3 sentence scope, and a connection strength from 1 to 10.
+4. You do NOT need to place every country. Name only those with a real connection; the program sweeps everyone else into a single leftover region. Optionally give that leftover a title and one-line scope.`
+        : `1. Partition the countries in scope into **4 to 7 named regions** that together cover the area comprehensively.
+2. Every country with a significant recorded history MUST be in a named region. A populous country, or the heartland of a major civilisation (e.g. Mesopotamia, the Nile, the Ganges plain), must NEVER be left to the leftover.
+3. List each region's members as country names or ISO codes.
+4. Give each region a short title (5 words max), a 2-3 sentence scope, and a connection strength from 1 to 10 (here: the region's overall historical significance).
+5. The leftover is only for genuine remnants — microstates, dependencies, and territories that fit no region. Expect it to be SMALL. Give it a title and one-line scope.`;
+
+    const groupCountRule = topical ? '2 to 4 groups.' : '4 to 7 groups, together covering the area comprehensively.';
+
+    const exampleGroup = topical
+        ? `{
+      "title": "Allied Powers",
+      "scope": "Britain, France, Russia, Italy and the United States: the principal Entente belligerents — their armies, war economies, and the alliance politics that bound them.",
+      "members": ["United Kingdom", "France", "Russia", "Italy", "United States"],
+      "connectionStrength": 9
+    }`
+        : `{
+      "title": "East Asia",
+      "scope": "China, Japan, Korea, and Mongolia: a civilisational sphere shaped by Chinese statecraft, writing, and religion, each with a distinct national history within it.",
+      "members": ["China", "Japan", "South Korea", "North Korea", "Mongolia"],
+      "connectionStrength": 9
+    }`;
+
+    const exampleLeftover = topical
+        ? `{ "title": "Rest of the World", "scope": "Countries with a lesser connection to this topic, kept reachable for deeper exploration." }`
+        : `{ "title": "Small States & Territories", "scope": "Microstates, dependencies, and territories that fit no larger region, kept reachable for deeper exploration." }`;
 
     return `# Geographic division by country grouping
 
@@ -951,36 +997,26 @@ ${ancestorContext}
 ${siblingNote}
 ## What a region means here
 
-A region is a group of countries that share a CONNECTION to this topic — through their people, forces, money, and decisions WHEREVER those acted, not only events that physically happened on their soil. Example: under "World War I", a region "Australia and New Zealand" covers the ANZACs who fought at Gallipoli and in France, far from home.
-
-You decide which countries belong together for THIS topic — there is no fixed map. Group them the way a historian teaching this topic would: by their role, alliance, or shared part in it (e.g. for a war: the major belligerents, the home fronts, the colonial theatres; for a cultural movement: the heartlands, then where it spread).
+${regionMeaning}
 ${scopeList}
 ## What to do
 
-1. Form **2 to 4 named regions**, each a group of countries with a strong, coherent connection to the topic. A region can be one country or several that belong together.
-2. List each region's members as country names or ISO codes.
-3. Give each region a short title (5 words max), a 2-3 sentence scope, and a connection strength from 1 to 10.
-4. You do NOT need to place every country. Name only those with a real connection; the program sweeps everyone else into a single leftover region. Optionally give that leftover a title and one-line scope.
+${whatToDo}
 
 ## Output: JSON only, no other text
 
 \`\`\`json
 {
   "groups": [
-    {
-      "title": "Allied Powers",
-      "scope": "Britain, France, Russia, Italy and the United States: the principal Entente belligerents — their armies, war economies, and the alliance politics that bound them.",
-      "members": ["United Kingdom", "France", "Russia", "Italy", "United States"],
-      "connectionStrength": 9
-    }
+    ${exampleGroup}
   ],
-  "leftover": { "title": "Rest of the World", "scope": "Countries with a lesser connection to this topic, kept reachable for deeper exploration." },
+  "leftover": ${exampleLeftover},
   "coverageJustification": "One or two sentences on why these groupings capture the topic's strongest geographic connections."
 }
 \`\`\`
 
 **Rules:**
-- 2 to 4 groups. Members must be **present-day countries** — use recognisable modern names or ISO codes. For a historical state, list its **modern successor countries** instead of the empire's name: e.g. Austria-Hungary → Austria, Hungary, Czechia, Slovakia, Slovenia, Croatia; the Ottoman Empire → Türkiye (and its successor states if relevant); the USSR → Russia, Ukraine, and the other former republics. The scope prose may still use the historical name; the member list must be modern countries.
+- ${groupCountRule} Members must be **present-day countries** — use recognisable modern names or ISO codes. For a historical state, list its **modern successor countries** instead of the empire's name: e.g. Austria-Hungary → Austria, Hungary, Czechia, Slovakia, Slovenia, Croatia; the Ottoman Empire → Türkiye (and its successor states if relevant); the USSR → Russia, Ukraine, and the other former republics. The scope prose may still use the historical name; the member list must be modern countries.
 - **The scope must describe ONLY that group's own member countries and their connection to the topic.** You may mention an outside place only to say what the group connected to or acted upon — never as part of the group.
 - Titles 5 words maximum. A title must not imply countries the group leaves out.
 - If a region is a time-bounded entity, put its period in brackets in the title.
