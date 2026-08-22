@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { loadPrompt, formatAncestorContext, formatSiblingContext, formatForbiddenTitles, renderAnalyticalFrame, renderParentSignpost, renderParentLabel, temporalCoordinate, geographicCoordinate } from '../lib/promptLoader.js';
 import { query, getAncestorPath, wouldCreateCycle, getGlobalConceptAnchors, normaliseConceptTitle } from '../lib/db.js';
 import { analyticalAncestors } from '../shared/ancestry.js';
-import { WORLD, getName, getLevel, getChildren, expandToCandidates, expandToCountries, resolveCountries } from '../lib/geography.js';
+import { WORLD, getName, getLevel, getChildren, getSubregion, getRegion, expandToCandidates, expandToCountries, resolveCountries } from '../lib/geography.js';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -456,7 +456,16 @@ export default async function handler(req, res) {
                 named.push({ title: g.title, scope: g.scope, members, connectionStrength: Number(g.connectionStrength) || 0 });
             }
 
-            const leftoverCodes = cUniverse.filter(code => !claimed.has(code));
+            let leftoverCodes = cUniverse.filter(code => !claimed.has(code));
+
+            // An untopical division must not grow a leftover child out of overlooked stragglers —
+            // scattered islands with nothing in common are not a region. Adopt each one into the
+            // named group that already holds its geographic neighbours; only unmatchable entries
+            // remain for the leftover. Topical divisions keep their leftover: "peripheral to this
+            // topic" is a meaningful membership there.
+            if (analyticalAncestors(ancestorPath).length === 0 && leftoverCodes.length > 0) {
+                leftoverCodes = adoptStragglers(named, leftoverCodes);
+            }
 
             // Hard cap: a division may never exceed 5 children in total (see capCountryGroups).
             const capped = capCountryGroups(named, leftoverCodes.length > 0 ? 4 : 5);
@@ -1716,6 +1725,34 @@ function canonicaliseTemporalBoundaries(anchors) {
         const tb = a.timeBoundaries || {};
         return { ...a, timeBoundaries: { ...tb, start: canonicalDate(tb.start, 'start'), end: canonicalDate(tb.end, 'end') } };
     });
+}
+
+// Adopt unplaced countries into the named group that already holds most of their UN-subregion
+// neighbours (falling back to region neighbours), mutating that group's members. Returns the codes
+// no group could adopt. Used for untopical divisions only, where every entity belongs somewhere and
+// a leftover child of scattered stragglers would be a nonsense region.
+export function adoptStragglers(named, leftoverCodes) {
+    const residual = [];
+    for (const code of leftoverCodes) {
+        let best = null;
+        let bestCount = 0;
+        for (const keyOf of [getSubregion, getRegion]) {
+            const key = keyOf(code);
+            if (!key) continue;
+            for (const g of named) {
+                const count = g.members.filter(m => keyOf(m) === key).length;
+                if (count > bestCount) { bestCount = count; best = g; }
+            }
+            if (best) break;
+        }
+        if (best) {
+            best.members.push(code);
+            console.log(`Breadth C (country): adopted straggler ${code} into "${best.title}"`);
+        } else {
+            residual.push(code);
+        }
+    }
+    return residual;
 }
 
 // Every division is capped at 5 children, matching the temporal cap below and the hand-seeded
