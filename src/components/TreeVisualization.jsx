@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@clerk/react';
 import { useClerkEnabled } from '../hooks/useClerkAuth';
@@ -10,9 +10,14 @@ import {
 } from '../data/treeStructure';
 import WhyTheseAnchors from './WhyTheseAnchors';
 import OrientationPanel from './OrientationPanel';
+import RegionHoverCard from './RegionHoverCard';
 import { useToasts } from './AchievementToasts';
 import { getRandomFact } from '../data/historyFacts';
 import { levelForScore, levelInfo } from '../../shared/levels';
+
+// The TopoJSON/d3-geo map bundle is heavy and only needed on C-breadth (geographic) anchors, so
+// it's lazy-loaded here (used by the mobile members panel below and by RegionHoverCard on desktop).
+const RegionMiniMap = lazy(() => import('./RegionMiniMap'));
 
 function useIsMobile(breakpoint = 768) {
     const [isMobile, setIsMobile] = useState(() => {
@@ -98,6 +103,42 @@ function TileSignalLegend() {
     );
 }
 
+const MOBILE_MEMBERS_PREVIEW = 8;
+
+// Mobile equivalent of the desktop RegionHoverCard: the member country list plus a mini map,
+// shown inline in the expanded-anchor panel for a C-breadth (geographic) anchor. No hover
+// timing needed here — it just sits in the panel whenever the expanded anchor has members.
+function MobileRegionMembers({ anchor, contextCodes }) {
+    const [expanded, setExpanded] = useState(false);
+    const members = anchor.members || [];
+    if (members.length === 0) return null;
+    const preview = members.slice(0, MOBILE_MEMBERS_PREVIEW);
+    const remaining = members.length - preview.length;
+
+    return (
+        <div className="mobile-region-members">
+            <Suspense fallback={<div className="region-mini-map-loading" style={{ width: '100%', maxWidth: 260, height: 150 }}>Loading map…</div>}>
+                <RegionMiniMap memberCodes={members.map(m => m.code)} contextCodes={contextCodes} width={260} height={150} />
+            </Suspense>
+            <div className="region-hover-card-heading">Countries in this region ({members.length})</div>
+            {!expanded ? (
+                <p className="region-hover-card-preview">
+                    {preview.map(m => m.name).join(', ')}
+                    {remaining > 0 && (
+                        <button type="button" className="region-hover-card-more" onClick={() => setExpanded(true)}>
+                            {` +${remaining} more`}
+                        </button>
+                    )}
+                </p>
+            ) : (
+                <p className="region-hover-card-full">
+                    {members.map(m => m.name).join(', ')}
+                </p>
+            )}
+        </div>
+    );
+}
+
 // Auth-gated loader: fetches the signed-in user's per-node mastery scores once and lifts them up.
 // Rendered only when Clerk is enabled, so useAuth is always inside ClerkProvider. Renders nothing.
 function MasteryScoreLoader({ onLoaded }) {
@@ -173,6 +214,20 @@ function TreeVisualization() {
 
     // Error state for user-facing messages
     const [errorMessage, setErrorMessage] = useState(null);
+
+    // Desktop hover card for C-breadth (geographic) nodes: a floating mini map + country list.
+    // hoverOpenTimerRef delays opening so a passing cursor doesn't flash the card; hoverCloseTimerRef
+    // gives a grace period so moving from the node onto the card itself doesn't close it.
+    const [hoverCard, setHoverCard] = useState(null); // { anchor, contextCodes, position: {x,y} } | null
+    const hoverOpenTimerRef = useRef(null);
+    const hoverCloseTimerRef = useRef(null);
+    const supportsHoverRef = useRef(
+        typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(hover: hover)').matches
+    );
+    useEffect(() => () => {
+        clearTimeout(hoverOpenTimerRef.current);
+        clearTimeout(hoverCloseTimerRef.current);
+    }, []);
 
     // First-visit welcome overlay (dismissable, persisted in localStorage)
     const [showIntro, setShowIntro] = useState(() => {
@@ -274,7 +329,8 @@ function TreeVisualization() {
                         level: anchor.level,
                         breadth: anchor.breadth,
                         position: anchor.position,
-                        parentId: nodeId
+                        parentId: nodeId,
+                        members: anchor.members
                     };
                 });
                 setTreeData(newTreeData);
@@ -348,7 +404,8 @@ function TreeVisualization() {
                 level: anchor.level,
                 breadth: anchor.breadth,
                 position: anchor.position,
-                parentId: anchor.parentId
+                parentId: anchor.parentId,
+                members: anchor.members
             };
         });
         setTreeData(staticTreeData);
@@ -452,7 +509,7 @@ function TreeVisualization() {
                 if (!next[a.id]) {
                     next[a.id] = {
                         id: a.id, title: a.title, scope: a.scope, level: a.level,
-                        breadth: a.breadth, position: a.position, parentId
+                        breadth: a.breadth, position: a.position, parentId, members: a.members
                     };
                     changed = true;
                 }
@@ -676,7 +733,7 @@ function TreeVisualization() {
                         data.anchors.forEach(a => {
                             additions[a.id] = {
                                 id: a.id, title: a.title, scope: a.scope, level: a.level,
-                                breadth: a.breadth, position: a.position, parentId: parent
+                                breadth: a.breadth, position: a.position, parentId: parent, members: a.members
                             };
                         });
                     }
@@ -1030,6 +1087,47 @@ function TreeVisualization() {
 
     const visibleNodes = getVisibleNodes();
 
+    // Union of member country/subdivision codes across every C-breadth sibling of `anchor`
+    // (including itself) — the "context" a region's mini map is framed against, e.g. all of
+    // Eurasia's children when hovering one of them, not the whole world.
+    const getRegionContextCodes = (anchor) => {
+        if (!anchor) return [];
+        // Siblings must come from the live treeData map — the static getChildren helper only
+        // knows the hand-seeded level-0/1 anchors, not database-loaded divisions.
+        const codes = new Set();
+        Object.values(treeData).forEach(n => {
+            if (n.parentId === anchor.parentId && n.breadth === 'C') {
+                (n.members || []).forEach(m => codes.add(m.code));
+            }
+        });
+        (anchor.members || []).forEach(m => codes.add(m.code));
+        return [...codes];
+    };
+
+    // Open the desktop hover card for a C-breadth node after a short delay, positioned next to
+    // the hovered element. Delayed so a passing cursor doesn't flash the card open.
+    const openHoverCard = (anchor, targetEl) => {
+        if (!supportsHoverRef.current) return;
+        clearTimeout(hoverCloseTimerRef.current);
+        clearTimeout(hoverOpenTimerRef.current);
+        hoverOpenTimerRef.current = setTimeout(() => {
+            const rect = targetEl.getBoundingClientRect();
+            setHoverCard({
+                anchor,
+                contextCodes: getRegionContextCodes(anchor),
+                position: { x: rect.right + 10, y: rect.top }
+            });
+        }, 150);
+    };
+    // Close after a small grace delay, so moving the pointer from the node onto the card itself
+    // (which cancels this via onMouseEnter below) doesn't close it.
+    const scheduleCloseHoverCard = () => {
+        clearTimeout(hoverOpenTimerRef.current);
+        clearTimeout(hoverCloseTimerRef.current);
+        hoverCloseTimerRef.current = setTimeout(() => setHoverCard(null), 200);
+    };
+    const cancelCloseHoverCard = () => clearTimeout(hoverCloseTimerRef.current);
+
     // Mobile XP pill: shows the node's mastery score, and "current/best" in amber when it has decayed
     // below the all-time peak (the desktop tree uses the SVG MasteryBadge for the same thing).
     const renderScorePill = (id) => {
@@ -1198,6 +1296,12 @@ function TreeVisualization() {
                             </h2>
                             {expandedAnchor.scope && (
                                 <p className="mobile-tree-scope">{expandedAnchor.scope}</p>
+                            )}
+                            {expandedAnchor.breadth === 'C' && expandedAnchor.members?.length > 0 && (
+                                <MobileRegionMembers
+                                    anchor={expandedAnchor}
+                                    contextCodes={getRegionContextCodes(expandedAnchor)}
+                                />
                             )}
 
                             {showStart ? (
@@ -1392,6 +1496,18 @@ function TreeVisualization() {
                                 onClick={() => {
                                     if (node.type === 'root' && activePath.length === 0) {
                                         handleExplore(node.id);
+                                    }
+                                }}
+                                onMouseEnter={(e) => {
+                                    // C-breadth (geographic) nodes get a hover card showing their member
+                                    // countries on a mini map; other breadths are unaffected.
+                                    if (node.anchor.breadth === 'C' && node.anchor.members?.length > 0) {
+                                        openHoverCard(node.anchor, e.currentTarget);
+                                    }
+                                }}
+                                onMouseLeave={() => {
+                                    if (node.anchor.breadth === 'C' && node.anchor.members?.length > 0) {
+                                        scheduleCloseHoverCard();
                                     }
                                 }}
                             >
@@ -1628,6 +1744,19 @@ function TreeVisualization() {
                         </foreignObject>
                     )}
                 </svg>
+
+                {/* Desktop hover card for a C-breadth node: mini map + country list. Rendered outside
+                    the SVG (position: fixed) so it can float above everything and clamp to the viewport. */}
+                {hoverCard && (
+                    <RegionHoverCard
+                        anchor={hoverCard.anchor}
+                        contextCodes={hoverCard.contextCodes}
+                        position={hoverCard.position}
+                        onClose={() => setHoverCard(null)}
+                        onMouseEnter={cancelCloseHoverCard}
+                        onMouseLeave={scheduleCloseHoverCard}
+                    />
+                )}
 
                 {/* "Why these Anchors?" Slide-in Panel */}
                 <WhyTheseAnchors
