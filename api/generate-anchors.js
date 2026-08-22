@@ -955,10 +955,10 @@ You decide which countries belong together for THIS topic — there is no fixed 
 3. Give each region a short title (5 words max), a 2-3 sentence scope, and a connection strength from 1 to 10.
 4. You do NOT need to place every country. Name only those with a real connection; the program sweeps everyone else into a single leftover region. Optionally give that leftover a title and one-line scope.`
         : `1. Partition the countries in scope into **4 to 7 named regions** that together cover the area comprehensively.
-2. Every country with a significant recorded history MUST be in a named region. A populous country, or the heartland of a major civilisation (e.g. Mesopotamia, the Nile, the Ganges plain), must NEVER be left to the leftover.
+2. Every country with a significant recorded history MUST be in a named region. Concretely: any country with more than one million people is NEVER a remnant and must be placed — including mid-size states you might be tempted to skip (e.g. Greece, the Baltic states, Cyprus). A populous country, or the heartland of a major civilisation (e.g. Mesopotamia, the Nile, the Ganges plain), must NEVER be left to the leftover.
 3. List each region's members as country names or ISO codes.
 4. Give each region a short title (5 words max), a 2-3 sentence scope, and a connection strength from 1 to 10 (here: the region's overall historical significance).
-5. The leftover is only for genuine remnants — microstates, dependencies, and territories that fit no region. Expect it to be SMALL. Give it a title and one-line scope.`;
+5. The leftover is only for genuine remnants — microstates, dependencies, and territories under about a million people that fit no region. Expect it to be SMALL. Before answering, re-check the country list for anything larger you forgot to place. Give the leftover a title and one-line scope.`;
 
     const groupCountRule = topical ? '2 to 4 groups.' : '4 to 7 groups, together covering the area comprehensively.';
 
