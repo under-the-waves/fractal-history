@@ -458,7 +458,10 @@ export default async function handler(req, res) {
 
             const leftoverCodes = cUniverse.filter(code => !claimed.has(code));
 
-            anchors = named.map((r, i) => ({
+            // Hard cap: a division may never exceed 5 children in total (see capCountryGroups).
+            const capped = capCountryGroups(named, leftoverCodes.length > 0 ? 4 : 5);
+
+            anchors = capped.map((r, i) => ({
                 title: r.title, scope: r.scope, position: i + 1,
                 region_codes: r.members, connectionStrength: r.connectionStrength
             }));
@@ -471,7 +474,7 @@ export default async function handler(req, res) {
                 });
             }
 
-            console.log(`Breadth C (country): ${named.length} group(s), leftover holds ${leftoverCodes.length} countr${leftoverCodes.length === 1 ? 'y' : 'ies'}`);
+            console.log(`Breadth C (country): ${capped.length} group(s), leftover holds ${leftoverCodes.length} countr${leftoverCodes.length === 1 ? 'y' : 'ies'}`);
 
             candidates = anchors.map(a => ({
                 title: a.title, scope: a.scope,
@@ -954,13 +957,15 @@ You decide which countries belong together for THIS topic — there is no fixed 
 2. List each region's members as country names or ISO codes.
 3. Give each region a short title (5 words max), a 2-3 sentence scope, and a connection strength from 1 to 10.
 4. You do NOT need to place every country. Name only those with a real connection; the program sweeps everyone else into a single leftover region. Optionally give that leftover a title and one-line scope.`
-        : `1. Partition the countries in scope into **4 to 7 named regions** that together cover the area comprehensively.
+        : `1. Partition the countries in scope into **3 to 4 named regions** that together cover the area comprehensively. Use a 5th named region ONLY if your regions then cover every listed country, leaving nothing for the leftover — a division may NEVER have more than 5 children in total (named regions plus leftover). Prefer fewer, broader regions: the tree divides again at every level, so depth is where detail belongs.
 2. Every country with a significant recorded history MUST be in a named region. Concretely: any country with more than one million people is NEVER a remnant and must be placed — including mid-size states you might be tempted to skip (e.g. Greece, the Baltic states, Cyprus). A populous country, or the heartland of a major civilisation (e.g. Mesopotamia, the Nile, the Ganges plain), must NEVER be left to the leftover.
 3. List each region's members as country names or ISO codes.
 4. Give each region a short title (5 words max), a 2-3 sentence scope, and a connection strength from 1 to 10 (here: the region's overall historical significance).
 5. The leftover is only for genuine remnants — microstates, dependencies, and territories under about a million people that fit no region. Expect it to be SMALL. Before answering, re-check the country list for anything larger you forgot to place. Give the leftover a title and one-line scope.`;
 
-    const groupCountRule = topical ? '2 to 4 groups.' : '4 to 7 groups, together covering the area comprehensively.';
+    const groupCountRule = topical
+        ? '2 to 4 groups.'
+        : '3 to 4 groups covering the area comprehensively (5 only when they cover every listed country and no leftover remains); never more than 5 children in total.';
 
     const exampleGroup = topical
         ? `{
@@ -1711,6 +1716,34 @@ function canonicaliseTemporalBoundaries(anchors) {
         const tb = a.timeBoundaries || {};
         return { ...a, timeBoundaries: { ...tb, start: canonicalDate(tb.start, 'start'), end: canonicalDate(tb.end, 'end') } };
     });
+}
+
+// Every division is capped at 5 children, matching the temporal cap below and the hand-seeded
+// level-1 sets. The country-grouping prompts ask for at most 4 named groups when a leftover will
+// exist; this is the hard backstop when the model overshoots: repeatedly merge the two smallest
+// named groups (by member count) so no membership is lost and no heartland gets demoted to the
+// leftover, keeping the merged group at the earlier group's position.
+export function capCountryGroups(named, maxNamed) {
+    if (!Array.isArray(named) || named.length <= maxNamed) return named;
+    console.warn(`Breadth C (country): model returned ${named.length} groups; merging down to ${maxNamed}.`);
+    const work = [...named];
+    while (work.length > maxNamed) {
+        let i1 = -1, i2 = -1;
+        for (let i = 0; i < work.length; i++) {
+            if (i1 === -1 || work[i].members.length < work[i1].members.length) { i2 = i1; i1 = i; }
+            else if (i2 === -1 || work[i].members.length < work[i2].members.length) { i2 = i; }
+        }
+        const [lo, hi] = i1 < i2 ? [i1, i2] : [i2, i1];
+        const a = work[lo], b = work[hi];
+        work[lo] = {
+            title: `${a.title} & ${b.title}`,
+            scope: `${a.scope || ''} ${b.scope || ''}`.trim(),
+            members: [...a.members, ...b.members],
+            connectionStrength: Math.max(a.connectionStrength || 0, b.connectionStrength || 0),
+        };
+        work.splice(hi, 1);
+    }
+    return work;
 }
 
 function capTemporalAnchors(anchors, max = 5) {
