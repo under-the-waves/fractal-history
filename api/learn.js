@@ -20,6 +20,7 @@ import { recordWriteMark } from '../lib/scoring.js';
 import { bankMastery, recordActivityDay, evaluateAchievements, levelSnapshot } from '../lib/achievements.js';
 import { getAncestorPath } from '../lib/db.js';
 import { resolvePageGeo } from '../lib/pageGeo.js';
+import { matchFactPlaces } from '../lib/factPlaces.js';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL);
@@ -78,6 +79,10 @@ async function handleGet(req, res) {
         getAncestorPath(anchorId)
     ]);
     const pageGeo = resolvePageGeo(ancestors);
+    // Places the fact base mentions take the atlas map's label slots (lib/factPlaces.js).
+    if (pageGeo && content?.factBase) {
+        pageGeo.places = matchFactPlaces(content.factBase, pageGeo.memberCodes);
+    }
 
     if (!content) return res.status(200).json({ success: true, exists: false, pageGeo });
     return res.status(200).json({ success: true, ...publicContent(content), pageGeo });

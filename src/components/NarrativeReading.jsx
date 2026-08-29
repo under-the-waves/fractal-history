@@ -689,7 +689,7 @@ function NarrativeReading() {
             <article className="narrative-content">
                 {anchor.pageGeo && (
                     <Suspense fallback={null}>
-                        <RegionAtlasMap memberCodes={anchor.pageGeo.memberCodes} title={anchor.pageGeo.title} />
+                        <RegionAtlasMap memberCodes={anchor.pageGeo.memberCodes} title={anchor.pageGeo.title} places={anchor.pageGeo.places} />
                     </Suspense>
                 )}
                 <NarrativeBody html={anchor.factCheckedNarrative || anchor.narrative} />

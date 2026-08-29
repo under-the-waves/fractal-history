@@ -114,7 +114,7 @@ function largestPolygon(feature, geoArea) {
 // so it's a separate component — see RegionMiniMap.jsx for the shared antimeridian-rotation trick
 // this reuses. Dynamically imported (world-atlas 50m + cities.json are both non-trivial), so this
 // should only ever be reached via React.lazy or an equivalent dynamic import.
-function RegionAtlasMap({ memberCodes, title, width = 640 }) {
+function RegionAtlasMap({ memberCodes, title, places, width = 640 }) {
     const [world, setWorld] = useState(null); // { features, geoNaturalEarth1, geoPath, geoCentroid }
     const [cities, setCities] = useState(null);
     const [failed, setFailed] = useState(false);
@@ -206,11 +206,25 @@ function RegionAtlasMap({ memberCodes, title, width = 640 }) {
         return true;
     };
 
-    // Cities ranked by population with a boost for capitals: major capitals lead, but a tiny
-    // capital (Dili) no longer outranks a giant non-capital (Shanghai).
-    const candidates = cities
-        .filter(c => memberCountryCodes.has(c.c))
-        .sort((a, b) => (b.p * (b.cap ? 4 : 1)) - (a.p * (a.cap ? 4 : 1)));
+    // Label slots go first to places the fact base actually mentions (content-derived, passed in
+    // by the page), then to generic picks whose quota scales with the map's scope: a
+    // single-country plate carries its major cities, a small group shows capitals only, and a
+    // continental plate shows none — generic city labels at that zoom are decoration that
+    // competes with the map's real job of showing which countries are in scope.
+    const factPlaces = (places || []).filter(p => memberCountryCodes.has(p.c));
+    const factPlaceKeys = new Set(factPlaces.map(p => `${p.n}|${p.c}`));
+    const genericQuota = memberCountryCodes.size === 1 ? MAX_CITIES
+        : memberCountryCodes.size <= 6 ? 6
+        : 0;
+    const generic = cities
+        .filter(c => memberCountryCodes.has(c.c)
+            && !factPlaceKeys.has(`${c.n}|${c.c}`)
+            && (memberCountryCodes.size === 1 || c.cap))
+        // Population-ranked with a boost for capitals: major capitals lead, but a tiny capital
+        // (Dili) does not outrank a giant non-capital (Shanghai).
+        .sort((a, b) => (b.p * (b.cap ? 4 : 1)) - (a.p * (a.cap ? 4 : 1)))
+        .slice(0, genericQuota);
+    const candidates = [...factPlaces, ...generic];
 
     const placedCities = [];
     for (const c of candidates) {

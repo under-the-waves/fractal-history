@@ -640,7 +640,7 @@ function GenerativeLearning() {
                 never inside the flashcard deck below, which is its own save-what-you-want screen. */}
             {pageGeo && stage !== 'flashcards' && (
                 <Suspense fallback={null}>
-                    <RegionAtlasMap memberCodes={pageGeo.memberCodes} title={pageGeo.title} />
+                    <RegionAtlasMap memberCodes={pageGeo.memberCodes} title={pageGeo.title} places={pageGeo.places} />
                 </Suspense>
             )}
 
