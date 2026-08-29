@@ -18,9 +18,19 @@ const MAX_HEIGHT = 420;
 const PADDING = 10;
 
 const MAX_CITIES = 10;
-// Minimum on-screen separation (px, straight-line) between two placed city labels — a simple
-// stand-in for real label collision detection, cheap enough to run per-candidate.
-const CITY_LABEL_MIN_DISTANCE = 26;
+
+// Approximate glyph widths (px per character) for the two label styles — SVG text can't be
+// measured before render, so collision boxes use these estimates. Slightly generous on purpose:
+// a few px of dead space beats two labels touching.
+const COUNTRY_LABEL_CHAR_W = 6.8;
+const COUNTRY_LABEL_FONT = 11;
+const CITY_LABEL_CHAR_W = 5.8;
+const CITY_LABEL_FONT = 10;
+const LABEL_PAD = 2;
+
+// Vertical offsets a country label may try, in order, when its centroid position collides with an
+// already-placed label. A country's name can sit anywhere inside its territory; a city's cannot.
+const COUNTRY_LABEL_NUDGES = [0, 16, -16, 30];
 
 // Below this projected area (px², from d3's geoPath.area) a member country's outline is too small
 // to carry a name label legibly, so the label is skipped rather than overlapping its neighbours.
@@ -45,10 +55,42 @@ function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
-// The largest ring of a (possibly multi-part) country, as its own single-Polygon feature, so a
-// scattered country (e.g. an archipelago) gets its label centred on its principal landmass rather
-// than on an empty-ocean average of every part.
-function largestPolygon(feature, path) {
+// Collision boxes: labels are rectangles (estimated from text length), not points — "Beijing"
+// reaches ~40px right of its dot, so a centre-distance test lets long labels overlap.
+function cityLabelBox(x, y, name, side = 'right') {
+    const textW = name.length * CITY_LABEL_CHAR_W;
+    switch (side) {
+        case 'left': return { x0: x - 5 - textW, x1: x + 3, y0: y - CITY_LABEL_FONT * 0.7, y1: y + CITY_LABEL_FONT * 0.6 };
+        case 'below': return { x0: x - textW / 2, x1: x + textW / 2, y0: y + 4, y1: y + 4 + CITY_LABEL_FONT * 1.2 };
+        case 'above': return { x0: x - textW / 2, x1: x + textW / 2, y0: y - 5 - CITY_LABEL_FONT * 1.2, y1: y - 5 };
+        default: return { x0: x - 3, x1: x + 5 + textW, y0: y - CITY_LABEL_FONT * 0.7, y1: y + CITY_LABEL_FONT * 0.6 };
+    }
+}
+
+// Text attributes for each city-label side, relative to the dot.
+const CITY_LABEL_SIDES = {
+    right: { dx: 5, dy: 3, anchor: 'start' },
+    left: { dx: -5, dy: 3, anchor: 'end' },
+    below: { dx: 0, dy: 13, anchor: 'middle' },
+    above: { dx: 0, dy: -8, anchor: 'middle' },
+};
+
+function countryLabelBox(x, y, name) {
+    const half = (name.length * COUNTRY_LABEL_CHAR_W) / 2;
+    return { x0: x - half, x1: x + half, y0: y - COUNTRY_LABEL_FONT * 0.8, y1: y + COUNTRY_LABEL_FONT * 0.4 };
+}
+
+function boxesOverlap(a, b) {
+    return a.x0 - LABEL_PAD < b.x1 && a.x1 + LABEL_PAD > b.x0 && a.y0 - LABEL_PAD < b.y1 && a.y1 + LABEL_PAD > b.y0;
+}
+
+// The largest ring of a (possibly multi-part) country, as its own single-Polygon feature. Used
+// both for label placement (an archipelago's label sits on its principal landmass, not an
+// empty-ocean average) and for framing (France's fit must be metropolitan France, not a bounding
+// box stretched to French Guiana and the Caribbean). Areas are measured on the sphere (geoArea),
+// so this works before the projection is fitted; a ring wound the wrong way would report the
+// complement of the sphere, hence the min() guard.
+function largestPolygon(feature, geoArea) {
     const geom = feature.geometry;
     if (!geom) return null;
     if (geom.type === 'Polygon') return feature;
@@ -57,7 +99,8 @@ function largestPolygon(feature, path) {
         let bestArea = -1;
         for (const coordinates of geom.coordinates) {
             const part = { type: 'Feature', geometry: { type: 'Polygon', coordinates } };
-            const area = Math.abs(path.area(part));
+            const raw = geoArea(part);
+            const area = Math.min(raw, 4 * Math.PI - raw);
             if (area > bestArea) { bestArea = area; best = part; }
         }
         return best;
@@ -96,7 +139,8 @@ function RegionAtlasMap({ memberCodes, title, width = 640 }) {
                     features: collection.features,
                     geoNaturalEarth1: d3geo.geoNaturalEarth1,
                     geoPath: d3geo.geoPath,
-                    geoCentroid: d3geo.geoCentroid
+                    geoCentroid: d3geo.geoCentroid,
+                    geoArea: d3geo.geoArea
                 });
                 setCities(citiesModule.default || citiesModule);
             } catch (err) {
@@ -127,7 +171,13 @@ function RegionAtlasMap({ memberCodes, title, width = 640 }) {
     const memberFeatures = world.features.filter(f => memberIds.has(normaliseId(f.id)));
     if (memberFeatures.length === 0) return null; // none of the members have geometry at this resolution
 
-    const fitCollection = { type: 'FeatureCollection', features: memberFeatures };
+    // Frame on each member's principal landmass only — every part is still DRAWN, but far-flung
+    // overseas territories must not stretch the fit (France otherwise pulls the frame across the
+    // Atlantic to French Guiana, shrinking Europe to a corner).
+    const mainlands = memberFeatures
+        .map(f => ({ f, part: largestPolygon(f, world.geoArea) }))
+        .filter(e => e.part);
+    const fitCollection = { type: 'FeatureCollection', features: mainlands.map(e => e.part) };
 
     const projection = world.geoNaturalEarth1();
     // Rotate so the region sits at the projection's centre BEFORE fitting — otherwise a region that
@@ -146,28 +196,21 @@ function RegionAtlasMap({ memberCodes, title, width = 640 }) {
     // context instead of the frame being cropped exactly to the member countries' edges.
     projection.scale(projection.scale() * ZOOM_OUT);
 
-    // Country labels: largest countries first, each skipped if it would sit on top of an
-    // already-placed label (small neighbours like the two Koreas otherwise collide).
-    const countryLabels = [];
-    const labelled = [...memberFeatures]
-        .map(f => ({ f, area: Math.abs(path.area(f)) }))
-        .filter(e => e.area >= LABEL_AREA_THRESHOLD)
-        .sort((a, b) => b.area - a.area);
-    for (const { f } of labelled) {
-        const part = largestPolygon(f, path);
-        if (!part) continue;
-        const centroid = path.centroid(part);
-        if (!centroid.every(Number.isFinite)) continue;
-        const [x, y] = centroid;
-        if (countryLabels.some(l => Math.hypot(l.x - x, l.y - y) < CITY_LABEL_MIN_DISTANCE)) continue;
-        countryLabels.push({ id: f.id, name: f.properties?.name || '', x, y });
-    }
+    // Label placement, rectangle-collision-checked throughout. Cities go first — a city label is
+    // pinned to its dot and cannot move, while a country name can sit anywhere in its territory,
+    // so country labels yield and nudge rather than crowding out Tokyo or Seoul.
+    const placedBoxes = [];
+    const placeIfFree = (box) => {
+        if (placedBoxes.some(b => boxesOverlap(b, box))) return false;
+        placedBoxes.push(box);
+        return true;
+    };
 
-    // Cities: candidates are any populated place whose country is a member, ranked capitals-first
-    // then by population, thinned to MAX_CITIES with a simple on-screen collision/viewport check.
+    // Cities ranked by population with a boost for capitals: major capitals lead, but a tiny
+    // capital (Dili) no longer outranks a giant non-capital (Shanghai).
     const candidates = cities
         .filter(c => memberCountryCodes.has(c.c))
-        .sort((a, b) => (b.cap - a.cap) || (b.p - a.p));
+        .sort((a, b) => (b.p * (b.cap ? 4 : 1)) - (a.p * (a.cap ? 4 : 1)));
 
     const placedCities = [];
     for (const c of candidates) {
@@ -176,10 +219,32 @@ function RegionAtlasMap({ memberCodes, title, width = 640 }) {
         if (!projected || !projected.every(Number.isFinite)) continue;
         const [x, y] = projected;
         if (x < 0 || x > width || y < 0 || y > fittedHeight) continue; // outside the viewport
-        const tooClose = placedCities.some(p => Math.hypot(p.x - x, p.y - y) < CITY_LABEL_MIN_DISTANCE)
-            || countryLabels.some(l => Math.hypot(l.x - x, l.y - y) < CITY_LABEL_MIN_DISTANCE);
-        if (tooClose) continue;
-        placedCities.push({ ...c, x, y });
+        // Try the label right of the dot, then left, below, above — Seoul's dot otherwise sits
+        // level with Beijing's and loses both horizontal positions.
+        const side = ['right', 'left', 'below', 'above'].find(s => placeIfFree(cityLabelBox(x, y, c.n, s)));
+        if (!side) continue;
+        placedCities.push({ ...c, x, y, side });
+    }
+
+    // Country labels: largest countries first, at the principal landmass's centroid, trying a few
+    // vertical nudges before giving up.
+    const countryLabels = [];
+    const labelled = mainlands
+        .map(e => ({ ...e, area: Math.abs(path.area(e.f)) }))
+        .filter(e => e.area >= LABEL_AREA_THRESHOLD)
+        .sort((a, b) => b.area - a.area);
+    for (const { f, part } of labelled) {
+        const centroid = path.centroid(part);
+        if (!centroid.every(Number.isFinite)) continue;
+        const name = f.properties?.name || '';
+        for (const dy of COUNTRY_LABEL_NUDGES) {
+            const [x, y] = [centroid[0], centroid[1] + dy];
+            if (y < COUNTRY_LABEL_FONT || y > fittedHeight - 4) continue;
+            if (placeIfFree(countryLabelBox(x, y, name))) {
+                countryLabels.push({ id: f.id, name, x, y });
+                break;
+            }
+        }
     }
 
     return (
@@ -220,8 +285,9 @@ function RegionAtlasMap({ memberCodes, title, width = 640 }) {
                     <g key={`city-${c.n}-${c.c}-${i}`}>
                         <circle cx={c.x} cy={c.y} r={c.cap ? 3 : 2.5} className="region-atlas-map-city-dot" />
                         <text
-                            x={c.x + 5}
-                            y={c.y + 3}
+                            x={c.x + CITY_LABEL_SIDES[c.side].dx}
+                            y={c.y + CITY_LABEL_SIDES[c.side].dy}
+                            textAnchor={CITY_LABEL_SIDES[c.side].anchor}
                             className="region-atlas-map-city-label"
                         >
                             {c.n}
