@@ -18,6 +18,7 @@ import { getLearnContent } from '../lib/learnContent.js';
 import { buildNarrativeGrounding, citeFromFactBase } from '../lib/narrativeGrounding.js';
 import { factCheckNarrative } from '../lib/factCheck.js';
 import { formatAncestorContext, renderAnalyticalFrame, renderParentSignpost, geographicCoordinate } from '../lib/promptLoader.js';
+import { resolvePageGeo } from '../lib/pageGeo.js';
 import { nearestAncestorOfBreadth } from '../shared/ancestry.js';
 
 // Load environment variables
@@ -317,7 +318,8 @@ async function handleGet(req, res) {
                     narrativeExists: false,
                     childAnchorsExist: childAnchors.length > 0,
                     childAnchorsCount: childAnchors.length,
-                    ancestors
+                    ancestors,
+                    pageGeo: resolvePageGeo(ancestors)
                 },
                 needsGeneration: true
             });
@@ -354,6 +356,7 @@ async function handleGet(req, res) {
                 estimatedReadTime: narrativeData.estimated_read_time || 5,
                 wordCount,
                 ancestors,
+                pageGeo: resolvePageGeo(ancestors),
                 childAnchors: childAnchors.map(c => ({ id: c.id, title: c.title })),
                 narrativeExists: true
             },

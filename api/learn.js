@@ -18,6 +18,8 @@ import { getLearnContent, generateLearnContent } from '../lib/learnContent.js';
 import { markNarrative } from '../lib/marking.js';
 import { recordWriteMark } from '../lib/scoring.js';
 import { bankMastery, recordActivityDay, evaluateAchievements, levelSnapshot } from '../lib/achievements.js';
+import { getAncestorPath } from '../lib/db.js';
+import { resolvePageGeo } from '../lib/pageGeo.js';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL);
@@ -67,9 +69,18 @@ async function handleGet(req, res) {
     const breadth = req.query.breadth || 'A';
     if (!anchorId) return res.status(400).json({ error: 'Anchor ID is required' });
 
-    const content = await getLearnContent(anchorId, breadth);
-    if (!content) return res.status(200).json({ success: true, exists: false });
-    return res.status(200).json({ success: true, ...publicContent(content) });
+    // ancestors is root-first and already includes anchorId as its last element (see
+    // lib/db.js:getAncestorPath), same shape the narrative reading page uses for its atlas map.
+    // Fetched regardless of whether study content has been generated yet, so the map can show on
+    // a learner's very first visit rather than only after generation completes.
+    const [content, ancestors] = await Promise.all([
+        getLearnContent(anchorId, breadth),
+        getAncestorPath(anchorId)
+    ]);
+    const pageGeo = resolvePageGeo(ancestors);
+
+    if (!content) return res.status(200).json({ success: true, exists: false, pageGeo });
+    return res.status(200).json({ success: true, ...publicContent(content), pageGeo });
 }
 
 async function handleGenerate(req, res) {

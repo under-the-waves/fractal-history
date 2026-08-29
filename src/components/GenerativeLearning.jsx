@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
 import { useToasts } from './AchievementToasts'
 import './generative.css'
+
+// The atlas map's TopoJSON/d3-geo/cities dependencies are heavy and only needed on pages with a
+// geographic scope, so it's lazy-loaded here (see RegionAtlasMap.jsx).
+const RegionAtlasMap = lazy(() => import('./RegionAtlasMap'))
 
 // The "learn" flow for an anchor. Write-first, with a COLD write before study (settled 2026-07-10, see
 // project knowledge/Cold_Write_Flow_Plan.md):
@@ -514,17 +518,20 @@ function GenerativeLearning() {
     const [hasStudied, setHasStudied] = useState(false)
     const [anchorInfo, setAnchorInfo] = useState(null)
     const [data, setData] = useState(null)       // study fact-cards for this anchor+breadth, from the DB
+    const [pageGeo, setPageGeo] = useState(null) // this page's geographic scope, for the atlas map
     const genRef = useRef(null)                  // in-flight background generation promise
 
     // Load the study fact-cards if they already exist for this anchor+breadth (cached in learn_content).
     useEffect(() => {
         let cancelled = false
         setData(null)
+        setPageGeo(null)
         fetch(`/api/learn?action=get&id=${id}&breadth=${breadth}`)
             .then(r => r.json())
             .then(d => {
                 if (cancelled || !d) return
                 if (d.exists) { setData(d); setAnchorInfo({ title: d.title, scope: d.scope }) }
+                if (d.pageGeo) setPageGeo(d.pageGeo)
             })
             .catch(() => { })
         return () => { cancelled = true }
@@ -628,6 +635,14 @@ function GenerativeLearning() {
     return (
         <div className="gl-page">
             <div className="gl-back-bar"><Link to="/" className="gl-back">← Back to the tree</Link></div>
+
+            {/* The atlas map sits at the top of the page content across every writing/study stage —
+                never inside the flashcard deck below, which is its own save-what-you-want screen. */}
+            {pageGeo && stage !== 'flashcards' && (
+                <Suspense fallback={null}>
+                    <RegionAtlasMap memberCodes={pageGeo.memberCodes} title={pageGeo.title} />
+                </Suspense>
+            )}
 
             {/* ---------- START ---------- */}
             {stage === 'start' && (

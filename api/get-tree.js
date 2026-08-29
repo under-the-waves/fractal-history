@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { expandToCountries, getName, getLevel, getArea } from '../lib/geography.js';
+import { getName, getLevel, getArea, resolveMemberCodes } from '../lib/geography.js';
 
 const sql = neon(process.env.DATABASE_URL);
 
@@ -25,7 +25,7 @@ function withMembers(rows) {
         // the region's significant members. Modern anchors keep their stored order — the
         // generation model already names significant countries first.
         const memberCodes = isLegacy
-            ? [...expandToCountries(codes)].sort((a, b) => getArea(b) - getArea(a))
+            ? resolveMemberCodes(codes).sort((a, b) => getArea(b) - getArea(a))
             : codes;
         return {
             ...row,

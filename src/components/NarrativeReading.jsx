@@ -1,10 +1,15 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
 import { citationsToFootnotes } from '../utils/citationsToFootnotes'
 import { getRandomFact } from '../data/historyFacts'
 import './scoredCards.css'
+
+// The atlas map's TopoJSON/d3-geo/cities dependencies are heavy and only needed on pages with a
+// geographic scope, so it's lazy-loaded here (see RegionAtlasMap.jsx and RegionMiniMap.jsx, which
+// this reuses techniques from).
+const RegionAtlasMap = lazy(() => import('./RegionAtlasMap'))
 
 // Loading stages for generation process
 const LOADING_STAGES = {
@@ -396,6 +401,7 @@ function NarrativeReading() {
                 id: checkData.anchor.id,
                 title: checkData.anchor.title,
                 scope: checkData.anchor.scope,
+                pageGeo: checkData.anchor.pageGeo,
                 breadth
             })
 
@@ -428,7 +434,9 @@ function NarrativeReading() {
             }
 
             setLoadingStage('complete')
-            setAnchor(generateData.anchor)
+            // The generate response's anchor carries no pageGeo; keep the one from the initial
+            // action=get check so the atlas map survives a first-visit generation.
+            setAnchor({ ...generateData.anchor, pageGeo: generateData.anchor.pageGeo ?? checkData.anchor.pageGeo })
             setLoading(false)
             setIsGenerating(false)
 
@@ -679,6 +687,11 @@ function NarrativeReading() {
 
             {/* Narrative area */}
             <article className="narrative-content">
+                {anchor.pageGeo && (
+                    <Suspense fallback={null}>
+                        <RegionAtlasMap memberCodes={anchor.pageGeo.memberCodes} title={anchor.pageGeo.title} />
+                    </Suspense>
+                )}
                 <NarrativeBody html={anchor.factCheckedNarrative || anchor.narrative} />
             </article>
 
