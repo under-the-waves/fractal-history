@@ -118,7 +118,7 @@ function MobileRegionMembers({ anchor, contextCodes }) {
     return (
         <div className="mobile-region-members">
             <Suspense fallback={<div className="region-mini-map-loading" style={{ width: '100%', maxWidth: 260, height: 150 }}>Loading map…</div>}>
-                <RegionMiniMap memberCodes={members.map(m => m.code)} contextCodes={contextCodes} width={260} height={150} />
+                <RegionMiniMap memberCodes={members.map(m => m.code)} contextCodes={contextCodes} width={260} />
             </Suspense>
             <div className="region-hover-card-heading">Countries in this region ({members.length})</div>
             {!expanded ? (
@@ -1115,7 +1115,7 @@ function TreeVisualization() {
             setHoverCard({
                 anchor,
                 contextCodes: getRegionContextCodes(anchor),
-                position: { x: rect.right + 10, y: rect.top }
+                anchorRect: { left: rect.left, right: rect.right, top: rect.top }
             });
         }, 150);
     };
@@ -1613,7 +1613,6 @@ function TreeVisualization() {
                                                     }}
                                                     style={{ cursor: 'pointer' }}
                                                 >
-                                                    <title>{breadthTileTooltip(breadth, pathXp, bOwn, isWritten)}</title>
                                                     <rect
                                                         x={tileX}
                                                         y={tileY}
@@ -1751,7 +1750,7 @@ function TreeVisualization() {
                     <RegionHoverCard
                         anchor={hoverCard.anchor}
                         contextCodes={hoverCard.contextCodes}
-                        position={hoverCard.position}
+                        anchorRect={hoverCard.anchorRect}
                         onClose={() => setHoverCard(null)}
                         onMouseEnter={cancelCloseHoverCard}
                         onMouseLeave={scheduleCloseHoverCard}

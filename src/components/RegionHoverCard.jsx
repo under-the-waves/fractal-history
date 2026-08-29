@@ -10,26 +10,29 @@ const PREVIEW_COUNT = 8;
 // region plus the list of member countries. The parent (TreeVisualization) owns the open/close
 // timing (hover delay to open, grace delay to close, Escape) and passes onMouseEnter/onMouseLeave
 // so the card can keep itself open while the pointer is over the card rather than the node.
-function RegionHoverCard({ anchor, contextCodes, position, onClose, onMouseEnter, onMouseLeave }) {
+function RegionHoverCard({ anchor, contextCodes, anchorRect, onClose, onMouseEnter, onMouseLeave }) {
     const cardRef = useRef(null);
     const [expanded, setExpanded] = useState(false);
     // Start hidden and reposition once we know the card's real size, so it never renders
     // off-screen for a frame before being clamped back into the viewport.
-    const [style, setStyle] = useState({ left: position.x, top: position.y, visibility: 'hidden' });
+    const [style, setStyle] = useState({ left: anchorRect.right + 10, top: anchorRect.top, visibility: 'hidden' });
 
     useLayoutEffect(() => {
         const el = cardRef.current;
         if (!el) return;
         const margin = 10;
+        const gap = 10;
         const rect = el.getBoundingClientRect();
-        let left = position.x;
-        let top = position.y;
-        if (left + rect.width > window.innerWidth - margin) left = window.innerWidth - rect.width - margin;
+        // Prefer the node's right side; if the card would spill past the viewport there, flip to
+        // its left side rather than sliding back over the node it belongs to.
+        let left = anchorRect.right + gap;
+        if (left + rect.width > window.innerWidth - margin) left = anchorRect.left - rect.width - gap;
         if (left < margin) left = margin;
+        let top = anchorRect.top;
         if (top + rect.height > window.innerHeight - margin) top = window.innerHeight - rect.height - margin;
         if (top < margin) top = margin;
         setStyle({ left, top, visibility: 'visible' });
-    }, [position.x, position.y, expanded]);
+    }, [anchorRect.left, anchorRect.right, anchorRect.top, expanded]);
 
     useEffect(() => {
         const onKeyDown = (e) => { if (e.key === 'Escape') onClose(); };

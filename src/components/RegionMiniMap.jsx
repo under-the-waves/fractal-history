@@ -20,7 +20,7 @@ function normaliseId(id) {
 // TopoJSON country outlines and d3-geo projection are heavy and rarely needed (most anchors
 // aren't geographic), so they're dynamically imported here rather than bundled up front — this
 // component should only ever be reached via React.lazy or an equivalent dynamic import.
-function RegionMiniMap({ memberCodes, contextCodes, width = 260, height = 150 }) {
+function RegionMiniMap({ memberCodes, contextCodes, width = 260 }) {
     const [world, setWorld] = useState(null); // { features, geoNaturalEarth1, geoPath }
     const [failed, setFailed] = useState(false);
 
@@ -43,7 +43,8 @@ function RegionMiniMap({ memberCodes, contextCodes, width = 260, height = 150 })
                 setWorld({
                     features: collection.features,
                     geoNaturalEarth1: d3geo.geoNaturalEarth1,
-                    geoPath: d3geo.geoPath
+                    geoPath: d3geo.geoPath,
+                    geoCentroid: d3geo.geoCentroid
                 });
             } catch (err) {
                 console.error('Failed to load region map data:', err);
@@ -55,7 +56,7 @@ function RegionMiniMap({ memberCodes, contextCodes, width = 260, height = 150 })
 
     if (hasSubdivision || failed) return null;
     if (!world) {
-        return <div className="region-mini-map-loading" style={{ width, height }}>Loading map…</div>;
+        return <div className="region-mini-map-loading" style={{ width, height: 150 }}>Loading map…</div>;
     }
 
     const toIds = (codes) => new Set(
@@ -78,11 +79,22 @@ function RegionMiniMap({ memberCodes, contextCodes, width = 260, height = 150 })
 
     const padding = 8;
     const projection = world.geoNaturalEarth1();
-    projection.fitExtent([[padding, padding], [width - padding, height - padding]], fitCollection);
+    // Rotate the projection so the region sits at its centre BEFORE fitting. Without this, a
+    // region crossing the antimeridian (Eurasia via Russia) has a bounding box spanning the whole
+    // globe, and the fit shrinks it to world width. Rotation moves the projection seam to the
+    // opposite side of the planet, making the region contiguous in projected space.
+    const [centroidLon] = world.geoCentroid(fitCollection);
+    if (Number.isFinite(centroidLon)) projection.rotate([-centroidLon, 0]);
+    // Fit to the card's width, then let the map's height follow the region's real aspect ratio
+    // (clamped) instead of letterboxing a wide region inside a fixed-height frame.
+    projection.fitWidth(width - 2 * padding, fitCollection);
+    const bounds = world.geoPath(projection).bounds(fitCollection);
+    const fittedHeight = Math.min(Math.max(bounds[1][1] - bounds[0][1] + 2 * padding, 100), 220);
+    projection.fitExtent([[padding, padding], [width - padding, fittedHeight - padding]], fitCollection);
     const path = world.geoPath(projection);
 
     return (
-        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="region-mini-map">
+        <svg width={width} height={fittedHeight} viewBox={`0 0 ${width} ${fittedHeight}`} className="region-mini-map">
             {world.features.map(f => {
                 const id = normaliseId(f.id);
                 const isMember = memberIds.has(id);
