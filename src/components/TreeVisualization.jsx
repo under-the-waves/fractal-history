@@ -137,8 +137,10 @@ function MobileRegionMembers({ anchor, contextCodes }) {
                     )}
                 </p>
             ) : (
+                /* The full list is for looking a country up, so it sorts alphabetically;
+                   the preview above keeps significant-first order. */
                 <p className="region-hover-card-full">
-                    {members.map(m => m.name).join(', ')}
+                    {[...members].sort((a, b) => a.name.localeCompare(b.name)).map(m => m.name).join(', ')}
                 </p>
             )}
         </div>

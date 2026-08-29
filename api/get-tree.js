@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { expandToCountries, getName, getLevel } from '../lib/geography.js';
+import { expandToCountries, getName, getLevel, getArea } from '../lib/geography.js';
 
 const sql = neon(process.env.DATABASE_URL);
 
@@ -20,7 +20,13 @@ function withMembers(rows) {
             const lvl = getLevel(c);
             return lvl === 'region' || lvl === 'subregion';
         });
-        const memberCodes = isLegacy ? [...expandToCountries(codes)] : codes;
+        // Legacy expansion comes back in taxonomy order (subregion by subregion), which is
+        // meaningless to a reader; sort it largest-country-first so the card's preview leads with
+        // the region's significant members. Modern anchors keep their stored order — the
+        // generation model already names significant countries first.
+        const memberCodes = isLegacy
+            ? [...expandToCountries(codes)].sort((a, b) => getArea(b) - getArea(a))
+            : codes;
         return {
             ...row,
             members: memberCodes.map(c => ({ code: c, name: getName(c) }))
