@@ -12,7 +12,8 @@ const sql = neon(process.env.DATABASE_URL);
 function withMembers(rows) {
     return rows.map(row => {
         const codes = row.region_codes;
-        if (row.breadth !== 'C' || !Array.isArray(codes) || codes.length === 0 || codes.includes('COSMIC')) {
+        if (row.breadth !== 'C' || !Array.isArray(codes) || codes.length === 0 ||
+            codes.some(c => c === 'COSMIC' || getLevel(c) === 'cosmic')) {
             return row;
         }
         const isLegacy = codes.some(c => {

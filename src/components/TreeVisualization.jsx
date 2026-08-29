@@ -105,6 +105,12 @@ function TileSignalLegend() {
 
 const MOBILE_MEMBERS_PREVIEW = 8;
 
+// The hand-seeded Cosmic & Planetary anchor is the one root-level geographic child with no Earth
+// geography to map (it covers the cosmos before the continents formed), so its hover card shows
+// this note instead of a map and member list.
+const COSMIC_GEO_ID = '1C-I6J1K';
+const COSMIC_GEO_NOTE = 'Covers the cosmos before Earth\'s continents formed — from the Big Bang to 66 million years ago. There is no Earth geography to map; drill in for the Milky Way, the Solar System, and the young Earth.';
+
 // Mobile equivalent of the desktop RegionHoverCard: the member country list plus a mini map,
 // shown inline in the expanded-anchor panel for a C-breadth (geographic) anchor. No hover
 // timing needed here — it just sits in the panel whenever the expanded anchor has members.
@@ -269,6 +275,27 @@ function TreeVisualization() {
         }
     };
 
+    // Hand-seeded C children (the root's continents) come from static data, which carries no
+    // membership. Hydrate their members from the API in the background so their hover cards work
+    // like every database-loaded region's. Updates existing treeData entries only.
+    const hydrateRegionMembers = (parentId, children) => {
+        if (!children.some(c => !c.members)) return;
+        fetchChildrenData(parentId, 'C').then(data => {
+            if (!data.success || !Array.isArray(data.anchors)) return;
+            setTreeData(prev => {
+                const next = { ...prev };
+                let changed = false;
+                data.anchors.forEach(a => {
+                    if (a.members && next[a.id] && !next[a.id].members) {
+                        next[a.id] = { ...next[a.id], members: a.members };
+                        changed = true;
+                    }
+                });
+                return changed ? next : prev;
+            });
+        });
+    };
+
     // Fetch generation metadata - returns data without setting state
     const fetchMetadataData = async (parentId, breadth) => {
         try {
@@ -302,6 +329,9 @@ function TreeVisualization() {
                 success: true,
                 anchors: localChildren.length > 0 ? localChildren : staticChildren
             };
+            if (breadth === 'C') {
+                hydrateRegionMembers(nodeId, localChildren.length > 0 ? localChildren : staticChildren);
+            }
             // Optionally fetch metadata in background (non-blocking for static data)
             try {
                 metadataData = await fetchMetadataData(nodeId, breadth);
@@ -636,6 +666,10 @@ function TreeVisualization() {
         };
 
         if (hasChildrenAtBreadth) {
+            if (breadth === 'C') {
+                const localC = getChildren(nodeId, 'C');
+                hydrateRegionMembers(nodeId, localC.length > 0 ? localC : getStaticChildren(nodeId, 'C'));
+            }
             setBreadthSelections(prev => ({ ...prev, [nodeId]: breadth }));
             const nodeIndexInPath = activePath.indexOf(nodeId);
             if (nodeIndexInPath !== -1) {
@@ -1500,13 +1534,14 @@ function TreeVisualization() {
                                 }}
                                 onMouseEnter={(e) => {
                                     // C-breadth (geographic) nodes get a hover card showing their member
-                                    // countries on a mini map; other breadths are unaffected.
-                                    if (node.anchor.breadth === 'C' && node.anchor.members?.length > 0) {
+                                    // countries on a mini map; the cosmic anchor gets a note card instead;
+                                    // other breadths are unaffected.
+                                    if (node.anchor.breadth === 'C' && (node.anchor.members?.length > 0 || node.anchor.id === COSMIC_GEO_ID)) {
                                         openHoverCard(node.anchor, e.currentTarget);
                                     }
                                 }}
                                 onMouseLeave={() => {
-                                    if (node.anchor.breadth === 'C' && node.anchor.members?.length > 0) {
+                                    if (node.anchor.breadth === 'C' && (node.anchor.members?.length > 0 || node.anchor.id === COSMIC_GEO_ID)) {
                                         scheduleCloseHoverCard();
                                     }
                                 }}
@@ -1751,6 +1786,7 @@ function TreeVisualization() {
                         anchor={hoverCard.anchor}
                         contextCodes={hoverCard.contextCodes}
                         anchorRect={hoverCard.anchorRect}
+                        note={hoverCard.anchor.id === COSMIC_GEO_ID ? COSMIC_GEO_NOTE : null}
                         onClose={() => setHoverCard(null)}
                         onMouseEnter={cancelCloseHoverCard}
                         onMouseLeave={scheduleCloseHoverCard}

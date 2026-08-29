@@ -10,7 +10,7 @@ const PREVIEW_COUNT = 8;
 // region plus the list of member countries. The parent (TreeVisualization) owns the open/close
 // timing (hover delay to open, grace delay to close, Escape) and passes onMouseEnter/onMouseLeave
 // so the card can keep itself open while the pointer is over the card rather than the node.
-function RegionHoverCard({ anchor, contextCodes, anchorRect, onClose, onMouseEnter, onMouseLeave }) {
+function RegionHoverCard({ anchor, contextCodes, anchorRect, note, onClose, onMouseEnter, onMouseLeave }) {
     const cardRef = useRef(null);
     const [expanded, setExpanded] = useState(false);
     // Start hidden and reposition once we know the card's real size, so it never renders
@@ -54,6 +54,12 @@ function RegionHoverCard({ anchor, contextCodes, anchorRect, onClose, onMouseEnt
         >
             <div className="region-hover-card-title">{anchor.title}</div>
 
+            {/* A note replaces the map and member list for regions with no Earth geography
+                (the Cosmic & Planetary anchor). */}
+            {note ? (
+                <p className="region-hover-card-note">{note}</p>
+            ) : (
+            <>
             <Suspense fallback={<div className="region-mini-map-loading" style={{ width: 260, height: 150 }}>Loading map…</div>}>
                 <RegionMiniMap memberCodes={members.map(m => m.code)} contextCodes={contextCodes} />
             </Suspense>
@@ -79,6 +85,8 @@ function RegionHoverCard({ anchor, contextCodes, anchorRect, onClose, onMouseEnt
                     </p>
                 )}
             </div>
+            </>
+            )}
         </div>
     );
 }

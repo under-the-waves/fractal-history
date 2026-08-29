@@ -4076,3 +4076,11 @@ button.orientation-axis-value:hover {
   gap: 8px;
   padding-top: 4px;
 }
+/* Note shown in the region hover card when a region has no Earth geography to map
+   (the Cosmic & Planetary anchor). */
+.region-hover-card-note {
+    margin: 8px 0 4px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #555;
+}
