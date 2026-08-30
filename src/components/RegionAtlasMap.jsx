@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import cca2ToCcn3 from '../data/cca2ToCcn3.json';
+import { formatTitleNumbers } from '../utils/formatTitleNumbers';
 
 // Breadth-C accent colour (matches getBreadthColor('C') in treeStructure.js and RegionMiniMap's
 // MEMBER_FILL) for the member-country fill.
@@ -315,7 +316,7 @@ function RegionAtlasMap({ memberCodes, title, places, width = 640 }) {
                     </g>
                 ))}
             </svg>
-            <p className="region-atlas-map-caption">Where: {title}</p>
+            <p className="region-atlas-map-caption">Where: {formatTitleNumbers(title)}</p>
         </div>
     );
 }

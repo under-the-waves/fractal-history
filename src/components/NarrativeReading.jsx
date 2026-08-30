@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { formatTitleNumbers } from '../utils/formatTitleNumbers'
 import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
 import { citationsToFootnotes } from '../utils/citationsToFootnotes'
@@ -543,7 +544,7 @@ function NarrativeReading() {
                     <div className="loading-content">
                         {anchor ? (
                             <>
-                                <h1 className="loading-title">{anchor.title}</h1>
+                                <h1 className="loading-title">{formatTitleNumbers(anchor.title)}</h1>
                                 <p className="loading-scope">{anchor.scope}</p>
                                 <p className="loading-breadth">
                                     {BREADTH_LABELS[breadth] || breadth} Narrative
@@ -641,18 +642,18 @@ function NarrativeReading() {
                                 to={`/tree?path=${path}`}
                                 className="breadcrumb-link"
                             >
-                                {ancestor.title}
+                                {formatTitleNumbers(ancestor.title)}
                             </Link>
                             <span className="breadcrumb-separator">→</span>
                         </span>
                     )
                 })}
-                <span className="breadcrumb-current">{anchor.title}</span>
+                <span className="breadcrumb-current">{formatTitleNumbers(anchor.title)}</span>
             </nav>
 
             {/* Title block */}
             <header className="narrative-header">
-                <h1 className="narrative-title">{anchor.title}</h1>
+                <h1 className="narrative-title">{formatTitleNumbers(anchor.title)}</h1>
                 <div className="narrative-meta">
                     <span className="read-time">{getReadTime()}</span>
                     <span className="breadth-indicator">
@@ -729,7 +730,7 @@ function NarrativeReading() {
                                 to={`/narrative/${child.id}?breadth=A`}
                                 className="child-anchor-link"
                             >
-                                {child.title}
+                                {formatTitleNumbers(child.title)}
                             </Link>
                         ))}
                     </div>

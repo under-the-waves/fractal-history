@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatTitleNumbers } from '../utils/formatTitleNumbers';
 
 function WhyTheseAnchors({ data, isOpen, onToggle }) {
     const [expandedRows, setExpandedRows] = useState({});
@@ -192,7 +193,7 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
                                     >
                                         <div className="why-scheme-header">
                                             <span className="why-scheme-rank">{index + 1}.</span>
-                                            <span className="why-scheme-name">{region.title}</span>
+                                            <span className="why-scheme-name">{formatTitleNumbers(region.title)}</span>
                                             {typeof region.connectionStrength === 'number' && region.connectionStrength > 0 && (
                                                 <span className="why-scheme-score">link {region.connectionStrength}/10</span>
                                             )}
@@ -230,7 +231,7 @@ function WhyTheseAnchors({ data, isOpen, onToggle }) {
                                     >
                                         <span className="why-col-rank">{index + 1}</span>
                                         <span className="why-col-title">
-                                            {candidate.title}
+                                            {formatTitleNumbers(candidate.title)}
                                             <span className="why-expand-icon">{expandedRows[index] ? '▲' : '▼'}</span>
                                         </span>
                                         <span className="why-col-score">{candidate.causalSignificance}</span>

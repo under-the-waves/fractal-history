@@ -1,4 +1,5 @@
 import { anchors } from '../data/anchors'
+import { formatTitleNumbers } from '../utils/formatTitleNumbers'
 
 function AnchorList({ onSelectAnchor, onBack }) {
     return (
@@ -21,7 +22,7 @@ function AnchorList({ onSelectAnchor, onBack }) {
                             {anchor.completed ? '✓' : '○'}
                         </span>
                         <div className="anchor-info">
-                            <h3>{index + 1} - {anchor.title.split(': ')[1] || anchor.title}</h3>
+                            <h3>{index + 1} - {formatTitleNumbers(anchor.title.split(': ')[1] || anchor.title)}</h3>
                             <span className="anchor-code">{anchor.id}</span>
                         </div>
                         <button

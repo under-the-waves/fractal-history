@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { bandForLevel } from '../../shared/levels';
+import { formatTitleNumbers } from '../utils/formatTitleNumbers';
 import AchievementBadge from './AchievementBadge';
 import './achievements.css';
 
@@ -46,7 +47,7 @@ function ToastCard({ toast, onClose }) {
                 <div className="achv-toast-body">
                     <div className="achv-toast-kicker">{isGlobal ? 'Rank up' : 'Topic level up'}</div>
                     <div className="achv-toast-title">
-                        {isGlobal ? `Level ${toast.level}${band ? ` · ${band}` : ''}` : `${toast.title} → Lv ${toast.level}`}
+                        {isGlobal ? `Level ${toast.level}${band ? ` · ${band}` : ''}` : `${formatTitleNumbers(toast.title)} → Lv ${toast.level}`}
                     </div>
                 </div>
                 <button className="achv-toast-close" onClick={onClose} aria-label="Dismiss">×</button>

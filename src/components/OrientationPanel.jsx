@@ -1,4 +1,5 @@
 import { orientationAxes } from '../../shared/ancestry.js';
+import { formatTitleNumbers } from '../utils/formatTitleNumbers';
 
 // "You Are Here" orientation panel. Decomposes the current tree position into the three
 // axes the tree is built on — Frame (analytical lens), When (temporal scope), Where
@@ -35,7 +36,7 @@ export default function OrientationPanel({ chain, currentId, onNavigate }) {
                                 <span className="orientation-axis-value is-empty" title={`No ${ax.hint} yet`}>—</span>
                             ) : isCurrent ? (
                                 <span className="orientation-axis-value is-current" title={`Current position (${ax.hint})`}>
-                                    {node.title}
+                                    {formatTitleNumbers(node.title)}
                                 </span>
                             ) : (
                                 <button
@@ -44,7 +45,7 @@ export default function OrientationPanel({ chain, currentId, onNavigate }) {
                                     onClick={() => onNavigate(node.id)}
                                     title={`Go to ${ax.hint} in the tree`}
                                 >
-                                    {node.title}
+                                    {formatTitleNumbers(node.title)}
                                 </button>
                             )}
                         </div>
