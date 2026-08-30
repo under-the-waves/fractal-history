@@ -420,7 +420,7 @@ function TreeVisualization() {
     // tiles, and a Learn action; the canvas is wide enough that up to 5 children still fit in a row.
     const rowHeight = 215;
     const nodeWidth = 230;
-    const nodeHeight = 155;
+    const nodeHeight = 175;
     const horizontalSpacing = 30;
     const containerWidth = 1300;
 
@@ -990,6 +990,19 @@ function TreeVisualization() {
     const svgWidth = 1300;
     const svgHeight = 60 + 8 * rowHeight;
 
+    // Insert thousand separators into 5+ digit numbers only, so "100000 BC" reads as
+    // "100,000 BC" while a year like 1453 stays unchanged (years never take separators).
+    const formatTitleNumbers = (s) => s.replace(/\d{5,}/g, n => Number(n).toLocaleString('en-GB'));
+
+    // Split a temporal-style title "First peoples to early states: 100000 BC – 550 BC" into its
+    // name and date range, so the node can lay them out on separate lines. Titles without a
+    // trailing date range come back with range null.
+    const splitTitleRange = (title) => {
+        const m = (title || '').match(/^(.*):\s*([^:]*\d[^:]*[–—-][^:]*)$/);
+        if (!m) return { name: title || '', range: null };
+        return { name: m[1], range: formatTitleNumbers(m[2].trim()) };
+    };
+
     const wrapText = (text, maxChars = 22) => {
         const words = text.split(' ');
         const lines = [];
@@ -1372,7 +1385,7 @@ function TreeVisualization() {
                             style={{ borderTopColor: accentColor }}
                         >
                             <h2 className="mobile-tree-title">
-                                {expandedAnchor.title}
+                                {formatTitleNumbers(expandedAnchor.title)}
                                 {renderScorePill(expandedAnchor.id)}
                             </h2>
                             {expandedAnchor.scope && (
@@ -1435,7 +1448,7 @@ function TreeVisualization() {
                                             ></span>
                                             <span className="mobile-child-body">
                                                 <span className="mobile-child-title">
-                                                    {child.anchor.title}
+                                                    {formatTitleNumbers(child.anchor.title)}
                                                     {renderScorePill(child.anchor.id)}
                                                 </span>
                                                 {child.anchor.scope && (
@@ -1557,9 +1570,11 @@ function TreeVisualization() {
                         const opacity = calculateOpacity(node);
                         const colors = calculateColor(node);
                         const hasChildren = getChildren(node.anchor.id, 'A').length > 0;
-                        // Cap the title at two lines inside the box (fuller title shows in the breadcrumb
-                        // and orientation panel); a longer title gets its second line truncated with an ellipsis.
-                        const rawLines = wrapText(node.anchor.title);
+                        // A temporal-style title splits into name + date range: the name gets up to two
+                        // wrapped lines (ellipsised beyond that; the full title shows in the breadcrumb
+                        // and orientation panel), and the range sits on its own smaller line below.
+                        const { name: titleName, range: titleRange } = splitTitleRange(node.anchor.title);
+                        const rawLines = wrapText(titleName);
                         const lines = rawLines.length <= 2
                             ? rawLines
                             : [rawLines[0], (rawLines.slice(1).join(' ')).slice(0, 20).trimEnd() + '…'];
@@ -1636,6 +1651,22 @@ function TreeVisualization() {
                                     ))}
                                 </text>
 
+                                {/* Date range on its own line beneath the name, directly under however
+                                    many name lines rendered. */}
+                                {titleRange && (
+                                    <text
+                                        x={nodeWidth / 2}
+                                        y={28 + lines.length * 17}
+                                        textAnchor="middle"
+                                        fill={colors.text}
+                                        fontSize="12"
+                                        fontWeight="500"
+                                        opacity="0.75"
+                                    >
+                                        {titleRange}
+                                    </text>
+                                )}
+
                                 {/* Cumulative score for the anchor (own + everything rolled up), on its own
                                     line under the title. Reads "current/best" in amber when it has decayed
                                     below the peak. The three pathway tiles below break this number down. */}
@@ -1650,7 +1681,7 @@ function TreeVisualization() {
                                     return (
                                         <text
                                             x={nodeWidth / 2}
-                                            y={64}
+                                            y={84}
                                             textAnchor="middle"
                                             fill={decayed ? '#e0a030' : greenOnDark}
                                             fontSize="14"
@@ -1679,7 +1710,7 @@ function TreeVisualization() {
                                             const pad = 12, gap = 8;
                                             const tileW = (nodeWidth - 2 * pad - 2 * gap) / 3;
                                             const tileX = pad + index * (tileW + gap);
-                                            const tileY = 74;
+                                            const tileY = 94;
                                             const tileH = 46;
                                             const onDark = colors.fill === '#555555';
                                             const pathXp = breadthScores[node.anchor.id]?.[breadth];
