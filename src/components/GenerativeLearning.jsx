@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { formatTitleNumbers } from '../utils/formatTitleNumbers'
 import { useAuth, SignInButton } from '@clerk/react'
 import { useClerkEnabled } from '../hooks/useClerkAuth'
 import { useToasts } from './AchievementToasts'
@@ -648,7 +649,7 @@ function GenerativeLearning() {
             {stage === 'start' && (
                 <div className="gl-start">
                     <p className="gl-eyebrow">Learn this topic</p>
-                    <h1 className="gl-title">{anchorInfo?.title || 'Loading…'}</h1>
+                    <h1 className="gl-title">{formatTitleNumbers(anchorInfo?.title || 'Loading…')}</h1>
                     <p className="gl-scope">{START_FRAMING[breadth] || START_FRAMING.A}</p>
 
                     <div className="gl-start-card">
@@ -684,7 +685,7 @@ function GenerativeLearning() {
             {stage === 'coldwrite' && (
                 <div className="gl-write">
                     <p className="gl-eyebrow">Step 1 · What you already know</p>
-                    <h1 className="gl-title">{anchorInfo?.title || 'This topic'}</h1>
+                    <h1 className="gl-title">{formatTitleNumbers(anchorInfo?.title || 'This topic')}</h1>
                     <p className="gl-instruction">
                         Before you study anything, write what you already know about this topic, in your own
                         words. Getting it partly wrong is fine — having a go first is what makes the facts
@@ -728,7 +729,7 @@ function GenerativeLearning() {
             {stage === 'study' && (
                 <div className="gl-study">
                     <p className="gl-eyebrow">Step 2 · Study</p>
-                    <h1 className="gl-title">{data?.title || anchorInfo?.title || 'This topic'}</h1>
+                    <h1 className="gl-title">{formatTitleNumbers(data?.title || anchorInfo?.title || 'This topic')}</h1>
                     {!data ? (
                         <div className="gl-marking">
                             <div className="gl-spinner" />
@@ -747,7 +748,7 @@ function GenerativeLearning() {
 
                             {data.prelude && (
                                 <section className="gl-subanchor gl-prelude">
-                                    <h2 className="gl-subanchor-title gl-prelude-title">{data.prelude.title}</h2>
+                                    <h2 className="gl-subanchor-title gl-prelude-title">{formatTitleNumbers(data.prelude.title)}</h2>
                                     {data.prelude.facts.map((f, j) => <FactCard key={j} fact={f} />)}
                                 </section>
                             )}
@@ -755,7 +756,7 @@ function GenerativeLearning() {
                             {data.subAnchors.map((sa, i) => (
                                 <section key={sa.title} className="gl-subanchor">
                                     <h2 className="gl-subanchor-title">
-                                        <span className="gl-subanchor-num">{i + 1}</span>{sa.title}
+                                        <span className="gl-subanchor-num">{i + 1}</span>{formatTitleNumbers(sa.title)}
                                     </h2>
                                     {sa.facts.map((f, j) => <FactCard key={j} fact={f} hideWhen={breadth === 'B'} />)}
                                 </section>
@@ -763,7 +764,7 @@ function GenerativeLearning() {
 
                             {data.postlude && (
                                 <section className="gl-subanchor gl-postlude">
-                                    <h2 className="gl-subanchor-title gl-postlude-title">{data.postlude.title}</h2>
+                                    <h2 className="gl-subanchor-title gl-postlude-title">{formatTitleNumbers(data.postlude.title)}</h2>
                                     {data.postlude.facts.map((f, j) => <FactCard key={j} fact={f} />)}
                                 </section>
                             )}
@@ -796,7 +797,7 @@ function GenerativeLearning() {
             {stage === 'write' && (
                 <div className="gl-write">
                     <p className="gl-eyebrow">Step 3 · Write it again</p>
-                    <h1 className="gl-title">{data?.title || anchorInfo?.title || 'This topic'}</h1>
+                    <h1 className="gl-title">{formatTitleNumbers(data?.title || anchorInfo?.title || 'This topic')}</h1>
                     <p className="gl-instruction">
                         Now write the history in your own words, from memory. You get full marks if you say
                         something true about each part of the story, connect them so they hang together, and get
@@ -852,7 +853,7 @@ function GenerativeLearning() {
             {stage === 'result' && result && (
                 <div className="gl-result-wrap">
                     <p className="gl-eyebrow">Your mark</p>
-                    <h1 className="gl-title">{data?.title || anchorInfo?.title || 'This topic'}</h1>
+                    <h1 className="gl-title">{formatTitleNumbers(data?.title || anchorInfo?.title || 'This topic')}</h1>
                     <MarkReport
                         result={result}
                         hasStudied={hasStudied}
@@ -869,7 +870,7 @@ function GenerativeLearning() {
             {stage === 'flashcards' && (
                 <div className="gl-flashcards-stage">
                     <p className="gl-eyebrow">Step 4 · Keep it</p>
-                    <h1 className="gl-title">{data?.title || anchorInfo?.title || 'This topic'}</h1>
+                    <h1 className="gl-title">{formatTitleNumbers(data?.title || anchorInfo?.title || 'This topic')}</h1>
                     <p className="gl-instruction">
                         Save the facts you want to keep. They go into your spaced-repetition deck and come
                         back over the next few days, which is what makes them stick.

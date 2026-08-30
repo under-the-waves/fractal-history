@@ -13,6 +13,7 @@ import OrientationPanel from './OrientationPanel';
 import RegionHoverCard from './RegionHoverCard';
 import { useToasts } from './AchievementToasts';
 import { getRandomFact } from '../data/historyFacts';
+import { formatTitleNumbers } from '../utils/formatTitleNumbers';
 import { levelForScore, levelInfo } from '../../shared/levels';
 
 // The TopoJSON/d3-geo map bundle is heavy and only needed on C-breadth (geographic) anchors, so
@@ -990,10 +991,6 @@ function TreeVisualization() {
     const svgWidth = 1300;
     const svgHeight = 60 + 8 * rowHeight;
 
-    // Insert thousand separators into 5+ digit numbers only, so "100000 BC" reads as
-    // "100,000 BC" while a year like 1453 stays unchanged (years never take separators).
-    const formatTitleNumbers = (s) => s.replace(/\d{5,}/g, n => Number(n).toLocaleString('en-GB'));
-
     // Split a temporal-style title "First peoples to early states: 100000 BC – 550 BC" into its
     // name and date range, so the node can lay them out on separate lines. Titles without a
     // trailing date range come back with range null.
@@ -1364,7 +1361,7 @@ function TreeVisualization() {
                                         className="mobile-breadcrumb-btn"
                                         onClick={() => navigateToAncestor(ancestor.id)}
                                     >
-                                        {ancestor.anchor.title}
+                                        {formatTitleNumbers(ancestor.anchor.title)}
                                     </button>
                                 </span>
                             ))}

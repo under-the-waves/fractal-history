@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, Suspense, lazy } from 'react';
+import { formatTitleNumbers } from '../utils/formatTitleNumbers';
 
 // The map itself carries the heavy TopoJSON/d3-geo dependencies, so it's lazy-loaded here
 // rather than imported directly (see RegionMiniMap.jsx for why).
@@ -52,7 +53,7 @@ function RegionHoverCard({ anchor, contextCodes, anchorRect, note, onClose, onMo
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
         >
-            <div className="region-hover-card-title">{anchor.title}</div>
+            <div className="region-hover-card-title">{formatTitleNumbers(anchor.title)}</div>
 
             {/* A note replaces the map and member list for regions with no Earth geography
                 (the Cosmic & Planetary anchor). */}
