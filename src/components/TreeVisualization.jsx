@@ -1123,6 +1123,29 @@ function TreeVisualization() {
 
     const visibleNodes = getVisibleNodes();
 
+    // When viewing the TEMPORAL pathway of a geographic region below continent level, the
+    // region's timeline starts at first human presence — the land's deep past is owned once by
+    // its continent (see geographicTemporalDomain in api/generate-anchors.js). This returns the
+    // continent anchor to point at, or null when the pointer doesn't apply: not a sub-continental
+    // geographic anchor, not viewing B, an analytical/temporal ancestor intervenes (the timeline
+    // isn't the region's full history then), or the cosmic branch (no human era at all).
+    const getDeepPastContinent = (anchorId2) => {
+        const cur = treeData[anchorId2];
+        if (!cur || cur.breadth !== 'C' || cur.level === 1) return null;
+        if ((breadthSelections[anchorId2] || 'A') !== 'B') return null;
+        let node = cur;
+        while (node && node.parentId) {
+            const parent = treeData[node.parentId];
+            if (!parent) return null;
+            if (parent.level === 1 && parent.breadth === 'C') {
+                return parent.id === COSMIC_GEO_ID ? null : parent;
+            }
+            if (parent.breadth !== 'C') return null;
+            node = parent;
+        }
+        return null;
+    };
+
     // Union of member country/subdivision codes across every C-breadth sibling of `anchor`
     // (including itself) — the "context" a region's mini map is framed against, e.g. all of
     // Eurasia's children when hovering one of them, not the whole world.
@@ -1163,6 +1186,28 @@ function TreeVisualization() {
         hoverCloseTimerRef.current = setTimeout(() => setHoverCard(null), 200);
     };
     const cancelCloseHoverCard = () => clearTimeout(hoverCloseTimerRef.current);
+
+    // The clickable pointer that accounts for the deep past on a sub-continental region's
+    // timeline view. Rendered in both the desktop and mobile layouts.
+    const renderDeepPastBanner = (anchorId2) => {
+        const continent = getDeepPastContinent(anchorId2);
+        if (!continent) return null;
+        return (
+            <div className="deep-past-banner">
+                <span className="deep-past-banner-text">
+                    This region&rsquo;s timeline starts with its first peoples. The land&rsquo;s deep past
+                    (66 million years ago onwards) is told once, under {continent.title.split(' (')[0]}.
+                </span>
+                <button
+                    type="button"
+                    className="deep-past-banner-link"
+                    onClick={() => handleBreadthSelect(continent, 'B')}
+                >
+                    View the deep past →
+                </button>
+            </div>
+        );
+    };
 
     // Mobile XP pill: shows the node's mastery score, and "current/best" in amber when it has decayed
     // below the all-time peak (the desktop tree uses the SVG MasteryBadge for the same thing).
@@ -1339,6 +1384,7 @@ function TreeVisualization() {
                                     contextCodes={getRegionContextCodes(expandedAnchor)}
                                 />
                             )}
+                            {renderDeepPastBanner(expandedAnchor.id)}
 
                             {showStart ? (
                                 <button
@@ -1486,6 +1532,8 @@ function TreeVisualization() {
                     onNavigate={navigateToAncestor}
                 />
             )}
+
+            {activePath.length > 0 && renderDeepPastBanner(activePath[activePath.length - 1])}
 
             <div
                 className="tree-container"

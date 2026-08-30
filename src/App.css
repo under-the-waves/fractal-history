@@ -4152,3 +4152,33 @@ button.orientation-axis-value:hover {
     line-height: 1.45;
     color: #555;
 }
+
+/* Pointer shown on a sub-continental region's temporal pathway: the region's timeline starts
+   with its first peoples, and the land's deep past is told once at the continent level. */
+.deep-past-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 8px auto;
+    max-width: 720px;
+    padding: 8px 14px;
+    background: #f4f5f7;
+    border: 1px dashed #c7cbcf;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #555;
+}
+.deep-past-banner-link {
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    color: #2980b9;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 6px;
+}
+.deep-past-banner-link:hover {
+    text-decoration: underline;
+}
