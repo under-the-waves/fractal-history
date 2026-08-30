@@ -1047,8 +1047,11 @@ const COSMIC_ROOT_ID = '1C-I6J1K';
 // Given a root-first ancestor path, return the temporal domain that bounds temporal (B) division of a
 // geographic place, or null when the division is not inside the geographic axis (no level-1 C
 // ancestor). The Cosmic & Planetary branch runs from the Big Bang to the threshold; every modern
-// continent runs from the threshold to the present. Applied only when there is no nearer temporal (B)
-// ancestor already bounding the window.
+// CONTINENT runs from the threshold to the present — deep time is owned once per continent branch.
+// Geographic anchors BELOW continent level begin instead at the region's first human presence: a
+// history of Iran opens with prehistoric Iran, not the Tethys Sea, and the land's deeper past stays
+// reachable via the continent's deep-time period (time-first path). Applied only when there is no
+// nearer temporal (B) ancestor already bounding the window.
 function geographicTemporalDomain(ancestorPath) {
     if (!Array.isArray(ancestorPath)) return null;
     const rootGeo = ancestorPath.find(a => a && a.level === 1 && a.breadth === 'C');
@@ -1060,10 +1063,20 @@ function geographicTemporalDomain(ancestorPath) {
             rule: `This runs from the Big Bang to ${GEO_THRESHOLD_LABEL}. Your LATEST period MUST end at ${GEO_THRESHOLD_LABEL} — the Cretaceous–Paleogene boundary, when the dinosaurs died and the modern continents begin their separate histories. It does NOT extend into human history.`,
         };
     }
+    // Dividing the continent itself: its timeline owns the full Cenozoic.
+    const dividing = ancestorPath[ancestorPath.length - 1];
+    if (dividing && dividing.id === rootGeo.id) {
+        return {
+            start: GEO_THRESHOLD_LABEL,
+            end: 'the present',
+            rule: `This place's history runs from ${GEO_THRESHOLD_LABEL} to the present. Your EARLIEST period MUST begin at ${GEO_THRESHOLD_LABEL} — the land's Cenozoic natural history and the evolution of its animals and plants — never at the start of recorded civilisation. Human history is the most recent part of this span, not the whole of it.`,
+        };
+    }
+    // A region within a continent: its own timeline is the human history of the place.
     return {
-        start: GEO_THRESHOLD_LABEL,
+        start: 'the first human presence in this region',
         end: 'the present',
-        rule: `This place's history runs from ${GEO_THRESHOLD_LABEL} to the present. Your EARLIEST period MUST begin at ${GEO_THRESHOLD_LABEL} — the land's Cenozoic natural history and the evolution of its animals and plants — never at the start of recorded civilisation. Human history is the most recent part of this span, not the whole of it.`,
+        rule: 'This region\'s timeline begins at the FIRST widely accepted human presence in the region and runs to the present. State that starting date explicitly in your earliest period\'s title (e.g. "First peoples: ~450,000 – 3200 BCE"). Do NOT begin at 66 million years ago or with geology: the land\'s deeper natural history is covered once at the continent level, not repeated here. Cover the full human span — the earliest period includes pre-agricultural peoples, not just recorded civilisation.',
     };
 }
 
