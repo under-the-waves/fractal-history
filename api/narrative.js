@@ -18,6 +18,8 @@ import { getLearnContent } from '../lib/learnContent.js';
 import { buildNarrativeGrounding, citeFromFactBase } from '../lib/narrativeGrounding.js';
 import { factCheckNarrative } from '../lib/factCheck.js';
 import { formatAncestorContext, renderAnalyticalFrame, renderParentSignpost, geographicCoordinate } from '../lib/promptLoader.js';
+import { resolvePageGeo } from '../lib/pageGeo.js';
+import { matchFactPlaces } from '../lib/factPlaces.js';
 import { nearestAncestorOfBreadth } from '../shared/ancestry.js';
 
 // Load environment variables
@@ -317,13 +319,24 @@ async function handleGet(req, res) {
                     narrativeExists: false,
                     childAnchorsExist: childAnchors.length > 0,
                     childAnchorsCount: childAnchors.length,
-                    ancestors
+                    ancestors,
+                    pageGeo: resolvePageGeo(ancestors)
                 },
                 needsGeneration: true
             });
         }
 
         const narrativeData = narrativeResult[0];
+
+        // Places the fact base mentions, for the atlas map's label slots. Code matching against
+        // the bundled city dataset — no model call (see lib/factPlaces.js).
+        const pageGeo = resolvePageGeo(ancestors);
+        if (pageGeo) {
+            const learnContent = await getLearnContent(id, breadth);
+            if (learnContent?.factBase) {
+                pageGeo.places = matchFactPlaces(learnContent.factBase, pageGeo.memberCodes);
+            }
+        }
 
         // Calculate word count from narrative HTML
         const textContent = narrativeData.narrative.replace(/<[^>]*>/g, ' ');
@@ -354,6 +367,7 @@ async function handleGet(req, res) {
                 estimatedReadTime: narrativeData.estimated_read_time || 5,
                 wordCount,
                 ancestors,
+                pageGeo,
                 childAnchors: childAnchors.map(c => ({ id: c.id, title: c.title })),
                 narrativeExists: true
             },

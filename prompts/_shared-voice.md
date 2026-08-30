@@ -15,6 +15,7 @@
 - *Selectivity beats coverage.* You need not mention everything that happened. A few things explained clearly beats many listed and none explained. When you must choose, drop the extra name and keep the explanation.
 - *Say where a person is from.* The first time you name a person, give where they were from or worked ("the Polish astronomer Copernicus", "Ibn al-Haytham, an Arab scholar working in Cairo"). Use where-from, not an anachronistic modern nationality for someone who predates the modern nation.
 - *Credit every society, erase none.* When you describe where a development came from, do not portray a field or region as static or "unchanged" if other cultures were advancing it — Greek science was extended for centuries by Islamic, Chinese, and Indian scholars before 1500. State who contributed what, and never quietly credit one region for the work of many.
+- *Anchor place names to where they are today.* The first time you name a historical place, tie it to its modern location — "Constantinople (modern-day Istanbul)", "Gaul (roughly modern France)". For a region or empire, name the modern countries it covers.
 
 **Economy means cutting padding, not context**: "Every sentence earns its place" means deleting filler and restatement; it never means compressing two ideas into one sentence or dropping the identifying phrase a newcomer needs to follow you. When clarity and propulsion conflict, clarity wins.
 
