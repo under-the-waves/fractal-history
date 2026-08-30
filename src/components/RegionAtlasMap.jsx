@@ -8,10 +8,12 @@ const MEMBER_STROKE = '#a85d16';
 const CONTEXT_FILL = '#e4e6e8';
 const CONTEXT_STROKE = '#c7cbcf';
 
-// After fitting the projection tightly to the member countries, scale down by this factor (around
-// the same centre) so neighbouring, non-member countries remain visible as context — this is an
-// atlas plate, not a silhouette cut-out.
-const ZOOM_OUT = 0.8;
+// Fraction of the frame kept as breathing room around the member countries, so neighbouring,
+// non-member countries remain visible as context — this is an atlas plate, not a silhouette
+// cut-out. Applied by insetting the fit extent, which keeps the region centred; scaling the
+// projection after fitting does NOT (the scale pivots on the projection's origin, which sits at
+// the equator and shifted Europe clean off its frame).
+const CONTEXT_MARGIN = 0.07;
 
 const MIN_HEIGHT = 160;
 const MAX_HEIGHT = 420;
@@ -191,10 +193,14 @@ function RegionAtlasMap({ memberCodes, title, places, width = 640 }) {
     const path = world.geoPath(projection);
     const bounds = path.bounds(fitCollection);
     const fittedHeight = clamp(bounds[1][1] - bounds[0][1] + 2 * PADDING, MIN_HEIGHT, MAX_HEIGHT);
-    projection.fitExtent([[PADDING, PADDING], [width - PADDING, fittedHeight - PADDING]], fitCollection);
-    // ...then zoom back out slightly around that same centre so neighbouring countries show up as
-    // context instead of the frame being cropped exactly to the member countries' edges.
-    projection.scale(projection.scale() * ZOOM_OUT);
+    // ...then fit into an extent inset by the context margin, so neighbouring countries show as
+    // a band of context around the members and the region stays centred.
+    const mx = width * CONTEXT_MARGIN;
+    const my = fittedHeight * CONTEXT_MARGIN;
+    projection.fitExtent(
+        [[PADDING + mx, PADDING + my], [width - PADDING - mx, fittedHeight - PADDING - my]],
+        fitCollection
+    );
 
     // Label placement, rectangle-collision-checked throughout. Cities go first — a city label is
     // pinned to its dot and cannot move, while a country name can sit anywhere in its territory,

@@ -332,7 +332,7 @@ async function handleGet(req, res) {
         // the bundled city dataset — no model call (see lib/factPlaces.js).
         const pageGeo = resolvePageGeo(ancestors);
         if (pageGeo) {
-            const learnContent = await getLearnContent(anchorId, breadth);
+            const learnContent = await getLearnContent(id, breadth);
             if (learnContent?.factBase) {
                 pageGeo.places = matchFactPlaces(learnContent.factBase, pageGeo.memberCodes);
             }
